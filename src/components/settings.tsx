@@ -5,7 +5,6 @@ import {
   Eye,
   Leaf,
   Monitor,
-  Moon,
   RefreshCw,
   Settings2,
   Tv,
@@ -21,7 +20,6 @@ interface Props {
   onUpdate: (patch: Partial<Preferences>) => void;
   onClose: () => void;
   onRefresh: () => void;
-  onAmbient: () => void;
   onTVSettings: () => void;
   onManage: () => void;
 }
@@ -31,23 +29,17 @@ export function Settings({
   onUpdate,
   onClose,
   onRefresh,
-  onAmbient,
   onTVSettings,
   onManage,
 }: Props) {
   return (
-    <Dialog
-      title="Feels like home."
-      subtitle="A few small things. Just the way you like them."
-      onClose={onClose}
-      wide
-    >
+    <Dialog title="Settings" onClose={onClose} wide>
       <div className="settings-content">
         <WeatherSettings
           location={preferences.weatherLocation}
           onChange={(weatherLocation) => onUpdate({ weatherLocation })}
         />
-        <h3 className="settings-section-title">Your backdrop</h3>
+        <h3 className="settings-section-title">Backdrop</h3>
         <div className="wallpaper-options">
           {wallpapers.map((wallpaper) => (
             <button
@@ -68,7 +60,6 @@ export function Settings({
                 ) : null}
               </span>
               <span>{wallpaper.title}</span>
-              <small>{wallpaper.detail}</small>
             </button>
           ))}
         </div>
@@ -98,7 +89,7 @@ export function Settings({
           >
             <Leaf />
             <span>
-              <strong>Gentler motion</strong>
+              <strong>Reduced motion</strong>
               <small>Keep things still and simple.</small>
             </span>
             <span className={`toggle${preferences.reducedMotion ? ' on' : ''}`}>
@@ -115,14 +106,6 @@ export function Settings({
           </button>
         </div>
         <div className="settings-group">
-          <button className="setting-row" data-focusable="setting-ambient" onClick={onAmbient}>
-            <Moon />
-            <span>
-              <strong>A moment of quiet</strong>
-              <small>Just your backdrop and the time.</small>
-            </span>
-            <ChevronRight />
-          </button>
           <button className="setting-row" data-focusable="setting-refresh" onClick={onRefresh}>
             <RefreshCw />
             <span>

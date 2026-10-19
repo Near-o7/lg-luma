@@ -705,10 +705,6 @@ export function App() {
                 void refresh();
                 notify('Refreshing your apps and inputs…');
               }}
-              onAmbient={() => {
-                setSettingsOpen(false);
-                setAmbient(true);
-              }}
               onTVSettings={() => {
                 setSettingsOpen(false);
                 void onLaunch({

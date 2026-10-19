@@ -145,7 +145,7 @@ pnpm exec playwright install chromium
 pnpm test:browser
 ```
 
-`pnpm check` runs Oxlint and TypeScript. Run `pnpm lint:fix` to apply automatic lint fixes. Oxlint checks TypeScript, React, hooks, and accessibility rules; generated output is excluded.
+`pnpm check` runs Oxlint and TypeScript. Run `pnpm lint:fix` to apply automatic lint fixes. Oxlint checks TypeScript, React, hooks, and accessibility rules; generated output is excluded. Formatting uses Oxfmt: `pnpm format` writes formatting changes and `pnpm format:check` verifies them.
 
 Browser checks cover packaged `file://` loading, remote navigation, hold-OK options, favorites, settings, search, persistence, focus restoration, weather configuration and caching, and TV-service failure behavior with a mock bridge. Weather APIs are mocked in browser tests; no tests connect to a TV. Run `pnpm build` first if the packaged app is missing.
 

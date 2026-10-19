@@ -5,7 +5,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 function members(bytes) {
   if (bytes.subarray(0, 8).toString() !== '!<arch>\n') throw new Error('Not an IPK/ar archive.');
   const result = [];
-  for (let offset = 8; offset + 60 <= bytes.length; ) {
+  for (let offset = 8; offset + 60 <= bytes.length;) {
     const header = Buffer.from(bytes.subarray(offset, offset + 60));
     const size = Number(header.subarray(48, 58).toString().trim());
     if (!Number.isSafeInteger(size) || size < 0 || offset + 60 + size > bytes.length)
@@ -22,7 +22,7 @@ function members(bytes) {
 
 function entries(tar) {
   const result = [];
-  for (let offset = 0; offset + 512 <= tar.length; ) {
+  for (let offset = 0; offset + 512 <= tar.length;) {
     const header = tar.subarray(offset, offset + 512);
     if (header.every((byte) => byte === 0)) break;
     const text = (start, length) =>

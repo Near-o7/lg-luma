@@ -63,7 +63,7 @@ test('settings trap focus, change bundled backgrounds and preserve preferences',
   await expect(page.getByRole('button', { name: 'TV settings', exact: false })).toBeFocused();
   await page.getByRole('button', { name: 'Higher ground', exact: false }).click();
   await page.getByRole('switch', { name: '24-hour clock', exact: false }).click();
-  await page.getByRole('switch', { name: 'Gentler motion', exact: false }).click();
+  await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();
   await page.screenshot({ path: info.outputPath('luma-settings.png') });
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -115,7 +115,11 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
   expect(errors).toEqual([]);
 });
 
-async function installMockTV(page: Page, denied: boolean, apps = [{ id: 'com.example.real', title: 'A real TV app', visible: true }]) {
+async function installMockTV(
+  page: Page,
+  denied: boolean,
+  apps = [{ id: 'com.example.real', title: 'A real TV app', visible: true }],
+) {
   const manifest = JSON.parse(readFileSync(path.resolve('appinfo.json'), 'utf8'));
   await page.addInitScript(
     ({ denied, requiredACG, apps }) => {
@@ -228,7 +232,9 @@ test('ambient mode wakes without launching an app and restores remote focus', as
   await expect(page.getByRole('status')).toHaveCount(0);
 });
 
-test('card focus stays the same size and navigation outlines have room beside the selected pill', async ({ page }) => {
+test('card focus stays the same size and navigation outlines have room beside the selected pill', async ({
+  page,
+}) => {
   await page.goto('/');
   const netflix = page.getByRole('button', { name: 'Open Netflix', exact: true });
   await expect(netflix).toBeFocused();
@@ -237,7 +243,9 @@ test('card focus stays the same size and navigation outlines have room beside th
   const next = await netflix.locator('.app-face').boundingBox();
   expect(next!.width).toBe(initial!.width);
   expect(next!.height).toBe(initial!.height);
-  expect(await netflix.locator('.app-face').evaluate((element) => getComputedStyle(element).transform)).toBe('none');
+  expect(
+    await netflix.locator('.app-face').evaluate((element) => getComputedStyle(element).transform),
+  ).toBe('none');
   await page.getByRole('button', { name: 'Home', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('button', { name: 'Apps', exact: true })).toBeFocused();
@@ -245,20 +253,37 @@ test('card focus stays the same size and navigation outlines have room beside th
     const selected = document.querySelector<HTMLElement>('.nav-item.active')!;
     const focused = document.activeElement as HTMLElement;
     const styles = getComputedStyle(focused);
-    return { available: focused.getBoundingClientRect().left - selected.getBoundingClientRect().right, required: parseFloat(styles.outlineWidth) + parseFloat(styles.outlineOffset) };
+    return {
+      available: focused.getBoundingClientRect().left - selected.getBoundingClientRect().right,
+      required: parseFloat(styles.outlineWidth) + parseFloat(styles.outlineOffset),
+    };
   });
   expect(gap.available).toBeGreaterThan(gap.required);
 });
 
-test('compact library filters can reset, long names wrap, and inputs stay compact', async ({ page }) => {
+test('compact library filters can reset, long names wrap, and inputs stay compact', async ({
+  page,
+}) => {
   await installMockTV(page, false, [
     { id: 'com.webos.app.lgchannels', title: 'LG Channels', visible: true },
-    { id: 'com.example.long', title: 'An application with a much longer name that should remain completely readable', visible: true },
+    {
+      id: 'com.example.long',
+      title: 'An application with a much longer name that should remain completely readable',
+      visible: true,
+    },
   ]);
   await page.goto('/');
   await page.getByRole('button', { name: 'Apps', exact: true }).click();
-  const label = page.locator('.library-grid .app-label').filter({ hasText: 'An application with a much longer name' });
-  const dimensions = await label.evaluate((element) => ({ width: element.clientWidth, scrollWidth: element.scrollWidth, height: element.clientHeight, scrollHeight: element.scrollHeight, whiteSpace: getComputedStyle(element).whiteSpace }));
+  const label = page
+    .locator('.library-grid .app-label')
+    .filter({ hasText: 'An application with a much longer name' });
+  const dimensions = await label.evaluate((element) => ({
+    width: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+    height: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    whiteSpace: getComputedStyle(element).whiteSpace,
+  }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
   expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.height);
   expect(dimensions.whiteSpace).toBe('normal');

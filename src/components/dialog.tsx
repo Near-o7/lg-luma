@@ -52,7 +52,6 @@ export function Dialog({
       >
         <div className="dialog-heading">
           <div>
-            <p className="eyebrow">MAKE IT YOURS</p>
             <h2 id="dialog-title">{title}</h2>
             {subtitle ? <p className="dialog-subtitle">{subtitle}</p> : null}
           </div>
