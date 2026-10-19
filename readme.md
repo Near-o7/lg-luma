@@ -2,7 +2,7 @@
 
 A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity and feel of Apple TV.
 
-Luma brings your installed apps and HDMI inputs into a locally rendered home screen: cinematic backdrops, large app tiles, spring-based focus, editable favorites, and a full app library. No accounts, recommendations, tracking, weather services, or runtime internet requests.
+Luma brings your installed apps and HDMI inputs into a locally rendered home screen: cinematic backdrops, static app tiles with clear focus outlines, editable favorites, compact inputs, and a searchable app library. Optional local weather is powered by Open-Meteo.
 
 ![Luma home screen, desktop preview](docs/home.png)
 
@@ -23,7 +23,7 @@ Open **http://127.0.0.1:5173**. Desktop preview shows clearly identified sample 
 pnpm run package
 ```
 
-Output: `dist/com.luma.launcher_0.1.1_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
+Output: `dist/com.luma.launcher_0.1.2_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
 
 Photographs and fonts are checked in locally. `pnpm assets` prepares them again if you deliberately remove them; it downloads from Unsplash, jsDelivr and the Inter repository at build time. Normal builds and TV use require no asset downloads.
 
@@ -32,7 +32,7 @@ Photographs and fonts are checked in locally. `pnpm assets` prepares them again 
 1. Open Homebrew Channel on your TV; check **Settings → Root status: ok**.
 2. Open [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop) on your Mac.
 3. Connect to `10.120.1.99`, port `22`, user `root`, using your existing SSH password or key.
-4. Install `dist/com.luma.launcher_0.1.1_all.ipk` and launch **Luma**.
+4. Install `dist/com.luma.launcher_0.1.2_all.ipk` and launch **Luma**.
 
 Or register your root SSH connection with the locally installed CLI:
 
@@ -49,7 +49,7 @@ The package has its own ID and installs alongside LG Home and LG-XMB.
 Manual IPK installation is supported. From your Mac, copy the built package:
 
 ```sh
-scp -O dist/com.luma.launcher_0.1.1_all.ipk root@10.120.1.99:/tmp/luma-0.1.1.ipk
+scp -O dist/com.luma.launcher_0.1.2_all.ipk root@10.120.1.99:/tmp/luma-0.1.2.ipk
 ssh root@10.120.1.99
 ```
 
@@ -57,7 +57,7 @@ Then, inside the TV's root shell:
 
 ```sh
 luna-send -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma-0.1.1.ipk","subscribe":true}'
+  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma-0.1.2.ipk","subscribe":true}'
 ```
 
 Wait for the terminal installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma so the new package permissions are used.
@@ -87,7 +87,17 @@ The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunab
 | Back on Home           | webOS's normal platform Back behavior                    |
 | Magic Remote pointer   | Point, click, or hold a tile for options                 |
 
-Apps → select an app → hold OK to edit favorites. Move pinned apps left or right from the same panel. Hidden apps remain installed and can be restored with **Apps → Hidden apps**. Settings includes three bundled backdrops, 12/24-hour time, reduced motion, refresh, TV settings, and a quiet ambient clock.
+Apps → select an app → hold OK to edit favorites. Move pinned apps left or right from the same panel. Hidden apps remain installed and can be restored with **Apps → Hidden apps**. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
+
+Settings includes six bundled backdrops (including San Francisco, Munich, and Tokyo), weather location, 12/24-hour time, reduced motion, refresh, TV settings, and a quiet ambient clock.
+
+## Weather
+
+Open **Settings → Weather location**, enter a city or postcode, press Search, and select the matching place. Home shows the chosen city, temperature in °C, and current conditions. The selected location persists on the TV; nothing uses browser geolocation or automatic IP-based location lookup.
+
+Weather refreshes every 15 minutes while the Home screen is visible. Recent readings are cached locally and reused after reopening the app. If the connection fails, an available cached reading is labeled as saved; otherwise the widget says weather is unavailable. Remove the weather location in Settings to turn it off.
+
+Location search calls `geocoding-api.open-meteo.com`, and weather calls `api.open-meteo.com`. Those are the only network origins allowed by the packaged app's Content Security Policy. No API key or account is required. Data attribution: [Open-Meteo](https://open-meteo.com/) / [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## Optional: open at boot
 
@@ -122,7 +132,7 @@ Luma does not inject code into LG services, replace the stock launcher, bind-mou
 - App launches use the public application manager API with the `application.launcher` and `application.query` ACGs. Homebrew service access declares `lunabus.query` for webOS 26 / Homebrew Channel 0.8.0-rc1. No service permissions are rewritten.
 - Service bridges are retained until completion, bounded by timeouts, and cancelled afterward. Partial refresh failures preserve the last valid inventory.
 - All app names and IDs come from inventory on the TV. A failure never substitutes desktop sample apps.
-- Preferences and recent launches stay in this app's local storage. No telemetry or remote requests. The packaged Content Security Policy disables web network connections.
+- Preferences, recent launches, weather location, and cached readings stay in this app's local storage. Weather makes requests only after a location is configured; city searches are sent only when you press Search. The packaged Content Security Policy limits web network connections to Open-Meteo's weather and geocoding APIs.
 - Homebrew Channel permissions and native service behavior need verification on the physical TV, particularly webOS 26. Browser tests cannot establish hardware compatibility.
 
 ## Checks
@@ -137,7 +147,7 @@ pnpm test:browser
 
 `pnpm check` runs Oxlint and TypeScript. Run `pnpm lint:fix` to apply automatic lint fixes. Oxlint checks TypeScript, React, hooks, and accessibility rules; generated output is excluded.
 
-Browser checks cover packaged `file://` loading, remote navigation, hold-OK options, favorites, settings, search, persistence, focus restoration and TV-service failure behavior with a mock bridge. They do not connect to a TV. Run `pnpm build` first if the packaged app is missing.
+Browser checks cover packaged `file://` loading, remote navigation, hold-OK options, favorites, settings, search, persistence, focus restoration, weather configuration and caching, and TV-service failure behavior with a mock bridge. Weather APIs are mocked in browser tests; no tests connect to a TV. Run `pnpm build` first if the packaged app is missing.
 
 ## Structure
 

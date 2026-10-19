@@ -11,14 +11,10 @@ import {
   Tv,
 } from 'lucide-react';
 import { Dialog } from './dialog';
+import { WeatherSettings } from './weather-settings';
 import { isTV } from '../bridge';
-import type { Preferences, Wallpaper } from '../types';
-
-const wallpapers: { id: Wallpaper; title: string; detail: string; image: string }[] = [
-  { id: 'dunes', title: 'Golden hour', detail: 'Desert light', image: 'dunes.jpg' },
-  { id: 'alpine', title: 'Higher ground', detail: 'Alpine light', image: 'alpine.jpg' },
-  { id: 'aurora', title: 'Afterglow', detail: 'Luma original', image: 'aurora.svg' },
-];
+import type { Preferences } from '../types';
+import { wallpapers } from '../wallpapers';
 
 interface Props {
   preferences: Preferences;
@@ -47,6 +43,10 @@ export function Settings({
       wide
     >
       <div className="settings-content">
+        <WeatherSettings
+          location={preferences.weatherLocation}
+          onChange={(weatherLocation) => onUpdate({ weatherLocation })}
+        />
         <h3 className="settings-section-title">Your backdrop</h3>
         <div className="wallpaper-options">
           {wallpapers.map((wallpaper) => (
@@ -144,7 +144,7 @@ export function Settings({
           <img src="./mark.svg" width="36" height="36" alt="" />
           <span>
             <strong>
-              Luma <small>0.1.1</small>
+              Luma <small>0.1.2</small>
             </strong>
           </span>
           <span className="local-badge">

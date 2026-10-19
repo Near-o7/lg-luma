@@ -1,5 +1,5 @@
 export type Page = 'home' | 'apps' | 'inputs';
-export type Wallpaper = 'dunes' | 'alpine' | 'aurora';
+export type Wallpaper = 'dunes' | 'alpine' | 'aurora' | 'san-francisco' | 'munich' | 'tokyo';
 export type Category = 'Streaming' | 'Music' | 'Gaming' | 'Utilities';
 
 export interface TVApp {
@@ -25,6 +25,21 @@ export interface Preferences {
   wallpaper: Wallpaper;
   reducedMotion: boolean;
   clock24: boolean;
+  weatherLocation: WeatherLocation | null;
+}
+
+export interface WeatherLocation {
+  name: string;
+  region: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface WeatherReading {
+  temperature: number;
+  code: number;
+  isDay: boolean;
 }
 
 export interface Inventory {

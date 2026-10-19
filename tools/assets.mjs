@@ -13,6 +13,18 @@ const assets = [
     'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=2560&q=88',
   ],
   [
+    'public/wallpapers/san-francisco.jpg',
+    'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=2560&q=88',
+  ],
+  [
+    'public/wallpapers/munich.jpg',
+    'https://images.unsplash.com/photo-1595867818082-083862f3d630?auto=format&fit=crop&w=2560&q=88',
+  ],
+  [
+    'public/wallpapers/tokyo.jpg',
+    'https://images.unsplash.com/photo-1513407030348-c983a97b98d8?auto=format&fit=crop&w=2560&q=88',
+  ],
+  [
     'public/fonts/inter-latin.woff2',
     'https://cdn.jsdelivr.net/fontsource/fonts/inter:vf@latest/latin-wght-normal.woff2',
   ],

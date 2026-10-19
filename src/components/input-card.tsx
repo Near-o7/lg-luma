@@ -4,16 +4,14 @@ import type { TVInput } from '../types';
 export function InputCard({
   input,
   onLaunch,
-  compact = false,
 }: {
   input: TVInput;
   onLaunch: (input: TVInput) => void;
-  compact?: boolean;
 }) {
   const Icon = { console: Gamepad2, streamer: Tv, computer: Monitor, hdmi: Cable }[input.kind];
   return (
     <button
-      className={`input-card input-${input.kind}${compact ? ' input-compact' : ''}`}
+      className={`input-card input-${input.kind}`}
       data-focusable={`input-${input.id}`}
       onClick={() => onLaunch(input)}
       onPointerEnter={(event) => {

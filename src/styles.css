@@ -119,6 +119,18 @@ button svg {
 .wallpaper-alpine {
   background-position: center 48%;
 }
+.wallpaper-san-francisco {
+  background-position: center 42%;
+  filter: saturate(0.75) brightness(0.82);
+}
+.wallpaper-munich {
+  background-position: center 36%;
+  filter: saturate(0.8);
+}
+.wallpaper-tokyo {
+  background-position: center 40%;
+  filter: saturate(0.8);
+}
 .wallpaper-shade {
   background:
     linear-gradient(
@@ -173,7 +185,8 @@ button svg {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  padding: 0.4rem;
+  gap: 0.8rem;
+  padding: 0.55rem;
   background: rgba(23, 28, 32, 0.34);
   border: 1px solid #ffffff12;
   border-radius: 3rem;
@@ -210,7 +223,7 @@ button svg {
     inset 0 1px 1px white;
 }
 .nav-item:focus-visible {
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 .header-right {
   display: flex;
@@ -413,18 +426,19 @@ button svg {
   color: #eeece8a8;
   font-weight: 450;
   max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-height: 2.8em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
   padding: 0 0.25rem;
 }
-.app-tile.is-focused .app-face {
+.app-tile:focus .app-face {
   box-shadow:
     0 14px 34px #0006,
     0 0 0 0.2rem #f9f5e9,
     0 0 0 0.43rem #ffffff19;
 }
-.app-tile.is-focused .app-label {
+.app-tile:focus .app-label {
   color: #fff;
   font-weight: 550;
 }
@@ -634,16 +648,18 @@ button svg {
   stroke-width: 1.4;
 }
 .brand-generic {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
+  line-height: 1.35;
   max-width: 100%;
+  min-width: 0;
 }
 .brand-generic span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 9rem;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .home-inputs {
-  margin-top: 2.6rem;
+  margin-top: 1.8rem;
 }
 .input-grid {
   display: grid;
@@ -657,11 +673,11 @@ button svg {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 1.65rem;
+  gap: 1rem;
   background: linear-gradient(125deg, #d8d8cc13, #c9c6b707);
   border: 1px solid #fffdf010;
-  padding: 1.35rem 1.7rem;
-  min-height: 8.3rem;
+  padding: 1.1rem 1.25rem;
+  min-height: 6.5rem;
   text-align: left;
   box-shadow: inset 0 1px 0 #ffffef04;
   transition:
@@ -677,9 +693,9 @@ button svg {
   outline-offset: 3px;
 }
 .input-art {
-  width: 4.6rem;
-  height: 4.6rem;
-  border-radius: 1rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.8rem;
   background: linear-gradient(145deg, #e2e4d61c, #e2e4d604);
   display: grid;
   place-items: center;
@@ -687,8 +703,8 @@ button svg {
   flex-shrink: 0;
 }
 .input-art svg {
-  width: 2.8rem;
-  height: 2.8rem;
+  width: 2.2rem;
+  height: 2.2rem;
 }
 .input-console .input-art {
   color: #d8dfeb;
@@ -714,9 +730,8 @@ button svg {
   font-size: 1.3rem;
   letter-spacing: -0.03em;
   font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .input-state {
   font-size: 0.82rem;
@@ -789,8 +804,7 @@ button svg {
   align-items: center;
   gap: 1.4rem;
 }
-.preview-badge,
-.local-indicator {
+.preview-badge {
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -819,27 +833,16 @@ button svg {
   width: 1.1rem;
   height: 1.1rem;
 }
-.page-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
-  padding: 4.5rem 0 3rem;
-}
-.page-heading .eyebrow {
-  margin-bottom: 1rem;
-}
-.page-heading h1 {
-  font-size: 4.4rem;
-  letter-spacing: -0.06em;
-  line-height: 1.1;
-  font-weight: 500;
-}
-.page-heading p:not(.eyebrow) {
-  font-size: 1.16rem;
-  color: var(--soft);
-  margin-top: 1rem;
-  letter-spacing: -0.02em;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .search-field {
   display: flex;
@@ -852,7 +855,7 @@ button svg {
   backdrop-filter: blur(16px);
   width: 19rem;
   color: #f4f2eb80;
-  margin-top: 1rem;
+  margin-top: 0;
 }
 .search-field:focus-within {
   border-color: #ffffffb3;
@@ -888,8 +891,22 @@ button svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 2.1rem;
+  gap: 1.5rem;
+  margin-top: 3.5rem;
+  margin-bottom: 2.4rem;
+}
+.library-options {
+  display: flex;
+  justify-content: flex-end;
+  margin: -1.2rem 0 1rem;
+}
+.filter-clear {
+  width: 2rem;
+  height: 2rem;
+}
+.filter-clear svg {
+  width: 1rem;
+  height: 1rem;
 }
 .filter-tabs {
   display: flex;
@@ -926,64 +943,12 @@ button svg {
   content: ' · Hidden';
   font-size: 0.8em;
 }
-.page-heading-icon {
-  padding: 2rem;
-  color: #f1eddb5e;
-}
-.page-heading-icon svg {
-  width: 6rem;
-  height: 6rem;
-}
 .full-input-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.8rem;
-  margin-top: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 3.5rem;
 }
-.full-input-grid .input-card {
-  min-height: 22rem;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 2rem;
-  background: linear-gradient(145deg, #a6afb92b, #4f62741a);
-  overflow: hidden;
-}
-.full-input-grid .input-art {
-  position: absolute;
-  top: 2.5rem;
-  left: 2.5rem;
-  width: 7rem;
-  height: 7rem;
-  border-radius: 1.6rem;
-}
-.full-input-grid .input-art svg {
-  width: 4.4rem;
-  height: 4.4rem;
-}
-.full-input-grid .input-info {
-  gap: 0.6rem;
-}
-.full-input-grid .input-title {
-  font-size: 2rem;
-  letter-spacing: -0.05em;
-}
-.full-input-grid .input-port {
-  font-size: 0.85rem;
-}
-.full-input-grid .input-state {
-  font-size: 1rem;
-}
-.full-input-grid .input-arrow {
-  position: absolute;
-  right: 2rem;
-  bottom: 2.5rem;
-  width: 1.5rem;
-  height: 1.5rem;
-}
-.input-footnote {
-  font-size: 0.9rem;
-  color: var(--muted);
-  margin-top: 2rem;
+.page-inputs > .empty-state {
+  margin-top: 3.5rem;
 }
 .recent-section {
   margin-top: 3rem;
@@ -1749,18 +1714,8 @@ button svg {
   .footer-right {
     gap: 0.5rem;
   }
-  .page-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 2.8rem 0 2rem;
-  }
-  .page-heading h1 {
-    font-size: 3.5rem;
-  }
   .search-field {
     width: 100%;
-    margin-top: 0.5rem;
   }
   .filter-tab {
     font-size: 0.85rem;
@@ -1769,23 +1724,11 @@ button svg {
   .library-toolbar {
     align-items: flex-start;
     flex-direction: column;
+    margin-top: 2.5rem;
+    margin-bottom: 1.5rem;
   }
   .full-input-grid {
     grid-template-columns: 1fr;
-  }
-  .full-input-grid .input-card {
-    min-height: 15rem;
-  }
-  .full-input-grid .input-art {
-    left: auto;
-    right: 2.5rem;
-    top: 2.5rem;
-  }
-  .full-input-grid .input-arrow {
-    display: none;
-  }
-  .page-heading-icon {
-    display: none;
   }
   .dialog-scrim {
     padding: 1rem;

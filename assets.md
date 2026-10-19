@@ -3,6 +3,9 @@
 - `public/mark.svg` and `public/wallpapers/aurora.svg`: original Luma artwork, MIT.
 - `public/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`, https://images.unsplash.com/photo-1509316785289-025f5b846b35. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/alpine.jpg`: Unsplash photo `1519681393784-d120267933ba`, https://images.unsplash.com/photo-1519681393784-d120267933ba. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`, https://images.unsplash.com/photo-1501594907352-04cda38ebc29. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/munich.jpg`: Unsplash photo `1595867818082-083862f3d630`, https://images.unsplash.com/photo-1595867818082-083862f3d630. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/tokyo.jpg`: Unsplash photo `1513407030348-c983a97b98d8`, https://images.unsplash.com/photo-1513407030348-c983a97b98d8. Bundled under the [Unsplash License](https://unsplash.com/license).
 - Inter variable font: Rasmus Andersson, SIL Open Font License 1.1. License bundled at `public/fonts/ofl.txt`.
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.

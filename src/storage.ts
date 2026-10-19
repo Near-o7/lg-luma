@@ -1,4 +1,6 @@
 import type { Preferences } from './types';
+import { parseLocation } from './weather';
+import { wallpapers } from './wallpapers';
 
 export const STORAGE_KEY = 'luma.preferences.v1';
 export const defaults: Preferences = {
@@ -9,6 +11,7 @@ export const defaults: Preferences = {
   wallpaper: 'dunes',
   reducedMotion: false,
   clock24: false,
+  weatherLocation: null,
 };
 
 const ids = (value: unknown): string[] =>
@@ -31,11 +34,12 @@ export function parsePreferences(raw: string | null): Preferences {
       favorites: !Array.isArray(value.favorites) ? null : ids(value.favorites),
       hidden: ids(value.hidden),
       recent: ids(value.recent).slice(0, 12),
-      wallpaper: ['dunes', 'alpine', 'aurora'].includes(value.wallpaper)
+      wallpaper: wallpapers.some((wallpaper) => wallpaper.id === value.wallpaper)
         ? value.wallpaper
         : 'dunes',
       reducedMotion: value.reducedMotion === true,
       clock24: value.clock24 === true,
+      weatherLocation: parseLocation(value.weatherLocation),
     };
   } catch {
     return { ...defaults };

@@ -21,18 +21,20 @@ import { AppTile } from './components/app-tile';
 import { InputCard } from './components/input-card';
 import { Settings } from './components/settings';
 import { AppOptions } from './components/app-options';
+import { Weather } from './components/weather';
 import { defaultFavorites } from './catalog';
 import { isTV, launchApp, loadInventory, platformBack } from './bridge';
 import { moveFocus, type Direction } from './navigation';
 import { loadPreferences, savePreferences } from './storage';
-import type { Inventory, Page, Preferences, TVApp, TVInput } from './types';
+import { wallpapers } from './wallpapers';
+import type { Category, Inventory, Page, Preferences, TVApp, TVInput } from './types';
 
 const tabs: { id: Page; title: string }[] = [
   { id: 'home', title: 'Home' },
   { id: 'apps', title: 'Apps' },
   { id: 'inputs', title: 'Inputs' },
 ];
-const categories = ['All apps', 'Streaming', 'Music', 'Gaming', 'Utilities'] as const;
+const categories: Category[] = ['Streaming', 'Music', 'Gaming', 'Utilities'];
 const focusFirstApp = () =>
   (
     document.querySelector<HTMLElement>('main [data-app-id]') ??
@@ -48,7 +50,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [optionsApp, setOptionsApp] = useState<TVApp | null>(null);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<string>('All apps');
+  const [category, setCategory] = useState<Category | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [ambient, setAmbient] = useState(false);
   const [launching, setLaunching] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function App() {
   );
   const filteredApps = visibleApps.filter(
     (app) =>
-      (category === 'All apps' || app.category === category) &&
+      (!category || app.category === category) &&
       app.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
   );
   const recent = preferences.recent
@@ -169,7 +171,7 @@ export function App() {
   const openPage = useCallback((next: Page) => {
     setPage(next);
     setQuery('');
-    setCategory('All apps');
+    setCategory(null);
     setShowHidden(false);
     document.querySelector('main')?.scrollTo({ top: 0 });
   }, []);
@@ -340,13 +342,11 @@ export function App() {
       prefix={prefix}
       pinned={pinned}
       launching={launching === app.id}
-      reducedMotion={reducedMotion}
       onLaunch={onLaunch}
       onOptions={onOptions}
     />
   );
-  const wallpaper =
-    preferences.wallpaper === 'aurora' ? 'aurora.svg' : `${preferences.wallpaper}.jpg`;
+  const wallpaper = wallpapers.find((item) => item.id === preferences.wallpaper) ?? wallpapers[0];
 
   return (
     <MotionConfig reducedMotion={reducedMotion ? 'always' : 'user'}>
@@ -356,7 +356,7 @@ export function App() {
         <div className="landscape-fallback" />
         <div
           className={`wallpaper wallpaper-${preferences.wallpaper}`}
-          style={{ backgroundImage: `url('./wallpapers/${wallpaper}')` }}
+          style={{ backgroundImage: `url('./wallpapers/${wallpaper.image}')` }}
         />
         <div className="wallpaper-shade" />
         <div className="grain" />
@@ -424,22 +424,15 @@ export function App() {
                     <div className="hero-copy">
                       <p className="eyebrow hero-date">{date}</p>
                       <h1 id="greeting">{greeting}</h1>
-                      <p className="hero-subtitle">Your favorites. A little closer.</p>
+                      <Weather
+                        location={preferences.weatherLocation}
+                        onConfigure={() => setSettingsOpen(true)}
+                      />
                     </div>
                     <div className="landscape-credit">
                       <span className="tiny-line" />
-                      {preferences.wallpaper === 'dunes'
-                        ? 'GOLDEN HOUR'
-                        : preferences.wallpaper === 'alpine'
-                          ? 'HIGHER GROUND'
-                          : 'AFTERGLOW'}
-                      <small>
-                        {preferences.wallpaper === 'dunes'
-                          ? 'Somewhere worth slowing down.'
-                          : preferences.wallpaper === 'alpine'
-                            ? 'A different point of view.'
-                            : 'A Luma original.'}
-                      </small>
+                      {wallpaper.title.toUpperCase()}
+                      <small>{wallpaper.description}</small>
                     </div>
                   </section>
                   <section className="favorites-section" aria-labelledby="favorites-heading">
@@ -501,7 +494,7 @@ export function App() {
                   {inventory.inputs.length ? (
                     <section className="home-inputs" aria-labelledby="inputs-heading">
                       <div className="section-heading">
-                        <h2 id="inputs-heading">A change of scene</h2>
+                        <h2 id="inputs-heading">Inputs</h2>
                         <button
                           className="text-button"
                           data-focusable="all-inputs"
@@ -512,7 +505,7 @@ export function App() {
                       </div>
                       <div className="input-grid home-input-grid">
                         {inventory.inputs.slice(0, 3).map((input) => (
-                          <InputCard key={input.id} input={input} onLaunch={onLaunch} compact />
+                          <InputCard key={input.id} input={input} onLaunch={onLaunch} />
                         ))}
                       </div>
                     </section>
@@ -532,11 +525,30 @@ export function App() {
               ) : null}
               {page === 'apps' ? (
                 <>
-                  <div className="page-heading">
-                    <div>
-                      <p className="eyebrow">ALL TOGETHER NOW</p>
-                      <h1>Your apps.</h1>
-                      <p>{inventory.apps.length} little possibilities. One place to find them.</p>
+                  <h1 className="sr-only">Apps</h1>
+                  <div className="library-toolbar">
+                    <div className="filter-tabs" aria-label="App categories">
+                      {categories.map((item) => (
+                        <button
+                          key={item}
+                          className={`filter-tab${category === item ? ' selected' : ''}`}
+                          data-focusable={`filter-${item}`}
+                          aria-pressed={category === item}
+                          onClick={() => setCategory((current) => (current === item ? null : item))}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                      {category ? (
+                        <button
+                          className="filter-clear icon-button"
+                          data-focusable="filter-clear"
+                          aria-label="Clear category filter"
+                          onClick={() => setCategory(null)}
+                        >
+                          <X size={16} />
+                        </button>
+                      ) : null}
                     </div>
                     <label className="search-field">
                       <Search size={21} />
@@ -560,21 +572,8 @@ export function App() {
                       ) : null}
                     </label>
                   </div>
-                  <div className="library-toolbar">
-                    <div className="filter-tabs" aria-label="App categories">
-                      {categories.map((item) => (
-                        <button
-                          key={item}
-                          className={`filter-tab${category === item ? ' selected' : ''}`}
-                          data-focusable={`filter-${item}`}
-                          aria-pressed={category === item}
-                          onClick={() => setCategory(item)}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                    {preferences.hidden.length ? (
+                  {preferences.hidden.length ? (
+                    <div className="library-options">
                       <button
                         className={`text-button${showHidden ? ' selected' : ''}`}
                         data-focusable="show-hidden"
@@ -585,8 +584,8 @@ export function App() {
                           ? 'Hide hidden apps'
                           : `Hidden apps (${preferences.hidden.length})`}
                       </button>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                   {filteredApps.length ? (
                     <div className="app-grid library-grid">
                       {filteredApps.map((app) => (
@@ -629,16 +628,7 @@ export function App() {
               ) : null}
               {page === 'inputs' ? (
                 <>
-                  <div className="page-heading">
-                    <div>
-                      <p className="eyebrow">BEYOND THE HOME SCREEN</p>
-                      <h1>A change of scene.</h1>
-                      <p>Big games. Movie nights. Whatever’s plugged in.</p>
-                    </div>
-                    <span className="page-heading-icon">
-                      <Tv strokeWidth={1} />
-                    </span>
-                  </div>
+                  <h1 className="sr-only">Inputs</h1>
                   {inventory.inputs.length ? (
                     <div className="input-grid full-input-grid">
                       {inventory.inputs.map((input) => (
@@ -662,9 +652,6 @@ export function App() {
                       </button>
                     </div>
                   )}
-                  <p className="input-footnote">
-                    Switch inputs with OK. Use Home to return to your launcher.
-                  </p>
                 </>
               ) : null}
               {error && inventory.apps.length ? (
@@ -693,12 +680,7 @@ export function App() {
                     <Monitor size={14} />
                     Desktop preview
                   </span>
-                ) : (
-                  <span className="local-indicator">
-                    <i className="status-dot" />
-                    All yours. All local.
-                  </span>
-                )}
+                ) : null}
                 <button
                   className="ambient-button"
                   data-focusable="ambient"

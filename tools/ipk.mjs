@@ -71,6 +71,9 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     'wallpapers/dunes.jpg',
     'wallpapers/alpine.jpg',
     'wallpapers/aurora.svg',
+    'wallpapers/san-francisco.jpg',
+    'wallpapers/munich.jpg',
+    'wallpapers/tokyo.jpg',
   ]) {
     if (!owned.some((file) => file.name.endsWith(`/${required}`) && file.data.length > 0))
       throw new Error(`Package is missing ${required}.`);
