@@ -130,11 +130,14 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize with the external TV inventory on mount.
     void refresh();
   }, [refresh]);
   useEffect(() => {
-    if (!savePreferences(preferences))
+    if (!savePreferences(preferences)) {
+      // oxlint-disable-next-line react/set-state-in-effect -- Report a failed external storage write, not derived UI state.
       notify('Your changes couldn’t be saved. Device storage may be full.', true);
+    }
   }, [preferences, notify]);
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 15000);
@@ -204,41 +207,43 @@ export function App() {
     options: () => {},
     wake: () => false,
   });
-  actions.current = {
-    back: () => {
-      if (ambient) {
+  useLayoutEffect(() => {
+    actions.current = {
+      back: () => {
+        if (ambient) {
+          setAmbient(false);
+          return;
+        }
+        if (optionsApp) {
+          setOptionsApp(null);
+          return;
+        }
+        if (settingsOpen) {
+          setSettingsOpen(false);
+          return;
+        }
+        if (query) {
+          setQuery('');
+          return;
+        }
+        if (page !== 'home') {
+          openPage('home');
+          requestAnimationFrame(focusFirstApp);
+          return;
+        }
+        platformBack();
+      },
+      options: () => {
+        const id = (document.activeElement as HTMLElement | null)?.dataset.appId;
+        if (!settingsOpen && !optionsApp && id && appMap.has(id)) setOptionsApp(appMap.get(id)!);
+      },
+      wake: () => {
+        if (!ambient) return false;
         setAmbient(false);
-        return;
-      }
-      if (optionsApp) {
-        setOptionsApp(null);
-        return;
-      }
-      if (settingsOpen) {
-        setSettingsOpen(false);
-        return;
-      }
-      if (query) {
-        setQuery('');
-        return;
-      }
-      if (page !== 'home') {
-        openPage('home');
-        requestAnimationFrame(focusFirstApp);
-        return;
-      }
-      platformBack();
-    },
-    options: () => {
-      const id = (document.activeElement as HTMLElement | null)?.dataset.appId;
-      if (!settingsOpen && !optionsApp && id && appMap.has(id)) setOptionsApp(appMap.get(id)!);
-    },
-    wake: () => {
-      if (!ambient) return false;
-      setAmbient(false);
-      return true;
-    },
-  };
+        return true;
+      },
+    };
+  });
 
   useEffect(() => {
     let holdTimer: ReturnType<typeof setTimeout> | undefined;

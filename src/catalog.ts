@@ -56,6 +56,7 @@ export function normalizeApps(raw: unknown): TVApp[] {
       const title =
         typeof entry.title === 'string'
           ? entry.title
+              // oxlint-disable-next-line eslint/no-control-regex -- Remove control characters from TV-supplied labels.
               .replace(/[\u0000-\u001f\u007f]/g, '')
               .trim()
               .slice(0, 120)
@@ -80,6 +81,7 @@ export function normalizeInputs(raw: unknown): TVInput[] {
     const title =
       typeof entry.label === 'string' && entry.label.trim()
         ? entry.label
+            // oxlint-disable-next-line eslint/no-control-regex -- Remove control characters from TV-supplied labels.
             .replace(/[\u0000-\u001f\u007f]/g, '')
             .trim()
             .slice(0, 120)

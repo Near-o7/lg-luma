@@ -5,20 +5,25 @@
   "description": "A quieter home for your TV. A modern, remote-first webOS launcher.",
   "license": "MIT",
   "type": "module",
+  "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "pnpm": ">=10 <11"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && node tools/build.mjs",
-    "package": "npm run build && node tools/package.mjs",
-    "deploy": "npm run package && node tools/deploy.mjs",
+    "build": "pnpm check && node tools/build.mjs",
+    "package": "pnpm build && node tools/package.mjs",
+    "deploy": "pnpm run package && node tools/deploy.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:browser": "playwright test",
-    "check": "tsc --noEmit",
+    "check": "pnpm lint && pnpm typecheck",
+    "lint": "oxlint --deny-warnings .",
+    "lint:fix": "oxlint --fix --deny-warnings .",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "screenshots": "npm run build && node tools/screenshots.mjs",
+    "screenshots": "pnpm build && node tools/screenshots.mjs",
     "assets": "node tools/assets.mjs"
   },
   "dependencies": {
@@ -34,6 +39,7 @@
     "@types/react-dom": "^19.2.0",
     "@webos-tools/cli": "3.2.6",
     "esbuild": "^0.27.0",
+    "oxlint": "1.88.0",
     "prettier": "3.6.2",
     "sharp": "0.35.5",
     "tsx": "^4.20.6",

@@ -4,7 +4,6 @@ import {
   Gamepad2,
   Globe2,
   MonitorPlay,
-  Music2,
   Settings2,
   Triangle,
 } from 'lucide-react';

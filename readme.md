@@ -8,11 +8,11 @@ Luma brings your installed apps and HDMI inputs into a locally rendered home scr
 
 ## Run on your Mac
 
-Node.js 22+:
+Node.js 22+ and pnpm 10 (the project pins pnpm 10.34.5):
 
 ```sh
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 Open **http://127.0.0.1:5173**. Desktop preview shows clearly identified sample apps and inputs; app launches display a preview message. On a TV, only its actual inventory is shown.
@@ -20,12 +20,12 @@ Open **http://127.0.0.1:5173**. Desktop preview shows clearly identified sample 
 ## Build an installable package
 
 ```sh
-npm run package
+pnpm run package
 ```
 
 Output: `dist/com.luma.launcher_0.1.0_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
 
-Photographs and fonts are checked in locally. `npm run assets` prepares them again if you deliberately remove them; it downloads from Unsplash, jsDelivr and the Inter repository at build time. Normal builds and TV use require no asset downloads.
+Photographs and fonts are checked in locally. `pnpm assets` prepares them again if you deliberately remove them; it downloads from Unsplash, jsDelivr and the Inter repository at build time. Normal builds and TV use require no asset downloads.
 
 ## Install on your rooted TV
 
@@ -37,9 +37,9 @@ Photographs and fonts are checked in locally. `npm run assets` prepares them aga
 Or register your root SSH connection with the locally installed CLI:
 
 ```sh
-npx ares-setup-device
+pnpm exec ares-setup-device
 # Add profile "tv": host 10.120.1.99, port 22, user root; choose your SSH authentication.
-npm run deploy -- --device tv
+pnpm run deploy --device tv
 ```
 
 The package has its own ID and installs alongside LG Home and LG-XMB.
@@ -97,13 +97,16 @@ Luma does not inject code into LG services, replace the stock launcher, bind-mou
 ## Checks
 
 ```sh
-npm run check
-npm test
-npx playwright install chromium
-npm run test:browser
+pnpm check
+pnpm format:check
+pnpm test
+pnpm exec playwright install chromium
+pnpm test:browser
 ```
 
-Browser checks cover packaged `file://` loading, remote navigation, hold-OK options, favorites, settings, search, persistence, focus restoration and TV-service failure behavior with a mock bridge. They do not connect to a TV.
+`pnpm check` runs Oxlint and TypeScript. Run `pnpm lint:fix` to apply automatic lint fixes. Oxlint checks TypeScript, React, hooks, and accessibility rules; generated output is excluded.
+
+Browser checks cover packaged `file://` loading, remote navigation, hold-OK options, favorites, settings, search, persistence, focus restoration and TV-service failure behavior with a mock bridge. They do not connect to a TV. Run `pnpm build` first if the packaged app is missing.
 
 ## Structure
 
