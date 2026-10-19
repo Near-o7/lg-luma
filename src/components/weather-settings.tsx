@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, CloudSun, LoaderCircle, MapPin, Search, X } from 'lucide-react';
+import { Check, Eye, LoaderCircle, MapPin, Search, X } from 'lucide-react';
 import type { WeatherLocation } from '../types';
 import { clearWeatherCache, locationDetail, locationKey, searchLocations } from '../weather';
 
@@ -59,9 +59,9 @@ export function WeatherSettings({
         data-focusable="setting-show-weather"
         onClick={() => onEnabledChange(!enabled)}
       >
-        <CloudSun />
+        <Eye />
         <span>
-          <strong>Show weather widget</strong>
+          <strong>Show widget</strong>
         </span>
         <span className={`toggle${enabled ? ' on' : ''}`}>
           <i />
@@ -160,18 +160,6 @@ export function WeatherSettings({
           ))}
         </div>
       ) : null}
-      <p className="weather-attribution">
-        Weather by{' '}
-        <a
-          href="https://open-meteo.com/"
-          target="_blank"
-          rel="noreferrer"
-          data-focusable="weather-attribution"
-        >
-          Open-Meteo
-        </a>
-        . Updates every 15 minutes. °C.
-      </p>
     </section>
   );
 }

@@ -292,31 +292,6 @@ button svg {
   margin-top: 1.15rem;
   font-weight: 400;
 }
-.landscape-credit {
-  align-self: flex-end;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  font-size: 0.65rem;
-  letter-spacing: 0.18em;
-  color: #fffae7a3;
-  line-height: 1.7;
-  margin-bottom: 2rem;
-}
-.landscape-credit small {
-  font-size: 0.78rem;
-  letter-spacing: 0;
-  color: #fffae785;
-  font-weight: 400;
-  margin-top: 0.2rem;
-}
-.tiny-line {
-  display: block;
-  width: 2.4rem;
-  height: 1px;
-  background: #f7edd15c;
-  margin-bottom: 0.85rem;
-}
 .section-heading {
   display: flex;
   align-items: center;
@@ -643,7 +618,7 @@ button svg {
   overflow-wrap: anywhere;
 }
 .home-inputs {
-  margin-top: 1.8rem;
+  margin-top: 2.6rem;
 }
 .input-grid {
   display: grid;
@@ -1442,9 +1417,6 @@ button svg {
   .hero {
     min-height: 22rem;
   }
-  .landscape-credit {
-    display: none;
-  }
   .dialog {
     max-height: 94vh;
   }
@@ -1553,9 +1525,6 @@ button svg {
   }
   .home-input-grid {
     grid-template-columns: 1fr;
-  }
-  .home-inputs {
-    margin-top: 2rem;
   }
   .input-card {
     min-height: 6rem;

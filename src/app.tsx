@@ -503,11 +503,6 @@ export function App() {
                         />
                       ) : null}
                     </div>
-                    <div className="landscape-credit">
-                      <span className="tiny-line" />
-                      {wallpaper.title.toUpperCase()}
-                      <small>{wallpaper.description}</small>
-                    </div>
                   </section>
                   <section className="favorites-section" aria-labelledby="favorites-heading">
                     <div className="section-heading">

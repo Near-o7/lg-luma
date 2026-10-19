@@ -172,7 +172,7 @@ test('weather visibility preserves the city and prevents requests when the widge
     .getByRole('heading', { name: 'Weather', exact: true })
     .boundingBox();
   expect(interfaceHeading!.y).toBeLessThan(weatherHeading!.y);
-  const toggle = page.getByRole('switch', { name: 'Show weather widget', exact: true });
+  const toggle = page.getByRole('switch', { name: 'Show widget', exact: true });
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.saved-location')).toContainText('Vienna');
   await toggle.click();

@@ -123,21 +123,6 @@
   color: #eee3c4ad;
   margin-top: 0.7rem;
 }
-.weather-attribution {
-  font-size: 0.67rem;
-  line-height: 1.5;
-  color: #eeead175;
-  margin-top: 0.65rem;
-}
-.weather-attribution a {
-  color: #eeead1a6;
-  text-underline-offset: 0.15em;
-  border-radius: 0.2rem;
-}
-.weather-attribution a:focus-visible {
-  outline: 2px solid white;
-  outline-offset: 4px;
-}
 @media (max-width: 600px) {
   .weather-summary {
     font-size: 1.05rem;

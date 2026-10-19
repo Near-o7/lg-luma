@@ -91,7 +91,7 @@ On Home, hold OK on a favorite to enter move mode, press Left/Right to change it
 
 Home shows Favorites and Inputs without a recent-app section or permanent control hints. App names beneath Home cards are hidden by default; enable **Settings → Interface → Show app names on Home** to display them. The Apps library always shows names. The header clock is at the top left.
 
-The top navigation includes a full-page **Settings** view, with Backdrops on the left and **Interface** above **Weather** on the right. The sliders icon at the top right opens **TV settings** directly. Interface controls Home app names, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
+The top navigation includes a full-page **Settings** view, with **Background** on the left and **Interface** above **Weather** on the right. The sliders icon at the top right opens **TV settings** directly. Interface controls Home app names, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
 
 The nine bundled backdrops are Golden hour, San Francisco, Midnight (a gradient), Summit, Coast, Forest, Sand dunes, Lake, and Northern lights.
 
@@ -99,7 +99,7 @@ Apple TV, Prime Video, Disney+, Jellyfin, Netflix, YouTube, ARTE, ZDF, and Das E
 
 ## Weather
 
-Open **Settings → Weather**, enter a city or postcode, press Search, and select the matching place. **Show weather widget** controls visibility on Home and the ambient screen; turning it off keeps your saved city. When enabled, the widget shows the chosen city, temperature in °C, and current conditions. Nothing uses browser geolocation or automatic IP-based location lookup.
+Open **Settings → Weather**, enter a city or postcode, press Search, and select the matching place. **Show widget** controls visibility on Home and the ambient screen; turning it off keeps your saved city. When enabled, the widget shows the chosen city, temperature in °C, and current conditions. Nothing uses browser geolocation or automatic IP-based location lookup.
 
 Weather refreshes every 15 minutes while Home or the ambient clock is visible. The ambient clock shows weather in place of the return hint when a location is configured. Recent readings are cached locally and reused after reopening the app. If the connection fails, an available cached reading is labeled as saved; otherwise the widget says weather is unavailable. Remove the weather location in Settings to turn it off.
 
