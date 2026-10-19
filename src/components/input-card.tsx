@@ -22,7 +22,6 @@ export function InputCard({
         <ConnectionIcon input={input} />
       </span>
       <span className="input-info">
-        <span className="input-port">{input.port}</span>
         <span className="input-title">{input.title}</span>
         <span className="input-state">
           {input.connected === true ? (

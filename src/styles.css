@@ -704,14 +704,9 @@ button svg {
   gap: 0.35rem;
   min-width: 0;
 }
-.input-port {
-  font-size: 0.7rem;
-  color: #eee9dd78;
-  letter-spacing: 0.1em;
-  font-weight: 600;
-}
 .input-title {
-  font-size: 1.3rem;
+  font-size: 1.5rem;
+  line-height: 1.2;
   letter-spacing: -0.03em;
   font-weight: 500;
   white-space: normal;
@@ -1569,7 +1564,7 @@ button svg {
     gap: 0.25rem;
   }
   .input-title {
-    font-size: 1.2rem;
+    font-size: 1.35rem;
   }
   .footer {
     font-size: 0.7rem;

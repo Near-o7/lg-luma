@@ -127,7 +127,7 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
     )
     .toBe(true);
   await page.getByRole('button', { name: 'Inputs', exact: true }).click();
-  await expect(page.getByRole('button', { name: /HDMI 1 PlayStation 5/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /PlayStation 5/ })).toBeVisible();
   await page.screenshot({ path: info.outputPath('luma-inputs.png') });
   expect(remote).toEqual([]);
   expect(failed).toEqual([]);
