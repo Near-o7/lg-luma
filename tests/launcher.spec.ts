@@ -115,10 +115,10 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
   expect(errors).toEqual([]);
 });
 
-async function installMockTV(page: Page, denied: boolean) {
+async function installMockTV(page: Page, denied: boolean, apps = [{ id: 'com.example.real', title: 'A real TV app', visible: true }]) {
   const manifest = JSON.parse(readFileSync(path.resolve('appinfo.json'), 'utf8'));
   await page.addInitScript(
-    ({ denied, requiredACG }) => {
+    ({ denied, requiredACG, apps }) => {
       const w = window as typeof window & { __calls: { uri: string; payload: any }[] };
       w.__calls = [];
       w.PalmSystem = { identifier: 'com.luma.launcher' };
@@ -147,7 +147,7 @@ async function installMockTV(page: Page, denied: boolean) {
                   payload.command.includes('listApps')
                     ? {
                         returnValue: true,
-                        apps: [{ id: 'com.example.real', title: 'A real TV app', visible: true }],
+                        apps,
                       }
                     : {
                         returnValue: true,
@@ -170,7 +170,7 @@ async function installMockTV(page: Page, denied: boolean) {
         }
       };
     },
-    { denied, requiredACG: manifest.requiredACG as string[] },
+    { denied, requiredACG: manifest.requiredACG as string[], apps },
   );
 }
 
