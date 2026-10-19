@@ -437,7 +437,7 @@ export function App() {
           </button>
         ) : (
           <div className="shell">
-            <header className="header">
+            <header className="header" data-focus-down={page === 'settings' ? 'setting-home-app-names' : undefined}>
               <time className="header-time" dateTime={now.toISOString()}>
                 {time}
               </time>
@@ -759,8 +759,8 @@ export function App() {
               ) : null}
               <div className="footer-right">
                 {page === 'settings' ? (
-                  <span className="settings-version" aria-label="Luma version 0.1.6">
-                    v0.1.6
+                  <span className="settings-version" aria-label="Luma version 0.1.7">
+                    v0.1.7
                   </span>
                 ) : (
                   <>

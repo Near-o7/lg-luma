@@ -64,7 +64,13 @@ test('full-page settings support remote navigation, Back, and persistent prefere
   await expect(settings).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.keyboard.press('ArrowDown');
-  expect(await page.locator(':focus').evaluate((element) => !!element.closest('main'))).toBe(true);
+  await expect(page.getByRole('switch', { name: 'Show app names on Home', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(settings).toBeFocused();
+  for (const id of ['setting-home-app-names', 'setting-clock', 'setting-motion', 'setting-refresh', 'setting-show-weather']) {
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator(':focus')).toHaveAttribute('data-focusable', id);
+  }
   await page.getByRole('button', { name: 'Summit', exact: true }).click();
   await page.getByRole('switch', { name: '24-hour clock', exact: false }).click();
   await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();

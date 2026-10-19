@@ -53,6 +53,7 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                 role="switch"
                 aria-checked={preferences.showHomeAppNames}
                 data-focusable="setting-home-app-names"
+                data-focus-up="nav-settings"
                 onClick={() => onUpdate({ showHomeAppNames: !preferences.showHomeAppNames })}
               >
                 <Type />

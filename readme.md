@@ -23,7 +23,7 @@ Open **http://127.0.0.1:5173**. Desktop preview shows clearly identified sample 
 pnpm run package
 ```
 
-Output: `dist/com.luma.launcher_0.1.6_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
+Output: `dist/com.luma.launcher_0.1.7_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
 
 Photographs, fonts, and app-logo SVGs are checked in locally. `pnpm assets` prepares them again if you deliberately remove them; it downloads from Unsplash, jsDelivr, Wikimedia Commons, and the Inter/Jellyfin repositories at build time. Normal builds and TV use require no asset downloads. Logo sources and licenses are documented in [assets.md](assets.md).
 
@@ -32,7 +32,7 @@ Photographs, fonts, and app-logo SVGs are checked in locally. `pnpm assets` prep
 1. Open Homebrew Channel on your TV; check **Settings → Root status: ok**.
 2. Open [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop) on your Mac.
 3. Connect to `10.120.1.99`, port `22`, user `root`, using your existing SSH password or key.
-4. Install `dist/com.luma.launcher_0.1.6_all.ipk` and launch **Luma**.
+4. Install `dist/com.luma.launcher_0.1.7_all.ipk` and launch **Luma**.
 
 Or register your root SSH connection with the locally installed CLI:
 
@@ -49,7 +49,7 @@ The package has its own ID and installs alongside LG Home and LG-XMB.
 Manual IPK installation is supported. From your Mac, copy the built package:
 
 ```sh
-scp -O dist/com.luma.launcher_0.1.6_all.ipk root@10.120.1.99:/tmp/luma-0.1.6.ipk
+scp -O dist/com.luma.launcher_0.1.7_all.ipk root@10.120.1.99:/tmp/luma-0.1.7.ipk
 ssh root@10.120.1.99
 ```
 
@@ -57,7 +57,7 @@ Then, inside the TV's root shell:
 
 ```sh
 luna-send -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma-0.1.6.ipk","subscribe":true}'
+  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma-0.1.7.ipk","subscribe":true}'
 ```
 
 Wait for the terminal installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma so the new package permissions are used.
@@ -93,7 +93,7 @@ Home shows Favorites and Inputs without a recent-app section or permanent contro
 
 The top navigation includes a full-page **Settings** view, with **Background** on the left and **Interface** above **Weather** on the right. The sliders icon at the top right opens **TV settings** directly. Interface controls Home app names, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
 
-The nine bundled backdrops are Golden hour, San Francisco, Midnight (a gradient), Summit, Coast, Forest, Sand dunes, Lake, and Northern lights.
+The nine bundled backgrounds are Golden hour, San Francisco, Midnight (a gradient), Summit, Coast, Forest, Sand dunes, Lake, and Northern lights. From the Settings tab, Down enters Interface and continues into Weather; Left reaches the background gallery.
 
 Apple TV, Prime Video, Disney+, Jellyfin, Netflix, YouTube, ARTE, ZDF, and Das Erste use bundled SVG logos. Input cards choose connection artwork from the reported device name: PlayStation uses the supplied PlayStation mark, USB uses the USB symbol, unnamed HDMI ports use an HDMI connector, and other devices use a suitable generic icon. Icon selection does not change the input's launch target.
 
