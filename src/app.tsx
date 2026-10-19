@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowRight,
-  ChevronRight,
   CircleAlert,
   Grid2X2,
   Heart,
@@ -10,7 +9,6 @@ import {
   Monitor,
   Moon,
   MoreHorizontal,
-  Plus,
   Search,
   Settings2,
   Sparkles,
@@ -454,21 +452,7 @@ export function App() {
                   </section>
                   <section className="favorites-section" aria-labelledby="favorites-heading">
                     <div className="section-heading">
-                      <div>
-                        <h2 id="favorites-heading">
-                          Your favorites <Heart size={17} strokeWidth={1.6} />
-                        </h2>
-                      </div>
-                      <button
-                        className="text-button"
-                        data-focusable="edit-favorites"
-                        onClick={() => {
-                          openPage('apps');
-                          notify('Hold OK on an app to add it to your favorites.');
-                        }}
-                      >
-                        Manage Apps <Plus size={17} />
-                      </button>
+                      <h2 id="favorites-heading">Your favorites</h2>
                     </div>
                     {loading && !inventory.apps.length ? (
                       <div className="app-grid skeleton-grid" aria-label="Loading apps">
@@ -512,13 +496,6 @@ export function App() {
                     <section className="home-inputs" aria-labelledby="inputs-heading">
                       <div className="section-heading">
                         <h2 id="inputs-heading">Inputs</h2>
-                        <button
-                          className="text-button"
-                          data-focusable="all-inputs"
-                          onClick={() => openPage('inputs')}
-                        >
-                          All inputs <ChevronRight size={17} />
-                        </button>
                       </div>
                       <div className="input-grid home-input-grid">
                         {inventory.inputs.slice(0, 3).map((input) => (
@@ -543,7 +520,7 @@ export function App() {
               {page === 'apps' ? (
                 <>
                   <h1 className="sr-only">Apps</h1>
-                  <div className="library-toolbar">
+                  <div className="library-toolbar" onFocus={(event) => event.currentTarget.closest('main')?.scrollTo({ top: 0, behavior: 'instant' })}>
                     <div className="filter-tabs" aria-label="App categories">
                       {categories.map((item) => (
                         <button
@@ -679,7 +656,6 @@ export function App() {
                     void refresh();
                     notify('Refreshing your apps and inputs…');
                   }}
-                  onManage={() => openPage('apps')}
                 />
               ) : null}
               {error && inventory.apps.length ? (

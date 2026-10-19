@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Clock3, Eye, Leaf, RefreshCw } from 'lucide-react';
+import { Check, ChevronRight, Clock3, Leaf, RefreshCw } from 'lucide-react';
 import { WeatherSettings } from './weather-settings';
 import type { Preferences } from '../types';
 import { wallpapers } from '../wallpapers';
@@ -7,10 +7,9 @@ interface Props {
   preferences: Preferences;
   onUpdate: (patch: Partial<Preferences>) => void;
   onRefresh: () => void;
-  onManage: () => void;
 }
 
-export function Settings({ preferences, onUpdate, onRefresh, onManage }: Props) {
+export function Settings({ preferences, onUpdate, onRefresh }: Props) {
   return (
     <section className="settings-page" aria-label="Luma settings">
       <h1 className="sr-only">Settings</h1>
@@ -50,9 +49,9 @@ export function Settings({ preferences, onUpdate, onRefresh, onManage }: Props) 
               onChange={(weatherLocation) => onUpdate({ weatherLocation })}
             />
           </section>
-          <section className="settings-panel" aria-labelledby="preferences-heading">
-            <h2 className="settings-section-title" id="preferences-heading">
-              Preferences
+          <section className="settings-panel" aria-labelledby="look-and-feel-heading">
+            <h2 className="settings-section-title" id="look-and-feel-heading">
+              Look &amp; Feel
             </h2>
             <div className="settings-group">
               <button
@@ -65,7 +64,6 @@ export function Settings({ preferences, onUpdate, onRefresh, onManage }: Props) 
                 <Clock3 />
                 <span>
                   <strong>24-hour clock</strong>
-                  <small>A little more precision.</small>
                 </span>
                 <span className={`toggle${preferences.clock24 ? ' on' : ''}`}>
                   <i />
@@ -81,19 +79,10 @@ export function Settings({ preferences, onUpdate, onRefresh, onManage }: Props) 
                 <Leaf />
                 <span>
                   <strong>Reduced motion</strong>
-                  <small>Keep things still and simple.</small>
                 </span>
                 <span className={`toggle${preferences.reducedMotion ? ' on' : ''}`}>
                   <i />
                 </span>
-              </button>
-              <button className="setting-row" data-focusable="setting-manage" onClick={onManage}>
-                <Eye />
-                <span>
-                  <strong>Manage your apps</strong>
-                  <small>Favorites, hidden apps, and your library.</small>
-                </span>
-                <ChevronRight />
               </button>
             </div>
             <div className="settings-group">
@@ -101,7 +90,6 @@ export function Settings({ preferences, onUpdate, onRefresh, onManage }: Props) 
                 <RefreshCw />
                 <span>
                   <strong>Refresh apps & inputs</strong>
-                  <small>Find anything you’ve recently installed.</small>
                 </span>
                 <ChevronRight />
               </button>
