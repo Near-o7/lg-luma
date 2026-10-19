@@ -7,6 +7,13 @@ const identities: { match: RegExp; brand: string; category: Category }[] = [
   { match: /apple.?tv|appletv/i, brand: 'apple', category: 'Streaming' },
   { match: /amazon|prime.?video/i, brand: 'prime', category: 'Streaming' },
   { match: /jellyfin/i, brand: 'jellyfin', category: 'Streaming' },
+  { match: /(?:^|[.\s_-])arte(?:$|[.\s_-])/i, brand: 'arte', category: 'Streaming' },
+  { match: /zdf/i, brand: 'zdf', category: 'Streaming' },
+  {
+    match: /das[\s._-]*erste|(?:^|[.\s_-])ard(?:$|[.\s_-])|ardmediathek/i,
+    brand: 'das-erste',
+    category: 'Streaming',
+  },
   { match: /plex/i, brand: 'plex', category: 'Streaming' },
   { match: /kodi/i, brand: 'kodi', category: 'Streaming' },
   { match: /spotify/i, brand: 'spotify', category: 'Music' },
@@ -125,6 +132,9 @@ export const demoApps = [
   ['com.limelight.webos', 'Moonlight'],
   ['org.webosbrew.hbchannel', 'Homebrew Channel'],
   ['com.webos.app.browser', 'Web Browser'],
+  ['com.arte.tv', 'ARTE'],
+  ['zdf', 'ZDF'],
+  ['ard', 'Das Erste'],
 ].map(([id, title]) => appIdentity(id, title));
 
 export const demoInputs: TVInput[] = [

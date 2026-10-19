@@ -473,95 +473,65 @@ button svg {
 .brand-netflix {
   background: #141414;
 }
-.wordmark-netflix {
-  color: #e9252c;
-  font-family: 'Luma Sans', Arial, sans-serif;
-  font-size: 2.8rem;
-  font-weight: 800;
-  letter-spacing: -0.055em;
-  transform: scaleX(0.86);
-}
 .brand-youtube {
   background: linear-gradient(155deg, #fffefc, #e9e8e5);
   color: #111;
 }
-.wordmark-youtube {
-  font-size: 1.9rem;
-  font-weight: 720;
-  gap: 0.4rem;
-  letter-spacing: -0.065em;
-  transform: scaleX(0.96);
-}
-.youtube-play {
-  width: 2.75rem;
-  height: 1.95rem;
-  background: #f32427;
-  border-radius: 0.6rem;
-  display: grid;
-  place-items: center;
-  color: white;
-}
-.youtube-play svg {
-  width: 1.65rem;
-  height: 1.65rem;
-}
 .brand-apple {
   background: linear-gradient(145deg, #242528, #07090b);
-}
-.wordmark-apple {
-  font-size: 4.1rem;
-  font-weight: 500;
-  gap: 0.45rem;
-  letter-spacing: -0.07em;
-}
-.wordmark-apple svg {
-  width: 2.6rem;
-  height: 3.15rem;
-  margin-top: -0.4rem;
 }
 .brand-disney {
   background: radial-gradient(ellipse at 50% 110%, #16466b, #0b244c 60%, #091936);
 }
-.wordmark-disney {
-  font-family: Georgia, serif;
-  font-size: 3rem;
-  font-style: italic;
-  letter-spacing: -0.1em;
-  margin-top: 0.65rem;
-}
-.disney-plus {
-  font-family: 'Luma Sans', sans-serif;
-  font-size: 2.4rem;
-  font-weight: 300;
-  font-style: normal;
-  letter-spacing: 0;
-  margin-left: 0.12rem;
-}
-.disney-arc {
-  position: absolute;
-  width: 8rem;
-  height: 2.3rem;
-  border-top: 2px solid #97c8dd;
-  border-radius: 50%;
-  top: -1.2rem;
-  left: 0.25rem;
-  transform: rotate(-10deg);
-}
 .brand-prime {
   background: linear-gradient(145deg, #0786bd, #005ba7);
 }
-.wordmark-prime {
-  font-size: 2.05rem;
-  letter-spacing: -0.055em;
-  font-weight: 650;
-  display: flex;
-  flex-direction: column;
-  margin-top: 1rem;
+.brand-logo {
+  display: block;
+  width: 70%;
+  height: 5.5rem;
+  object-fit: contain;
+  pointer-events: none;
 }
-.wordmark-prime svg {
-  width: 7.7rem;
-  height: 1.6rem;
-  margin-top: 0.3rem;
+.brand-logo-netflix {
+  width: 76%;
+}
+.brand-logo-youtube {
+  width: 74%;
+}
+.brand-logo-apple {
+  width: 43%;
+}
+.brand-logo-disney {
+  width: 72%;
+  height: 6.6rem;
+}
+.brand-logo-prime {
+  width: 72%;
+}
+.brand-logo-jellyfin {
+  width: 83%;
+}
+.brand-logo-arte {
+  width: 58%;
+}
+.brand-logo-zdf {
+  width: 50%;
+}
+.brand-logo-apple,
+.brand-logo-disney,
+.brand-logo-prime,
+.brand-logo-das-erste {
+  filter: brightness(0) invert(1);
+}
+.brand-arte {
+  background: linear-gradient(145deg, #242323, #121212);
+}
+.brand-zdf {
+  background: linear-gradient(145deg, #fffefb, #eae8e2);
+}
+.brand-das-erste {
+  background: linear-gradient(145deg, #064c84, #00254e);
 }
 .brand-plex {
   background: linear-gradient(140deg, #343434, #232323);
@@ -589,17 +559,7 @@ button svg {
   height: 2.5rem;
 }
 .brand-jellyfin {
-  background: linear-gradient(135deg, #38477f, #181e3e);
-}
-.wordmark-jellyfin {
-  font-size: 2rem;
-  gap: 0.6rem;
-  font-weight: 550;
-}
-.wordmark-jellyfin svg {
-  width: 2.4rem;
-  height: 2.4rem;
-  color: #b5a8ef;
+  background: linear-gradient(135deg, #25283f, #101422);
 }
 .brand-homebrew {
   background: linear-gradient(135deg, #7c6042, #3f392d);
@@ -669,7 +629,7 @@ button svg {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: linear-gradient(125deg, #d8d8cc13, #c9c6b707);
+  background: linear-gradient(125deg, #20252bef, #171c22ed);
   border: 1px solid #fffdf010;
   padding: 1.1rem 1.25rem;
   min-height: 6.5rem;
@@ -681,7 +641,7 @@ button svg {
 }
 .input-card:hover,
 .input-card:focus-visible {
-  background: linear-gradient(125deg, #d8d8cc26, #c9c6b713);
+  background: linear-gradient(125deg, #30363cf5, #242a30f2);
   border-color: #fff9e83d;
 }
 .input-card:focus-visible {
@@ -1597,46 +1557,6 @@ button svg {
   .app-label {
     font-size: 0.9rem;
   }
-  .wordmark-netflix {
-    font-size: 2.1rem;
-  }
-  .wordmark-youtube {
-    font-size: 1.25rem;
-  }
-  .youtube-play {
-    width: 1.9rem;
-    height: 1.4rem;
-    border-radius: 0.4rem;
-  }
-  .youtube-play svg {
-    width: 1.2rem;
-    height: 1.2rem;
-  }
-  .wordmark-apple {
-    font-size: 3rem;
-  }
-  .wordmark-apple svg {
-    width: 2rem;
-    height: 2.3rem;
-  }
-  .wordmark-disney {
-    font-size: 2.2rem;
-  }
-  .disney-arc {
-    width: 5.5rem;
-    height: 1.8rem;
-    top: -0.9rem;
-  }
-  .disney-plus {
-    font-size: 1.8rem;
-  }
-  .wordmark-prime {
-    font-size: 1.5rem;
-  }
-  .wordmark-prime svg {
-    width: 5.8rem;
-    height: 1.3rem;
-  }
   .wordmark-plex {
     font-size: 3.4rem;
   }
@@ -1655,14 +1575,6 @@ button svg {
   .wordmark-spotify svg {
     width: 1.6rem;
     height: 1.6rem;
-  }
-  .wordmark-jellyfin {
-    font-size: 1.3rem;
-    gap: 0.3rem;
-  }
-  .wordmark-jellyfin svg {
-    width: 1.8rem;
-    height: 1.8rem;
   }
   .wordmark-kodi {
     font-size: 2.2rem;

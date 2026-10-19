@@ -127,7 +127,7 @@ export function Settings({
           <img src="./mark.svg" width="36" height="36" alt="" />
           <span>
             <strong>
-              Luma <small>0.1.2</small>
+              Luma <small>0.1.3</small>
             </strong>
           </span>
           <span className="local-badge">

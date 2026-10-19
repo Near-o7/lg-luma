@@ -1,4 +1,5 @@
-import { Gamepad2, Monitor, Tv, Cable, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import { ConnectionIcon } from './connection-icon';
 import type { TVInput } from '../types';
 
 export function InputCard({
@@ -8,7 +9,6 @@ export function InputCard({
   input: TVInput;
   onLaunch: (input: TVInput) => void;
 }) {
-  const Icon = { console: Gamepad2, streamer: Tv, computer: Monitor, hdmi: Cable }[input.kind];
   return (
     <button
       className={`input-card input-${input.kind}`}
@@ -19,7 +19,7 @@ export function InputCard({
       }}
     >
       <span className="input-art">
-        <Icon strokeWidth={1.25} />
+        <ConnectionIcon input={input} />
       </span>
       <span className="input-info">
         <span className="input-port">{input.port}</span>

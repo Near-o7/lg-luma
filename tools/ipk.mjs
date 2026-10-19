@@ -74,6 +74,15 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     'wallpapers/san-francisco.jpg',
     'wallpapers/munich.jpg',
     'wallpapers/tokyo.jpg',
+    'logos/apple-tv.svg',
+    'logos/prime-video.svg',
+    'logos/disney-plus.svg',
+    'logos/jellyfin.svg',
+    'logos/netflix.svg',
+    'logos/youtube.svg',
+    'logos/arte.svg',
+    'logos/zdf.svg',
+    'logos/das-erste.svg',
   ]) {
     if (!owned.some((file) => file.name.endsWith(`/${required}`) && file.data.length > 0))
       throw new Error(`Package is missing ${required}.`);

@@ -10,6 +10,24 @@
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
 
+## Brand SVGs
+
+The requested app logos use downloaded vector artwork, rather than font approximations. SVG outlines are preserved; Apple TV, Disney+, Prime Video, and Das Erste use a white monochrome display treatment for contrast. All files are bundled locally under `public/logos/`.
+
+| Asset             | Source                                                                                                                          | Source license / attribution                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `apple-tv.svg`    | [Apple TV logo](https://commons.wikimedia.org/wiki/File:Apple_TV_logo.svg)                                                      | Apple Inc.; public-domain logo artwork                                                                                              |
+| `prime-video.svg` | [Amazon Prime Video logo](https://commons.wikimedia.org/wiki/File:Amazon_Prime_Video_logo.svg)                                  | Amazon; public-domain logo artwork                                                                                                  |
+| `disney-plus.svg` | [Disney+ logo](https://commons.wikimedia.org/wiki/File:Disney%2B_logo.svg)                                                      | Disney Enterprises, Inc.; public-domain logo artwork                                                                                |
+| `jellyfin.svg`    | [Jellyfin official branding, banner-dark.svg](https://github.com/jellyfin/jellyfin-ux/blob/master/branding/SVG/banner-dark.svg) | Jellyfin contributors; [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); original license notice retained in the SVG |
+| `netflix.svg`     | [Netflix 2015 logo](https://commons.wikimedia.org/wiki/File:Netflix_2015_logo.svg)                                              | Netflix Inc.; public-domain logo artwork                                                                                            |
+| `youtube.svg`     | [YouTube 2024](https://commons.wikimedia.org/wiki/File:YouTube_2024.svg)                                                        | Google Inc.; public-domain logo artwork                                                                                             |
+| `arte.svg`        | [ARTE 2026 logo](https://commons.wikimedia.org/wiki/File:Arte_Logo_2026.svg)                                                    | ARTE; public-domain logo artwork                                                                                                    |
+| `zdf.svg`         | [ZDF logo](https://commons.wikimedia.org/wiki/File:ZDF_logo.svg)                                                                | ZDF; public-domain logo artwork                                                                                                     |
+| `das-erste.svg`   | [Das Erste 2014](https://commons.wikimedia.org/wiki/File:Das_Erste_2014.svg)                                                    | ARD; public-domain logo artwork                                                                                                     |
+
+The PlayStation input symbol uses the SVG path supplied by the user. PlayStation is a Sony Interactive Entertainment mark. HDMI, USB, and generic device symbols are Lucide icons.
+
 TV integration was developed with [LG-XMB](https://github.com/Ripthulhu/LG-XMB)'s documented, working Homebrew Channel discovery transport as a reference. Luma does not include its code, native input hooks, shaders, or PS3 assets.
 
 The Apple design guidance supplied for this project informed motion, focus feedback, materials, typography, and reduced-motion behavior. It is not an Apple product.

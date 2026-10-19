@@ -29,6 +29,39 @@ const assets = [
     'https://cdn.jsdelivr.net/fontsource/fonts/inter:vf@latest/latin-wght-normal.woff2',
   ],
   ['public/fonts/ofl.txt', 'https://raw.githubusercontent.com/rsms/inter/master/LICENSE.txt'],
+  [
+    'public/logos/apple-tv.svg',
+    'https://upload.wikimedia.org/wikipedia/commons/f/f7/Apple_TV_logo.svg',
+  ],
+  [
+    'public/logos/prime-video.svg',
+    'https://upload.wikimedia.org/wikipedia/commons/1/11/Amazon_Prime_Video_logo.svg',
+  ],
+  [
+    'public/logos/disney-plus.svg',
+    'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg',
+  ],
+  [
+    'public/logos/jellyfin.svg',
+    'https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/banner-dark.svg',
+  ],
+  [
+    'public/logos/netflix.svg',
+    'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg',
+  ],
+  [
+    'public/logos/youtube.svg',
+    'https://upload.wikimedia.org/wikipedia/commons/2/20/YouTube_2024.svg',
+  ],
+  [
+    'public/logos/arte.svg',
+    'https://upload.wikimedia.org/wikipedia/commons/e/ee/Arte_Logo_2026.svg',
+  ],
+  ['public/logos/zdf.svg', 'https://upload.wikimedia.org/wikipedia/commons/c/c1/ZDF_logo.svg'],
+  [
+    'public/logos/das-erste.svg',
+    'https://upload.wikimedia.org/wikipedia/commons/c/ca/Das_Erste_2014.svg',
+  ],
 ];
 for (const [relative, url] of assets) {
   const destination = path.join(root, relative);
@@ -42,6 +75,8 @@ for (const [relative, url] of assets) {
   if (!response.ok) throw new Error(`${url}: ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length < 100) throw new Error(`Unexpectedly small asset: ${relative}`);
+  if (relative.endsWith('.svg') && !bytes.toString('utf8').includes('<svg'))
+    throw new Error(`Not an SVG asset: ${relative}`);
   await fs.writeFile(destination, bytes);
   console.log(`Bundled ${relative} (${bytes.length} bytes)`);
 }

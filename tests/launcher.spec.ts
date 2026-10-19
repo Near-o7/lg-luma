@@ -107,6 +107,20 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.fonts.check('16px "Luma Sans"'))).toBe(true);
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await expect(page.locator('.library-grid .brand-logo')).toHaveCount(9);
+  await expect
+    .poll(() =>
+      page
+        .locator('.library-grid .brand-logo')
+        .evaluateAll((images) =>
+          images.every(
+            (image) =>
+              image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true);
   await page.getByRole('button', { name: 'Inputs', exact: true }).click();
   await expect(page.getByRole('button', { name: /HDMI 1 PlayStation 5/ })).toBeVisible();
   await page.screenshot({ path: info.outputPath('luma-inputs.png') });
@@ -119,10 +133,13 @@ async function installMockTV(
   page: Page,
   denied: boolean,
   apps = [{ id: 'com.example.real', title: 'A real TV app', visible: true }],
+  devices = [
+    { appId: 'com.webos.app.hdmi2', id: 'HDMI_2', port: 2, label: 'Real HDMI', connected: true },
+  ],
 ) {
   const manifest = JSON.parse(readFileSync(path.resolve('appinfo.json'), 'utf8'));
   await page.addInitScript(
-    ({ denied, requiredACG, apps }) => {
+    ({ denied, requiredACG, apps, devices }) => {
       const w = window as typeof window & { __calls: { uri: string; payload: any }[] };
       w.__calls = [];
       w.PalmSystem = { identifier: 'com.luma.launcher' };
@@ -155,15 +172,7 @@ async function installMockTV(
                       }
                     : {
                         returnValue: true,
-                        devices: [
-                          {
-                            appId: 'com.webos.app.hdmi2',
-                            id: 'HDMI_2',
-                            port: 2,
-                            label: 'Real HDMI',
-                            connected: true,
-                          },
-                        ],
+                        devices,
                       },
                 ),
               };
@@ -174,7 +183,7 @@ async function installMockTV(
         }
       };
     },
-    { denied, requiredACG: manifest.requiredACG as string[], apps },
+    { denied, requiredACG: manifest.requiredACG as string[], apps, devices },
   );
 }
 
@@ -299,4 +308,40 @@ test('compact library filters can reset, long names wrap, and inputs stay compac
   const input = await page.locator('.full-input-grid .input-card').first().boundingBox();
   expect(input!.height).toBeLessThan(140);
   expect(input!.y).toBeLessThan(250);
+});
+
+test('connection artwork follows the reported device labels without changing the input target', async ({
+  page,
+}) => {
+  await installMockTV(page, false, undefined, [
+    {
+      appId: 'com.webos.app.hdmi1',
+      id: 'HDMI_1',
+      port: 1,
+      label: 'PlayStation 5',
+      connected: true,
+    },
+    { appId: 'com.webos.app.hdmi2', id: 'HDMI_2', port: 2, label: 'USB media', connected: true },
+    { appId: 'com.webos.app.hdmi3', id: 'HDMI_3', port: 3, label: 'HDMI 3', connected: true },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Inputs', exact: true }).click();
+  const playstation = page.locator('[data-focusable="input-com.webos.app.hdmi1"]');
+  await expect(playstation.locator('[data-connection-icon="playstation"]')).toBeVisible();
+  await expect(
+    page.locator('[data-focusable="input-com.webos.app.hdmi2"] [data-connection-icon="usb"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-focusable="input-com.webos.app.hdmi3"] [data-connection-icon="hdmi"]'),
+  ).toBeVisible();
+  await playstation.click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as any).__calls
+          .filter((call: any) => call.uri.endsWith('/launch'))
+          .map((call: any) => call.payload.id),
+      ),
+    )
+    .toEqual(['com.webos.app.hdmi1']);
 });

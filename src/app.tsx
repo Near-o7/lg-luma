@@ -450,7 +450,7 @@ export function App() {
                           notify('Hold OK on an app to add it to your favorites.');
                         }}
                       >
-                        Make it yours <Plus size={17} />
+                        Manage Apps <Plus size={17} />
                       </button>
                     </div>
                     {loading && !inventory.apps.length ? (
