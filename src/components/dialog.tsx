@@ -69,7 +69,7 @@ export function Dialog({
         {children}
         <div className="dialog-footer">
           <div className="dialog-shortcuts">
-            <span className="keycap">↵</span> Select <span className="keycap">esc</span> Back
+            <span className="keycap">OK</span> Select <span className="keycap">Back</span> Close
           </div>
           {footerEnd ? <div className="dialog-footer-end">{footerEnd}</div> : null}
         </div>

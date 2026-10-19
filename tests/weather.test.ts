@@ -21,6 +21,19 @@ test('old saved preferences migrate without enabling weather and invalid coordin
   assert.equal(parsePreferences('{"version":1,"favorites":["netflix"]}').weatherLocation, null);
   const preferences = parsePreferences(JSON.stringify({ version: 1, weatherLocation: vienna }));
   assert.deepEqual(preferences.weatherLocation, vienna);
+  assert.equal(preferences.showWeather, true);
+  assert.equal(preferences.showHomeAppNames, false);
+  const configured = parsePreferences(
+    JSON.stringify({
+      version: 1,
+      weatherLocation: vienna,
+      showWeather: false,
+      showHomeAppNames: true,
+    }),
+  );
+  assert.equal(configured.showWeather, false);
+  assert.equal(configured.showHomeAppNames, true);
+  assert.deepEqual(configured.weatherLocation, vienna);
   assert.equal(parseLocation({ ...vienna, latitude: Infinity }), null);
   assert.equal(parseLocation({ ...vienna, longitude: 181 }), null);
   assert.equal(parseLocation({ ...vienna, name: '' }), null);

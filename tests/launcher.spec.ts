@@ -65,7 +65,7 @@ test('full-page settings support remote navigation, Back, and persistent prefere
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.keyboard.press('ArrowDown');
   expect(await page.locator(':focus').evaluate((element) => !!element.closest('main'))).toBe(true);
-  await page.getByRole('button', { name: 'Higher ground', exact: false }).click();
+  await page.getByRole('button', { name: 'Summit', exact: true }).click();
   await page.getByRole('switch', { name: '24-hour clock', exact: false }).click();
   await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();
   await page.screenshot({ path: info.outputPath('luma-settings.png') });
@@ -73,7 +73,7 @@ test('full-page settings support remote navigation, Back, and persistent prefere
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await page.reload();
-  await expect(page.locator('.wallpaper')).toHaveClass(/wallpaper-alpine/);
+  await expect(page.locator('.wallpaper')).toHaveClass(/wallpaper-summit/);
   await expect(page.locator('.luma')).toHaveClass(/reduce-motion/);
 });
 
@@ -92,7 +92,7 @@ test('search, category filtering, empty results and Back work', async ({ page })
   await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Open Spotify', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('heading', { name: 'Your favorites' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Favorites', exact: true })).toBeVisible();
 });
 
 test('the packaged file app loads offline with CSP, local fonts, no module fetches and no remote requests', async ({
@@ -108,6 +108,7 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
   page.on('requestfailed', (request) => failed.push(request.url()));
   await page.goto(pathToFileURL(path.resolve('dist/app/index.html')).href);
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeVisible();
+  await expect(page.locator('.header-time')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.fonts.check('16px "Luma Sans"'))).toBe(true);
@@ -444,4 +445,29 @@ test('moving up to the Apps categories restores the complete top of the scroller
   await page.keyboard.press('ArrowUp');
   await expect(page.getByRole('button', { name: 'Utilities', exact: true })).toBeFocused();
   await expect.poll(() => page.locator('main').evaluate((main) => main.scrollTop)).toBe(0);
+});
+
+test('Home card captions are opt-in, persist, and do not affect library captions', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+  await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const names = page.getByRole('switch', { name: 'Show app names on Home', exact: true });
+  await expect(names).toHaveAttribute('aria-checked', 'false');
+  await names.click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.favorites-grid .app-label').first()).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.favorites-grid .app-label').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(names).toHaveAttribute('aria-checked', 'true');
+  await names.click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await expect(page.locator('.library-grid .app-label').first()).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
 });

@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, LoaderCircle, MapPin, Search, X } from 'lucide-react';
+import { Check, CloudSun, LoaderCircle, MapPin, Search, X } from 'lucide-react';
 import type { WeatherLocation } from '../types';
 import { clearWeatherCache, locationDetail, locationKey, searchLocations } from '../weather';
 
 export function WeatherSettings({
   location,
   onChange,
+  enabled,
+  onEnabledChange,
 }: {
   location: WeatherLocation | null;
   onChange: (location: WeatherLocation | null) => void;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<WeatherLocation[]>([]);
@@ -44,10 +48,25 @@ export function WeatherSettings({
   };
 
   return (
-    <section className="weather-settings" aria-labelledby="weather-location-heading">
-      <h2 className="settings-section-title" id="weather-location-heading">
-        Weather location
+    <section className="weather-settings" aria-labelledby="weather-heading">
+      <h2 className="settings-section-title" id="weather-heading">
+        Weather
       </h2>
+      <button
+        className="setting-row weather-visibility-toggle"
+        role="switch"
+        aria-checked={enabled}
+        data-focusable="setting-show-weather"
+        onClick={() => onEnabledChange(!enabled)}
+      >
+        <CloudSun />
+        <span>
+          <strong>Show weather widget</strong>
+        </span>
+        <span className={`toggle${enabled ? ' on' : ''}`}>
+          <i />
+        </span>
+      </button>
       {location ? (
         <div className="saved-location">
           <MapPin size={18} />

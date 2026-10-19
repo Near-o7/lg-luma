@@ -143,3 +143,49 @@ test('location search handles no matches and can be retried', async ({ page }) =
   await page.getByRole('button', { name: 'Search locations', exact: true }).click();
   await expect.poll(() => requests).toBe(2);
 });
+
+test('weather visibility preserves the city and prevents requests when the widget is off', async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.addInitScript(
+    (location) =>
+      localStorage.setItem(
+        'luma.preferences.v1',
+        JSON.stringify({ version: 1, weatherLocation: location, showWeather: false }),
+      ),
+    location,
+  );
+  await page.route('https://api.open-meteo.com/**', (route) => {
+    requests++;
+    return route.fulfill({ json: { current: { temperature_2m: 12, weather_code: 3, is_day: 1 } } });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+  await expect(page.locator('.weather-summary')).toHaveCount(0);
+  expect(requests).toBe(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const interfaceHeading = await page
+    .getByRole('heading', { name: 'Interface', exact: true })
+    .boundingBox();
+  const weatherHeading = await page
+    .getByRole('heading', { name: 'Weather', exact: true })
+    .boundingBox();
+  expect(interfaceHeading!.y).toBeLessThan(weatherHeading!.y);
+  const toggle = page.getByRole('switch', { name: 'Show weather widget', exact: true });
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(page.locator('.saved-location')).toContainText('Vienna');
+  await toggle.click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.weather-summary')).toContainText('12°C');
+  expect(requests).toBe(1);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await toggle.click();
+  await page.keyboard.press('Escape');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+  await expect(page.locator('.weather-summary')).toHaveCount(0);
+  expect(requests).toBe(1);
+  await page.getByRole('button', { name: 'Enter ambient mode' }).click();
+  await expect(page.locator('.ambient-hint')).toHaveText('Press any button to return');
+});

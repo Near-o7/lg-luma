@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Pin, PinOff, Play } from 'lucide-react';
+import { Eye, EyeOff, Pin, PinOff } from 'lucide-react';
 import { Dialog } from './dialog';
 import { Brand } from './brand';
 import type { TVApp } from '../types';
@@ -8,36 +8,18 @@ interface Props {
   favorites: string[];
   hidden: boolean;
   onClose: () => void;
-  onLaunch: () => void;
   onPin: () => void;
   onHide: () => void;
-  onMove: (offset: number) => void;
 }
 
-export function AppOptions({
-  app,
-  favorites,
-  hidden,
-  onClose,
-  onLaunch,
-  onPin,
-  onHide,
-  onMove,
-}: Props) {
-  const index = favorites.indexOf(app.id);
-  const pinned = index >= 0;
+export function AppOptions({ app, favorites, hidden, onClose, onPin, onHide }: Props) {
+  const pinned = favorites.includes(app.id);
   return (
     <Dialog title={app.title} subtitle={app.category} onClose={onClose}>
       <div className={`option-app-art brand-${app.brand}`}>
         <Brand app={app} />
       </div>
       <div className="settings-group">
-        <button className="setting-row" data-focusable="option-open" onClick={onLaunch}>
-          <Play />
-          <span>
-            <strong>Open app</strong>
-          </span>
-        </button>
         <button className="setting-row" data-focusable="option-pin" onClick={onPin}>
           {pinned ? <PinOff /> : <Pin />}
           <span>
@@ -55,31 +37,6 @@ export function AppOptions({
           </span>
         </button>
       </div>
-      {pinned ? (
-        <div className="reorder-controls">
-          <span>
-            Favorite {index + 1} of {favorites.length}
-          </span>
-          <button
-            className="small-button"
-            data-focusable="option-left"
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-            aria-label="Move favorite left"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <button
-            className="small-button"
-            data-focusable="option-right"
-            disabled={index === favorites.length - 1}
-            onClick={() => onMove(1)}
-            aria-label="Move favorite right"
-          >
-            <ArrowRight size={18} />
-          </button>
-        </div>
-      ) : null}
     </Dialog>
   );
 }

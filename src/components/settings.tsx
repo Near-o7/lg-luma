@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Clock3, Leaf, RefreshCw } from 'lucide-react';
+import { Check, ChevronRight, Clock3, Leaf, RefreshCw, Type } from 'lucide-react';
 import { WeatherSettings } from './weather-settings';
 import type { Preferences } from '../types';
 import { wallpapers } from '../wallpapers';
@@ -43,17 +43,26 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
           </div>
         </section>
         <div className="settings-controls">
-          <section className="settings-panel">
-            <WeatherSettings
-              location={preferences.weatherLocation}
-              onChange={(weatherLocation) => onUpdate({ weatherLocation })}
-            />
-          </section>
-          <section className="settings-panel" aria-labelledby="look-and-feel-heading">
-            <h2 className="settings-section-title" id="look-and-feel-heading">
-              Look &amp; Feel
+          <section className="settings-panel" aria-labelledby="interface-heading">
+            <h2 className="settings-section-title" id="interface-heading">
+              Interface
             </h2>
             <div className="settings-group">
+              <button
+                className="setting-row"
+                role="switch"
+                aria-checked={preferences.showHomeAppNames}
+                data-focusable="setting-home-app-names"
+                onClick={() => onUpdate({ showHomeAppNames: !preferences.showHomeAppNames })}
+              >
+                <Type />
+                <span>
+                  <strong>Show app names on Home</strong>
+                </span>
+                <span className={`toggle${preferences.showHomeAppNames ? ' on' : ''}`}>
+                  <i />
+                </span>
+              </button>
               <button
                 className="setting-row"
                 role="switch"
@@ -94,6 +103,14 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                 <ChevronRight />
               </button>
             </div>
+          </section>
+          <section className="settings-panel">
+            <WeatherSettings
+              location={preferences.weatherLocation}
+              onChange={(weatherLocation) => onUpdate({ weatherLocation })}
+              enabled={preferences.showWeather}
+              onEnabledChange={(showWeather) => onUpdate({ showWeather })}
+            />
           </section>
         </div>
       </div>

@@ -9,20 +9,32 @@ const assets = [
     'https://images.unsplash.com/photo-1509316785289-025f5b846b35?auto=format&fit=crop&w=2560&q=88',
   ],
   [
-    'public/wallpapers/alpine.jpg',
-    'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=2560&q=88',
+    'public/wallpapers/summit.jpg',
+    'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=2560&q=88',
   ],
   [
     'public/wallpapers/san-francisco.jpg',
     'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=2560&q=88',
   ],
   [
-    'public/wallpapers/munich.jpg',
-    'https://images.unsplash.com/photo-1595867818082-083862f3d630?auto=format&fit=crop&w=2560&q=88',
+    'public/wallpapers/coast.jpg',
+    'https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?auto=format&fit=crop&w=2560&q=88',
   ],
   [
-    'public/wallpapers/tokyo.jpg',
-    'https://images.unsplash.com/photo-1513407030348-c983a97b98d8?auto=format&fit=crop&w=2560&q=88',
+    'public/wallpapers/forest.jpg',
+    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2560&q=88',
+  ],
+  [
+    'public/wallpapers/sand-dunes.jpg',
+    'https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?auto=format&fit=crop&w=2560&q=88',
+  ],
+  [
+    'public/wallpapers/lake.jpg',
+    'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=2560&q=88',
+  ],
+  [
+    'public/wallpapers/northern-lights.jpg',
+    'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=2560&q=88',
   ],
   [
     'public/fonts/inter-latin.woff2',

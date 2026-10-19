@@ -89,13 +89,17 @@ The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunab
 
 On Home, hold OK on a favorite to enter move mode, press Left/Right to change its position, then press Back to finish. The new order is saved immediately and the selected app stays focused. Apps → select an app → hold OK to add/remove favorites or hide apps. Hidden apps remain installed and can be restored with **Apps → Hidden apps**. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
 
-The top navigation includes a full-page **Settings** view, with Backdrops beside Weather and **Look & Feel**. The sliders icon at the top right opens **TV settings** directly. Luma settings includes six bundled backdrops (including San Francisco, Munich, and Tokyo), weather location, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
+Home shows Favorites and Inputs without a recent-app section or permanent control hints. App names beneath Home cards are hidden by default; enable **Settings → Interface → Show app names on Home** to display them. The Apps library always shows names. The header clock is at the top left.
+
+The top navigation includes a full-page **Settings** view, with Backdrops on the left and **Interface** above **Weather** on the right. The sliders icon at the top right opens **TV settings** directly. Interface controls Home app names, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
+
+The nine bundled backdrops are Golden hour, San Francisco, Midnight (a gradient), Summit, Coast, Forest, Sand dunes, Lake, and Northern lights.
 
 Apple TV, Prime Video, Disney+, Jellyfin, Netflix, YouTube, ARTE, ZDF, and Das Erste use bundled SVG logos. Input cards choose connection artwork from the reported device name: PlayStation uses the supplied PlayStation mark, USB uses the USB symbol, unnamed HDMI ports use an HDMI connector, and other devices use a suitable generic icon. Icon selection does not change the input's launch target.
 
 ## Weather
 
-Open **Settings → Weather location**, enter a city or postcode, press Search, and select the matching place. Home shows the chosen city, temperature in °C, and current conditions. The selected location persists on the TV; nothing uses browser geolocation or automatic IP-based location lookup.
+Open **Settings → Weather**, enter a city or postcode, press Search, and select the matching place. **Show weather widget** controls visibility on Home and the ambient screen; turning it off keeps your saved city. When enabled, the widget shows the chosen city, temperature in °C, and current conditions. Nothing uses browser geolocation or automatic IP-based location lookup.
 
 Weather refreshes every 15 minutes while Home or the ambient clock is visible. The ambient clock shows weather in place of the return hint when a location is configured. Recent readings are cached locally and reused after reopening the app. If the connection fails, an available cached reading is labeled as saved; otherwise the widget says weather is unavailable. Remove the weather location in Settings to turn it off.
 
@@ -134,7 +138,7 @@ Luma does not inject code into LG services, replace the stock launcher, bind-mou
 - App launches use the public application manager API with the `application.launcher` and `application.query` ACGs. Homebrew service access declares `lunabus.query` for webOS 26 / Homebrew Channel 0.8.0-rc1. No service permissions are rewritten.
 - Service bridges are retained until completion, bounded by timeouts, and cancelled afterward. Partial refresh failures preserve the last valid inventory.
 - All app names and IDs come from inventory on the TV. A failure never substitutes desktop sample apps.
-- Preferences, recent launches, weather location, and cached readings stay in this app's local storage. Weather makes requests only after a location is configured; city searches are sent only when you press Search. The packaged Content Security Policy limits web network connections to Open-Meteo's weather and geocoding APIs.
+- Preferences, recent launches, weather location, and cached readings stay in this app's local storage. Forecast requests require an enabled widget and a configured location; city searches are sent only when you press Search. The packaged Content Security Policy limits web network connections to Open-Meteo's weather and geocoding APIs.
 - Homebrew Channel permissions and native service behavior need verification on the physical TV, particularly webOS 26. Browser tests cannot establish hardware compatibility.
 
 ## Checks

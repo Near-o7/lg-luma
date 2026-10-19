@@ -79,9 +79,6 @@ export function App() {
       (!category || app.category === category) &&
       app.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
   );
-  const recent = preferences.recent
-    .flatMap((id) => (appMap.get(id) && !preferences.hidden.includes(id) ? [appMap.get(id)!] : []))
-    .slice(0, 6);
   const date = now.toLocaleDateString(undefined, {
     weekday: 'long',
     month: 'long',
@@ -431,25 +428,19 @@ export function App() {
             <span className="ambient-date">{date}</span>
             <span className="ambient-time">{time}</span>
             <span className="ambient-hint">
-              {preferences.weatherLocation ? (
+              {preferences.showWeather && preferences.weatherLocation ? (
                 <Weather location={preferences.weatherLocation} />
               ) : (
                 'Press any button to return'
               )}
             </span>
-            <span className="ambient-logo">
-              luma<span>✦</span>
-            </span>
           </button>
         ) : (
           <div className="shell">
             <header className="header">
-              <div className="logo">
-                luma
-                <span className="logo-spark" aria-hidden="true">
-                  ✦
-                </span>
-              </div>
+              <time className="header-time" dateTime={now.toISOString()}>
+                {time}
+              </time>
               <nav className="navigation" aria-label="Main navigation">
                 {tabs.map((tab) => (
                   <button
@@ -471,7 +462,6 @@ export function App() {
                 ))}
               </nav>
               <div className="header-right">
-                <time className="header-time">{time}</time>
                 <button
                   className="icon-button settings-button"
                   data-focusable="tv-settings"
@@ -497,19 +487,21 @@ export function App() {
                     <div className="hero-copy">
                       <p className="eyebrow hero-date">{date}</p>
                       <h1 id="greeting">{greeting}</h1>
-                      <Weather
-                        location={preferences.weatherLocation}
-                        onConfigure={() => {
-                          openPage('settings');
-                          requestAnimationFrame(() => {
-                            const field = document.querySelector<HTMLElement>(
-                              '[data-focusable="weather-location-query"]',
-                            );
-                            field?.focus({ preventScroll: true });
-                            field?.scrollIntoView({ block: 'nearest' });
-                          });
-                        }}
-                      />
+                      {preferences.showWeather ? (
+                        <Weather
+                          location={preferences.weatherLocation}
+                          onConfigure={() => {
+                            openPage('settings');
+                            requestAnimationFrame(() => {
+                              const field = document.querySelector<HTMLElement>(
+                                '[data-focusable="weather-location-query"]',
+                              );
+                              field?.focus({ preventScroll: true });
+                              field?.scrollIntoView({ block: 'nearest' });
+                            });
+                          }}
+                        />
+                      ) : null}
                     </div>
                     <div className="landscape-credit">
                       <span className="tiny-line" />
@@ -519,7 +511,7 @@ export function App() {
                   </section>
                   <section className="favorites-section" aria-labelledby="favorites-heading">
                     <div className="section-heading">
-                      <h2 id="favorites-heading">Your favorites</h2>
+                      <h2 id="favorites-heading">Favorites</h2>
                       {reordering ? (
                         <span className="reorder-status" role="status">
                           Move apps
@@ -547,7 +539,7 @@ export function App() {
                       </div>
                     ) : favorites.length ? (
                       <div
-                        className={`app-grid favorites-grid${reordering ? ' is-reordering' : ''}`}
+                        className={`app-grid favorites-grid${preferences.showHomeAppNames ? '' : ' hide-app-labels'}${reordering ? ' is-reordering' : ''}`}
                       >
                         {favorites.map((app) => renderTile(app, 'favorite'))}
                       </div>
@@ -575,17 +567,6 @@ export function App() {
                         {inventory.inputs.slice(0, 3).map((input) => (
                           <InputCard key={input.id} input={input} onLaunch={onLaunch} />
                         ))}
-                      </div>
-                    </section>
-                  ) : null}
-                  {recent.length ? (
-                    <section className="recent-section">
-                      <div className="section-heading">
-                        <h2>Recently opened</h2>
-                        <span className="section-note">Right where you left them.</span>
-                      </div>
-                      <div className="app-grid">
-                        {recent.map((app) => renderTile(app, 'recent'))}
                       </div>
                     </section>
                   ) : null}
@@ -748,37 +729,39 @@ export function App() {
               ) : null}
             </main>
             <footer className="footer">
-              <div className="remote-hints" id={reordering ? 'reorder-instructions' : undefined}>
-                {reordering ? (
-                  <>
-                    <span>
-                      <span className="keycap">← →</span>Move
-                    </span>
-                    <span>
-                      <span className="keycap">Back</span>Done
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      <span className="keycap keycap-ok">OK</span>
-                      {page === 'settings' ? 'Select' : 'Open'}
-                    </span>
-                    <span>
-                      {page === 'settings' ? (
-                        <>
-                          <span className="keycap">Back</span>Home
-                        </>
-                      ) : (
-                        <>
-                          <MoreHorizontal size={19} />
-                          {page === 'home' ? 'Hold OK to move apps' : 'Hold OK for options'}
-                        </>
-                      )}
-                    </span>
-                  </>
-                )}
-              </div>
+              {reordering || page !== 'home' ? (
+                <div className="remote-hints" id={reordering ? 'reorder-instructions' : undefined}>
+                  {reordering ? (
+                    <>
+                      <span>
+                        <span className="keycap">← →</span>Move
+                      </span>
+                      <span>
+                        <span className="keycap">Back</span>Done
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        <span className="keycap keycap-ok">OK</span>
+                        {page === 'settings' ? 'Select' : 'Open'}
+                      </span>
+                      <span>
+                        {page === 'settings' ? (
+                          <>
+                            <span className="keycap">Back</span>Home
+                          </>
+                        ) : (
+                          <>
+                            <MoreHorizontal size={19} />
+                            Hold OK for options
+                          </>
+                        )}
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : null}
               <div className="footer-right">
                 {page === 'settings' ? (
                   <span className="settings-version" aria-label="Luma version 0.1.5">
@@ -817,10 +800,6 @@ export function App() {
               favorites={favoriteIds}
               hidden={preferences.hidden.includes(optionsApp.id)}
               onClose={() => setOptionsApp(null)}
-              onLaunch={() => {
-                setOptionsApp(null);
-                void onLaunch(optionsApp);
-              }}
               onPin={() => {
                 const pinned = favoriteIds.includes(optionsApp.id);
                 update({
@@ -848,15 +827,6 @@ export function App() {
                     ? `${optionsApp.title} is back in your library.`
                     : `${optionsApp.title} hidden. You can restore it from Apps.`,
                 );
-              }}
-              onMove={(offset) => {
-                const next = [...favoriteIds];
-                const index = next.indexOf(optionsApp.id);
-                const target = index + offset;
-                if (index >= 0 && target >= 0 && target < next.length) {
-                  [next[index], next[target]] = [next[target], next[index]];
-                  update({ favorites: next });
-                }
               }}
             />
           ) : null}

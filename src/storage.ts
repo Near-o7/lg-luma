@@ -11,6 +11,8 @@ export const defaults: Preferences = {
   wallpaper: 'dunes',
   reducedMotion: false,
   clock24: false,
+  showHomeAppNames: false,
+  showWeather: true,
   weatherLocation: null,
 };
 
@@ -39,6 +41,8 @@ export function parsePreferences(raw: string | null): Preferences {
         : 'dunes',
       reducedMotion: value.reducedMotion === true,
       clock24: value.clock24 === true,
+      showHomeAppNames: value.showHomeAppNames === true,
+      showWeather: value.showWeather !== false,
       weatherLocation: parseLocation(value.weatherLocation),
     };
   } catch {

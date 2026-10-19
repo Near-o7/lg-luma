@@ -41,6 +41,9 @@
 .weather-settings {
   margin-bottom: 1.7rem;
 }
+.weather-visibility-toggle {
+  margin-bottom: 1rem;
+}
 .location-search {
   display: flex;
   align-items: center;

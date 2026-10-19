@@ -1,5 +1,14 @@
 export type Page = 'home' | 'apps' | 'inputs' | 'settings';
-export type Wallpaper = 'dunes' | 'alpine' | 'aurora' | 'san-francisco' | 'munich' | 'tokyo';
+export type Wallpaper =
+  | 'dunes'
+  | 'san-francisco'
+  | 'midnight'
+  | 'summit'
+  | 'coast'
+  | 'forest'
+  | 'sand-dunes'
+  | 'lake'
+  | 'northern-lights';
 export type Category = 'Streaming' | 'Music' | 'Gaming' | 'Utilities';
 
 export interface TVApp {
@@ -25,6 +34,8 @@ export interface Preferences {
   wallpaper: Wallpaper;
   reducedMotion: boolean;
   clock24: boolean;
+  showHomeAppNames: boolean;
+  showWeather: boolean;
   weatherLocation: WeatherLocation | null;
 }
 

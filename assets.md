@@ -1,11 +1,14 @@
 # Luma assets and references
 
-- `public/mark.svg`, `public/app-icon.svg`, and `public/wallpapers/aurora.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
+- `public/mark.svg`, `public/app-icon.svg`, and `public/wallpapers/midnight.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
 - `public/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`, https://images.unsplash.com/photo-1509316785289-025f5b846b35. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/alpine.jpg`: Unsplash photo `1519681393784-d120267933ba`, https://images.unsplash.com/photo-1519681393784-d120267933ba. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`, https://images.unsplash.com/photo-1501594907352-04cda38ebc29. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/munich.jpg`: Unsplash photo `1595867818082-083862f3d630`, https://images.unsplash.com/photo-1595867818082-083862f3d630. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/tokyo.jpg`: Unsplash photo `1513407030348-c983a97b98d8`, https://images.unsplash.com/photo-1513407030348-c983a97b98d8. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/summit.jpg`: Unsplash photo `1454496522488-7a8e488e8606`, https://images.unsplash.com/photo-1454496522488-7a8e488e8606. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/coast.jpg`: Unsplash photo `1475924156734-496f6cac6ec1`, https://images.unsplash.com/photo-1475924156734-496f6cac6ec1. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/forest.jpg`: Unsplash photo `1441974231531-c6227db76b6e`, https://images.unsplash.com/photo-1441974231531-c6227db76b6e. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/sand-dunes.jpg`: Unsplash photo `1473580044384-7ba9967e16a0`, https://images.unsplash.com/photo-1473580044384-7ba9967e16a0. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/lake.jpg`: Unsplash photo `1470770841072-f978cf4d019e`, https://images.unsplash.com/photo-1470770841072-f978cf4d019e. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/northern-lights.jpg`: Unsplash photo `1531366936337-7c912a4589a7`, https://images.unsplash.com/photo-1531366936337-7c912a4589a7. Bundled under the [Unsplash License](https://unsplash.com/license).
 - Inter variable font: Rasmus Andersson, SIL Open Font License 1.1. License bundled at `public/fonts/ofl.txt`.
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
