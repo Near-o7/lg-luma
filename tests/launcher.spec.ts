@@ -381,7 +381,9 @@ test('connection artwork follows the reported device labels without changing the
     .toEqual(['com.webos.app.hdmi1']);
 });
 
-test('Home favorites move inline with hold OK and left/right, and Back keeps the order', async ({ page }) => {
+test('Home favorites move inline with hold OK and left/right, and Back keeps the order', async ({
+  page,
+}) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await page.keyboard.down('Enter');
@@ -391,7 +393,15 @@ test('Home favorites move inline with hold OK and left/right, and Back keeps the
   await expect(moving).toBeFocused();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.keyboard.press('ArrowRight');
-  await expect.poll(() => page.locator('.favorites-grid [data-app-id]').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => (node as HTMLElement).dataset.appId))).toEqual(['youtube.leanback.v4', 'netflix']);
+  await expect
+    .poll(() =>
+      page
+        .locator('.favorites-grid [data-app-id]')
+        .evaluateAll((nodes) =>
+          nodes.slice(0, 2).map((node) => (node as HTMLElement).dataset.appId),
+        ),
+    )
+    .toEqual(['youtube.leanback.v4', 'netflix']);
   await expect(moving).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('.toast')).toHaveCount(0);
@@ -401,14 +411,28 @@ test('Home favorites move inline with hold OK and left/right, and Back keeps the
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await expect(page.locator('.favorites-grid.is-reordering')).toHaveCount(0);
   await page.reload();
-  await expect.poll(() => page.locator('.favorites-grid [data-app-id]').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => (node as HTMLElement).dataset.appId))).toEqual(['youtube.leanback.v4', 'netflix']);
+  await expect
+    .poll(() =>
+      page
+        .locator('.favorites-grid [data-app-id]')
+        .evaluateAll((nodes) =>
+          nodes.slice(0, 2).map((node) => (node as HTMLElement).dataset.appId),
+        ),
+    )
+    .toEqual(['youtube.leanback.v4', 'netflix']);
   await page.getByRole('button', { name: 'Open Netflix', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status')).toContainText('Desktop preview');
 });
 
-test('moving up to the Apps categories restores the complete top of the scroller', async ({ page }) => {
-  const apps = Array.from({ length: 36 }, (_, index) => ({ id: `com.example.scroll${index + 1}`, title: `App ${String(index + 1).padStart(2, '0')}`, visible: true }));
+test('moving up to the Apps categories restores the complete top of the scroller', async ({
+  page,
+}) => {
+  const apps = Array.from({ length: 36 }, (_, index) => ({
+    id: `com.example.scroll${index + 1}`,
+    title: `App ${String(index + 1).padStart(2, '0')}`,
+    visible: true,
+  }));
   await installMockTV(page, false, apps);
   await page.goto('/');
   await page.getByRole('button', { name: 'Apps', exact: true }).click();
