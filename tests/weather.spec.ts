@@ -41,8 +41,35 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   await page.reload();
   await expect(page.locator('.weather-summary')).toContainText('14°C');
   expect(forecasts).toBe(1);
-  await page.getByRole('button', { name: 'Luma settings' }).click();
-  await page.getByRole('button', { name: 'Remove weather location' }).click();
+  await page.getByRole('button', { name: 'Enter ambient mode' }).click();
+  await expect(page.locator('.ambient-hint')).toContainText('Vienna');
+  await expect(page.locator('.ambient-hint')).toContainText('14°C');
+  await expect(page.locator('.ambient-screen button')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+  expect(forecasts).toBe(1);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const clearLocation = page.getByRole('button', { name: 'Remove weather location' });
+  await clearLocation.focus();
+  await page.keyboard.press('ArrowRight');
+  await clearLocation.focus();
+  const focusStyle = await clearLocation.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    return {
+      width: box.width,
+      height: box.height,
+      shadow: style.boxShadow,
+      outline: style.outlineStyle,
+      radius: style.borderRadius,
+    };
+  });
+  expect(focusStyle.width).toBe(focusStyle.height);
+  expect(focusStyle.shadow).not.toBe('none');
+  expect(focusStyle.outline).toBe('none');
+  expect(focusStyle.radius).toBe('50%');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Search locations', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(
     page.getByRole('button', { name: 'Set weather location', exact: true }),
@@ -109,7 +136,7 @@ test('location search handles no matches and can be retried', async ({ page }) =
     return route.fulfill({ json: { results: [] } });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Luma settings' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('searchbox', { name: 'City or postcode' }).fill('xx');
   await page.getByRole('button', { name: 'Search locations', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('No locations found');

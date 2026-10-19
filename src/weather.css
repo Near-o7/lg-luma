@@ -14,6 +14,12 @@
   height: 1.65rem;
   color: #e8dfc5d4;
 }
+.ambient-hint .weather-summary {
+  justify-content: center;
+  min-height: 0;
+  font-size: 1rem;
+  color: #fff9e9a6;
+}
 .weather-city {
   font-weight: 450;
 }
@@ -75,6 +81,8 @@
   flex: 1;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .saved-location strong {
   font-weight: 500;
@@ -85,8 +93,11 @@
   color: var(--muted);
 }
 .saved-location .icon-button {
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
   backdrop-filter: none;
 }
 .saved-location .icon-button svg {

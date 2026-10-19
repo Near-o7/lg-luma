@@ -60,12 +60,14 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     throw new Error('Packaged app metadata does not match the source.');
   if (JSON.stringify(actual.requiredACG) !== JSON.stringify(manifest.requiredACG))
     throw new Error('Packaged app permissions do not match the source.');
+  if (actual.icon !== manifest.icon || actual.largeIcon !== manifest.largeIcon)
+    throw new Error('Packaged icon paths do not match the source.');
   for (const required of [
     'index.html',
     'app.js',
     'app.css',
-    'icon.png',
-    'large-icon.png',
+    manifest.icon,
+    manifest.largeIcon,
     'autostart.sh',
     'fonts/inter-latin.woff2',
     'wallpapers/dunes.jpg',

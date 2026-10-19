@@ -18,7 +18,7 @@ try {
   for (const [name, action] of [
     ['apps', () => page.getByRole('button', { name: 'Apps', exact: true }).click()],
     ['inputs', () => page.getByRole('button', { name: 'Inputs', exact: true }).click()],
-    ['settings', () => page.getByRole('button', { name: 'Luma settings' }).click()],
+    ['settings', () => page.getByRole('button', { name: 'Settings', exact: true }).click()],
   ]) {
     await action();
     await page.mouse.move(1, 1);

@@ -52,24 +52,24 @@ test('hold OK opens options, favorites persist and hidden apps can be restored',
   await expect(page.getByRole('button', { name: 'Hide hidden apps', exact: true })).toHaveCount(0);
 });
 
-test('settings trap focus, change bundled backgrounds and preserve preferences', async ({
+test('full-page settings support remote navigation, Back, and persistent preferences', async ({
   page,
 }, info) => {
   await page.goto('/');
-  const settings = page.getByRole('button', { name: 'Luma settings' });
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
   await settings.click();
-  await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await expect(
-    page.getByRole('dialog').getByRole('button', { name: 'Refresh apps & inputs', exact: false }),
-  ).toBeFocused();
+  await expect(page.getByRole('region', { name: 'Luma settings', exact: true })).toBeVisible();
+  await expect(settings).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.keyboard.press('ArrowDown');
+  expect(await page.locator(':focus').evaluate((element) => !!element.closest('main'))).toBe(true);
   await page.getByRole('button', { name: 'Higher ground', exact: false }).click();
   await page.getByRole('switch', { name: '24-hour clock', exact: false }).click();
   await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();
   await page.screenshot({ path: info.outputPath('luma-settings.png') });
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(settings).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await page.reload();
   await expect(page.locator('.wallpaper')).toHaveClass(/wallpaper-alpine/);
   await expect(page.locator('.luma')).toHaveClass(/reduce-motion/);
@@ -210,8 +210,8 @@ test('a TV uses its real inventory and launches TV settings separately from Luma
   );
   expect(launches[0].payload).toEqual({ id: 'com.example.real' });
   await expect(page.getByRole('status')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Luma settings', exact: true }).focus();
-  await page.keyboard.press('ArrowLeft');
+  await page.getByRole('button', { name: 'Settings', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('button', { name: 'TV settings', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect
@@ -224,11 +224,12 @@ test('a TV uses its real inventory and launches TV settings separately from Luma
     )
     .toEqual(['com.example.real', 'com.palm.app.settings']);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Luma settings', exact: true }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(
-    page.getByRole('dialog').getByRole('button', { name: 'TV settings', exact: true }),
-  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const settingsPage = page.getByRole('region', { name: 'Luma settings', exact: true });
+  await expect(settingsPage).toBeVisible();
+  await expect(settingsPage.getByRole('button', { name: 'TV settings', exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test('TV inventory failure is actionable and never becomes a pretend desktop inventory', async ({
@@ -255,9 +256,13 @@ test('mobile preview remains usable without horizontal overflow', async ({ page 
   const tvSettings = await page
     .getByRole('button', { name: 'TV settings', exact: true })
     .boundingBox();
-  expect(navigation!.x + navigation!.width).toBeLessThan(tvSettings!.x);
-  await page.getByRole('button', { name: 'Luma settings' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(navigation!.y).toBeGreaterThan(tvSettings!.y + tvSettings!.height);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Luma settings', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test('ambient mode wakes without launching an app and restores remote focus', async ({ page }) => {

@@ -1,6 +1,6 @@
 # Luma assets and references
 
-- `public/mark.svg` and `public/wallpapers/aurora.svg`: original Luma artwork, MIT.
+- `public/mark.svg`, `public/app-icon.svg`, and `public/wallpapers/aurora.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
 - `public/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`, https://images.unsplash.com/photo-1509316785289-025f5b846b35. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/alpine.jpg`: Unsplash photo `1519681393784-d120267933ba`, https://images.unsplash.com/photo-1519681393784-d120267933ba. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`, https://images.unsplash.com/photo-1501594907352-04cda38ebc29. Bundled under the [Unsplash License](https://unsplash.com/license).

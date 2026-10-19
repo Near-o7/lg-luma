@@ -31,22 +31,13 @@ export function Weather({
   onConfigure,
 }: {
   location: WeatherLocation | null;
-  onConfigure: () => void;
+  onConfigure?: () => void;
 }) {
   const { reading, failed, loading } = useWeather(location);
   const condition = reading ? weatherCondition(reading.code, reading.isDay) : null;
   const Icon = condition ? icons[condition.icon] : MapPin;
-  return (
-    <button
-      className="hero-subtitle weather-summary"
-      data-focusable="weather-configure"
-      onClick={onConfigure}
-      aria-label={
-        location
-          ? `Weather in ${location.name}. Configure weather location.`
-          : 'Set weather location'
-      }
-    >
+  const content = (
+    <>
       <Icon aria-hidden="true" strokeWidth={1.6} />
       {location ? (
         <>
@@ -69,6 +60,21 @@ export function Weather({
       ) : (
         <span>Set weather location</span>
       )}
+    </>
+  );
+  if (!onConfigure) return <span className="weather-summary">{content}</span>;
+  return (
+    <button
+      className="hero-subtitle weather-summary"
+      data-focusable="weather-configure"
+      onClick={onConfigure}
+      aria-label={
+        location
+          ? `Weather in ${location.name}. Configure weather location.`
+          : 'Set weather location'
+      }
+    >
+      {content}
     </button>
   );
 }

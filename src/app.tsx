@@ -8,7 +8,6 @@ import {
   Heart,
   LoaderCircle,
   Monitor,
-  MonitorCog,
   Moon,
   MoreHorizontal,
   Plus,
@@ -34,6 +33,7 @@ const tabs: { id: Page; title: string }[] = [
   { id: 'home', title: 'Home' },
   { id: 'apps', title: 'Apps' },
   { id: 'inputs', title: 'Inputs' },
+  { id: 'settings', title: 'Settings' },
 ];
 const categories: Category[] = ['Streaming', 'Music', 'Gaming', 'Utilities'];
 const focusFirstApp = () =>
@@ -48,7 +48,6 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [preferences, setPreferences] = useState(loadPreferences);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [optionsApp, setOptionsApp] = useState<TVApp | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category | null>(null);
@@ -162,7 +161,7 @@ export function App() {
 
   useLayoutEffect(() => {
     if (!loading && document.activeElement === document.body) focusFirstApp();
-  }, [loading]);
+  }, [loading, page]);
 
   useLayoutEffect(() => {
     if (wasAmbient.current && !ambient) focusFirstApp();
@@ -221,10 +220,6 @@ export function App() {
           setOptionsApp(null);
           return;
         }
-        if (settingsOpen) {
-          setSettingsOpen(false);
-          return;
-        }
         if (query) {
           setQuery('');
           return;
@@ -238,7 +233,7 @@ export function App() {
       },
       options: () => {
         const id = (document.activeElement as HTMLElement | null)?.dataset.appId;
-        if (!settingsOpen && !optionsApp && id && appMap.has(id)) setOptionsApp(appMap.get(id)!);
+        if (!optionsApp && id && appMap.has(id)) setOptionsApp(appMap.get(id)!);
       },
       wake: () => {
         if (!ambient) return false;
@@ -371,7 +366,11 @@ export function App() {
             <span className="ambient-date">{date}</span>
             <span className="ambient-time">{time}</span>
             <span className="ambient-hint">
-              A little room to breathe. Press any button to return.
+              {preferences.weatherLocation ? (
+                <Weather location={preferences.weatherLocation} />
+              ) : (
+                'Press any button to return'
+              )}
             </span>
             <span className="ambient-logo">
               luma<span>✦</span>
@@ -422,15 +421,6 @@ export function App() {
                     })
                   }
                 >
-                  <MonitorCog strokeWidth={1.8} />
-                </button>
-                <button
-                  className="icon-button settings-button"
-                  data-focusable="settings"
-                  aria-label="Luma settings"
-                  title="Luma settings"
-                  onClick={() => setSettingsOpen(true)}
-                >
                   <Settings2 strokeWidth={1.8} />
                 </button>
               </div>
@@ -444,7 +434,16 @@ export function App() {
                       <h1 id="greeting">{greeting}</h1>
                       <Weather
                         location={preferences.weatherLocation}
-                        onConfigure={() => setSettingsOpen(true)}
+                        onConfigure={() => {
+                          openPage('settings');
+                          requestAnimationFrame(() => {
+                            const field = document.querySelector<HTMLElement>(
+                              '[data-focusable="weather-location-query"]',
+                            );
+                            field?.focus({ preventScroll: true });
+                            field?.scrollIntoView({ block: 'nearest' });
+                          });
+                        }}
                       />
                     </div>
                     <div className="landscape-credit">
@@ -672,6 +671,17 @@ export function App() {
                   )}
                 </>
               ) : null}
+              {page === 'settings' ? (
+                <Settings
+                  preferences={preferences}
+                  onUpdate={update}
+                  onRefresh={() => {
+                    void refresh();
+                    notify('Refreshing your apps and inputs…');
+                  }}
+                  onManage={() => openPage('apps')}
+                />
+              ) : null}
               {error && inventory.apps.length ? (
                 <div className="inventory-warning">
                   <CircleAlert size={18} />
@@ -685,50 +695,50 @@ export function App() {
             <footer className="footer">
               <div className="remote-hints">
                 <span>
-                  <span className="keycap keycap-ok">OK</span>Open
+                  <span className="keycap keycap-ok">OK</span>
+                  {page === 'settings' ? 'Select' : 'Open'}
                 </span>
                 <span>
-                  <MoreHorizontal size={19} />
-                  Hold OK for options
+                  {page === 'settings' ? (
+                    <>
+                      <span className="keycap">Back</span>Home
+                    </>
+                  ) : (
+                    <>
+                      <MoreHorizontal size={19} />
+                      Hold OK for options
+                    </>
+                  )}
                 </span>
               </div>
               <div className="footer-right">
-                {!isTV() ? (
-                  <span className="preview-badge">
-                    <Monitor size={14} />
-                    Desktop preview
+                {page === 'settings' ? (
+                  <span className="settings-version" aria-label="Luma version 0.1.3">
+                    0.1.3
                   </span>
-                ) : null}
-                <button
-                  className="ambient-button"
-                  data-focusable="ambient"
-                  aria-label="Enter ambient mode"
-                  onClick={() => setAmbient(true)}
-                >
-                  <Moon size={19} />
-                </button>
+                ) : (
+                  <>
+                    {!isTV() ? (
+                      <span className="preview-badge">
+                        <Monitor size={14} />
+                        Desktop preview
+                      </span>
+                    ) : null}
+                    <button
+                      className="ambient-button"
+                      data-focusable="ambient"
+                      aria-label="Enter ambient mode"
+                      onClick={() => setAmbient(true)}
+                    >
+                      <Moon size={19} />
+                    </button>
+                  </>
+                )}
               </div>
             </footer>
           </div>
         )}
         <AnimatePresence>
-          {settingsOpen ? (
-            <Settings
-              key="settings"
-              preferences={preferences}
-              onUpdate={update}
-              onClose={() => setSettingsOpen(false)}
-              onRefresh={() => {
-                setSettingsOpen(false);
-                void refresh();
-                notify('Refreshing your apps and inputs…');
-              }}
-              onManage={() => {
-                setSettingsOpen(false);
-                openPage('apps');
-              }}
-            />
-          ) : null}
           {optionsApp ? (
             <AppOptions
               key="options"

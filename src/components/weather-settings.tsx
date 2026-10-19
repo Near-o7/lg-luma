@@ -45,9 +45,9 @@ export function WeatherSettings({
 
   return (
     <section className="weather-settings" aria-labelledby="weather-location-heading">
-      <h3 className="settings-section-title" id="weather-location-heading">
+      <h2 className="settings-section-title" id="weather-location-heading">
         Weather location
-      </h3>
+      </h2>
       {location ? (
         <div className="saved-location">
           <MapPin size={18} />
@@ -57,6 +57,7 @@ export function WeatherSettings({
           </span>
           <button
             className="icon-button"
+            type="button"
             data-focusable="weather-location-clear"
             aria-label="Remove weather location"
             onClick={() => {
@@ -66,6 +67,7 @@ export function WeatherSettings({
               onChange(null);
               setResults([]);
               setMessage('');
+              searchButton.current?.focus({ preventScroll: true });
             }}
           >
             <X size={17} />

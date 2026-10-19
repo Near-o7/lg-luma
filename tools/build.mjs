@@ -38,10 +38,12 @@ await fs.copyFile(path.join(root, 'assets.md'), path.join(output, 'assets.md'));
 await fs.copyFile(path.join(root, 'tv', 'autostart.sh'), path.join(output, 'autostart.sh'));
 await fs.chmod(path.join(output, 'autostart.sh'), 0o755);
 for (const [name, size] of [
-  ['icon.png', 80],
-  ['large-icon.png', 130],
+  [manifest.icon, 80],
+  [manifest.largeIcon, 130],
 ]) {
-  await sharp(path.join(root, 'public/mark.svg'))
+  // Let webOS supply the tile background/mask. A second painted panel gets its
+  // own image clipping radius and looks like a rounded tile inside another tile.
+  await sharp(path.join(root, 'public/app-icon.svg'))
     .resize(size, size)
     .png()
     .toFile(path.join(output, name));
@@ -49,7 +51,7 @@ for (const [name, size] of [
 await fs.writeFile(
   path.join(output, 'index.html'),
   `<!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#17191c"><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src https://api.open-meteo.com https://geocoding-api.open-meteo.com; object-src 'none'; base-uri 'none'"><title>Luma</title><link rel="icon" href="./icon.png"><link rel="stylesheet" href="./app.css"></head><body><div id="root"></div><script defer src="./app.js"></script></body></html>\n`,
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#17191c"><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src https://api.open-meteo.com https://geocoding-api.open-meteo.com; object-src 'none'; base-uri 'none'"><title>Luma</title><link rel="icon" href="./${manifest.icon}"><link rel="stylesheet" href="./app.css"></head><body><div id="root"></div><script defer src="./app.js"></script></body></html>\n`,
 );
 const files = await fs.readdir(output);
 const js = await fs.stat(path.join(output, 'app.js'));

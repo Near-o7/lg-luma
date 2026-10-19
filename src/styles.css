@@ -233,6 +233,8 @@ button svg {
   text-shadow: 0 1px 12px #0005;
 }
 .icon-button {
+  position: relative;
+  flex-shrink: 0;
   width: 3.1rem;
   height: 3.1rem;
   border-radius: 50%;
@@ -245,6 +247,10 @@ button svg {
 .icon-button:hover,
 .icon-button:focus-visible {
   background: #ffffff24;
+}
+.icon-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
 }
 .icon-button svg {
   width: 1.45rem;
@@ -1194,57 +1200,27 @@ button svg {
 .toggle.on i {
   transform: translateX(1.1rem);
 }
-.about-luma {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.6rem;
-}
-.about-luma img {
-  width: 2.25rem;
-  height: 2.25rem;
-}
-.about-luma > span:not(.local-badge) {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-.about-luma strong {
-  font-size: 0.95rem;
-  font-weight: 550;
-  letter-spacing: -0.025em;
-}
-.about-luma strong small {
-  margin-left: 0.3rem;
-  opacity: 0.6;
-}
-.about-luma small {
-  font-size: 0.7rem;
-  font-weight: 400;
-  color: var(--muted);
-}
-.local-badge {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.65rem;
-  color: var(--muted);
-}
-.local-badge svg {
-  width: 0.85rem;
-  height: 0.85rem;
-}
 .dialog-footer {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
   gap: 0.4rem;
   color: #ede7d759;
   font-size: 0.65rem;
   margin-top: 1.2rem;
   padding-top: 0.9rem;
   border-top: 1px solid #ffffff0a;
+}
+.dialog-shortcuts {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.dialog-footer-end {
+  grid-column: 3;
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
 }
 .dialog-footer .keycap {
   font-size: 0.5rem;
@@ -1512,16 +1488,20 @@ button svg {
     padding: 1.7rem 1.5rem 1.2rem;
   }
   .header {
-    height: 4.4rem;
-    min-height: 4.4rem;
+    height: 8.5rem;
+    min-height: 8.5rem;
+    align-items: flex-start;
   }
   .logo {
     font-size: 2.3rem;
   }
   .navigation {
-    left: auto;
-    right: 0;
-    transform: none;
+    top: 4.4rem;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    gap: 0.5rem;
+    padding: 0.5rem;
   }
   .nav-item {
     min-width: 4.4rem;
@@ -1529,7 +1509,15 @@ button svg {
     font-size: 1.1rem;
   }
   .header-right {
+    display: flex;
+    gap: 0.65rem;
+  }
+  .header-time {
     display: none;
+  }
+  .settings-button {
+    width: 2.6rem;
+    height: 2.6rem;
   }
   .hero {
     min-height: 19rem;
@@ -1648,34 +1636,5 @@ button svg {
   }
   .ambient-hint {
     padding: 0 2rem;
-  }
-}
-@media (max-width: 600px) {
-  .header-right {
-    display: flex;
-    gap: 0.65rem;
-  }
-  .header-time {
-    display: none;
-  }
-  .navigation {
-    right: 6.8rem;
-  }
-  .settings-button {
-    width: 2.6rem;
-    height: 2.6rem;
-  }
-}
-@media (max-width: 380px) {
-  .header {
-    height: 8.3rem;
-    min-height: 8.3rem;
-    align-items: flex-start;
-  }
-  .navigation {
-    top: 4.2rem;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
   }
 }

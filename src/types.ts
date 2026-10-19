@@ -1,4 +1,4 @@
-export type Page = 'home' | 'apps' | 'inputs';
+export type Page = 'home' | 'apps' | 'inputs' | 'settings';
 export type Wallpaper = 'dunes' | 'alpine' | 'aurora' | 'san-francisco' | 'munich' | 'tokyo';
 export type Category = 'Streaming' | 'Music' | 'Gaming' | 'Utilities';
 

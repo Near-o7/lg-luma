@@ -8,12 +8,14 @@ export function Dialog({
   children,
   onClose,
   wide = false,
+  footerEnd,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  footerEnd?: ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -66,7 +68,10 @@ export function Dialog({
         </div>
         {children}
         <div className="dialog-footer">
-          <span className="keycap">↵</span> Select <span className="keycap">esc</span> Back
+          <div className="dialog-shortcuts">
+            <span className="keycap">↵</span> Select <span className="keycap">esc</span> Back
+          </div>
+          {footerEnd ? <div className="dialog-footer-end">{footerEnd}</div> : null}
         </div>
       </motion.div>
     </motion.div>

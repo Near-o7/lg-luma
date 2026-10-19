@@ -1,0 +1,106 @@
+.settings-page {
+  padding-top: 3.5rem;
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 2.25rem;
+  align-items: start;
+}
+.settings-panel {
+  min-width: 0;
+  padding: 1.6rem;
+  background: linear-gradient(140deg, #20262cd6, #181e25d9);
+  border: 1px solid #ffffff14;
+  border-radius: 1.2rem;
+}
+.settings-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.settings-page .settings-section-title {
+  font-size: 1.3rem;
+  font-weight: 550;
+  color: #f4f1e8de;
+  letter-spacing: -0.025em;
+  margin-bottom: 1.3rem;
+}
+.settings-page .wallpaper-options {
+  gap: 1.2rem;
+  margin-bottom: 0;
+}
+.settings-page .wallpaper-thumbnail {
+  height: auto;
+  aspect-ratio: 16/9;
+}
+.settings-page .wallpaper-option > span:not(.wallpaper-thumbnail) {
+  font-size: 1.05rem;
+  margin-top: 0.35rem;
+}
+.settings-page .weather-settings {
+  margin-bottom: 0;
+}
+.settings-page .location-search .search-field {
+  padding: 1rem;
+}
+.settings-page .location-search .search-field input {
+  font-size: 1.05rem;
+}
+.settings-page .location-search-button {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+.settings-page .settings-group {
+  background: transparent;
+  border: 0;
+  margin: 0;
+}
+.settings-page .setting-row {
+  padding: 1.1rem 0.85rem;
+  min-height: 4.8rem;
+}
+.settings-page .setting-row strong {
+  font-size: 1.08rem;
+}
+.settings-page .setting-row small {
+  font-size: 0.82rem;
+}
+.settings-version {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .settings-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+@media (max-width: 600px) {
+  .settings-page {
+    padding-top: 2rem;
+  }
+  .settings-layout {
+    gap: 1.25rem;
+  }
+  .settings-panel {
+    padding: 1.25rem;
+  }
+  .settings-controls {
+    display: flex;
+  }
+  .settings-page .wallpaper-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .settings-page .settings-section-title {
+    font-size: 1.15rem;
+  }
+}
