@@ -1,14 +1,4 @@
-import {
-  Check,
-  ChevronRight,
-  Clock3,
-  Eye,
-  Leaf,
-  Monitor,
-  RefreshCw,
-  Settings2,
-  Tv,
-} from 'lucide-react';
+import { Check, ChevronRight, Clock3, Eye, Leaf, Monitor, RefreshCw, Tv } from 'lucide-react';
 import { Dialog } from './dialog';
 import { WeatherSettings } from './weather-settings';
 import { isTV } from '../bridge';
@@ -20,18 +10,10 @@ interface Props {
   onUpdate: (patch: Partial<Preferences>) => void;
   onClose: () => void;
   onRefresh: () => void;
-  onTVSettings: () => void;
   onManage: () => void;
 }
 
-export function Settings({
-  preferences,
-  onUpdate,
-  onClose,
-  onRefresh,
-  onTVSettings,
-  onManage,
-}: Props) {
+export function Settings({ preferences, onUpdate, onClose, onRefresh, onManage }: Props) {
   return (
     <Dialog title="Settings" onClose={onClose} wide>
       <div className="settings-content">
@@ -111,14 +93,6 @@ export function Settings({
             <span>
               <strong>Refresh apps & inputs</strong>
               <small>Find anything you’ve recently installed.</small>
-            </span>
-            <ChevronRight />
-          </button>
-          <button className="setting-row" data-focusable="setting-tv" onClick={onTVSettings}>
-            <Settings2 />
-            <span>
-              <strong>TV settings</strong>
-              <small>Picture, sound, network, and more.</small>
             </span>
             <ChevronRight />
           </button>

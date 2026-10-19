@@ -528,7 +528,7 @@ button svg {
   background: linear-gradient(145deg, #242323, #121212);
 }
 .brand-zdf {
-  background: linear-gradient(145deg, #fffefb, #eae8e2);
+  background: #121b22;
 }
 .brand-das-erste {
   background: linear-gradient(145deg, #064c84, #00254e);
@@ -629,7 +629,7 @@ button svg {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: linear-gradient(125deg, #20252bef, #171c22ed);
+  background: linear-gradient(125deg, #20252b99, #171c228c);
   border: 1px solid #fffdf010;
   padding: 1.1rem 1.25rem;
   min-height: 6.5rem;
@@ -641,7 +641,7 @@ button svg {
 }
 .input-card:hover,
 .input-card:focus-visible {
-  background: linear-gradient(125deg, #30363cf5, #242a30f2);
+  background: linear-gradient(125deg, #30363cb3, #242a30a6);
   border-color: #fff9e83d;
 }
 .input-card:focus-visible {
@@ -1653,15 +1653,29 @@ button svg {
 @media (max-width: 600px) {
   .header-right {
     display: flex;
+    gap: 0.65rem;
   }
   .header-time {
     display: none;
   }
   .navigation {
-    right: 3.6rem;
+    right: 6.8rem;
   }
   .settings-button {
     width: 2.6rem;
     height: 2.6rem;
+  }
+}
+@media (max-width: 380px) {
+  .header {
+    height: 8.3rem;
+    min-height: 8.3rem;
+    align-items: flex-start;
+  }
+  .navigation {
+    top: 4.2rem;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
   }
 }

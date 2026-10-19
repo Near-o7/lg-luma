@@ -89,7 +89,7 @@ The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunab
 
 Apps → select an app → hold OK to edit favorites. Move pinned apps left or right from the same panel. Hidden apps remain installed and can be restored with **Apps → Hidden apps**. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
 
-Settings includes six bundled backdrops (including San Francisco, Munich, and Tokyo), weather location, 12/24-hour time, reduced motion, refresh, and TV settings. The moon button in the footer opens the ambient clock.
+The header has two settings buttons: the monitor-cog icon opens TV settings directly, and the sliders icon opens Luma settings. Luma settings includes six bundled backdrops (including San Francisco, Munich, and Tokyo), weather location, 12/24-hour time, reduced motion, and refresh. The moon button in the footer opens the ambient clock.
 
 Apple TV, Prime Video, Disney+, Jellyfin, Netflix, YouTube, ARTE, ZDF, and Das Erste use bundled SVG logos. Input cards choose connection artwork from the reported device name: PlayStation uses the supplied PlayStation mark, USB uses the USB symbol, unnamed HDMI ports use an HDMI connector, and other devices use a suitable generic icon. Icon selection does not change the input's launch target.
 

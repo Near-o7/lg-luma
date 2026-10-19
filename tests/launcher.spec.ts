@@ -60,7 +60,9 @@ test('settings trap focus, change bundled backgrounds and preserve preferences',
   await settings.click();
   await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  await expect(page.getByRole('button', { name: 'TV settings', exact: false })).toBeFocused();
+  await expect(
+    page.getByRole('dialog').getByRole('button', { name: 'Refresh apps & inputs', exact: false }),
+  ).toBeFocused();
   await page.getByRole('button', { name: 'Higher ground', exact: false }).click();
   await page.getByRole('switch', { name: '24-hour clock', exact: false }).click();
   await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();
@@ -187,7 +189,9 @@ async function installMockTV(
   );
 }
 
-test('a TV uses its real inventory and sends a single validated launch', async ({ page }) => {
+test('a TV uses its real inventory and launches TV settings separately from Luma settings', async ({
+  page,
+}) => {
   await installMockTV(page, false);
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Open A real TV app', exact: true })).toBeVisible();
@@ -206,6 +210,25 @@ test('a TV uses its real inventory and sends a single validated launch', async (
   );
   expect(launches[0].payload).toEqual({ id: 'com.example.real' });
   await expect(page.getByRole('status')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Luma settings', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('button', { name: 'TV settings', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as any).__calls
+          .filter((call: any) => call.uri.endsWith('/launch'))
+          .map((call: any) => call.payload.id),
+      ),
+    )
+    .toEqual(['com.example.real', 'com.palm.app.settings']);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Luma settings', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(
+    page.getByRole('dialog').getByRole('button', { name: 'TV settings', exact: true }),
+  ).toHaveCount(0);
 });
 
 test('TV inventory failure is actionable and never becomes a pretend desktop inventory', async ({
@@ -228,6 +251,11 @@ test('mobile preview remains usable without horizontal overflow', async ({ page 
   );
   await page.getByRole('button', { name: 'Apps', exact: true }).click();
   await expect(page.getByRole('searchbox', { name: 'Find an app' })).toBeVisible();
+  const navigation = await page.getByRole('navigation', { name: 'Main navigation' }).boundingBox();
+  const tvSettings = await page
+    .getByRole('button', { name: 'TV settings', exact: true })
+    .boundingBox();
+  expect(navigation!.x + navigation!.width).toBeLessThan(tvSettings!.x);
   await page.getByRole('button', { name: 'Luma settings' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });

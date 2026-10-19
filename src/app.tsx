@@ -8,6 +8,7 @@ import {
   Heart,
   LoaderCircle,
   Monitor,
+  MonitorCog,
   Moon,
   MoreHorizontal,
   Plus,
@@ -409,8 +410,25 @@ export function App() {
                 <time className="header-time">{time}</time>
                 <button
                   className="icon-button settings-button"
+                  data-focusable="tv-settings"
+                  aria-label="TV settings"
+                  title="TV settings"
+                  onClick={() =>
+                    void onLaunch({
+                      id: 'com.palm.app.settings',
+                      title: 'TV settings',
+                      category: 'Utilities',
+                      brand: 'settings',
+                    })
+                  }
+                >
+                  <MonitorCog strokeWidth={1.8} />
+                </button>
+                <button
+                  className="icon-button settings-button"
                   data-focusable="settings"
                   aria-label="Luma settings"
+                  title="Luma settings"
                   onClick={() => setSettingsOpen(true)}
                 >
                   <Settings2 strokeWidth={1.8} />
@@ -704,15 +722,6 @@ export function App() {
                 setSettingsOpen(false);
                 void refresh();
                 notify('Refreshing your apps and inputs…');
-              }}
-              onTVSettings={() => {
-                setSettingsOpen(false);
-                void onLaunch({
-                  id: 'com.palm.app.settings',
-                  title: 'TV settings',
-                  category: 'Utilities',
-                  brand: 'settings',
-                });
               }}
               onManage={() => {
                 setSettingsOpen(false);
