@@ -437,7 +437,10 @@ export function App() {
           </button>
         ) : (
           <div className="shell">
-            <header className="header" data-focus-down={page === 'settings' ? 'setting-home-app-names' : undefined}>
+            <header
+              className="header"
+              data-focus-down={page === 'settings' ? 'setting-home-app-names' : undefined}
+            >
               <time className="header-time" dateTime={now.toISOString()}>
                 {time}
               </time>

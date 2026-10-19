@@ -60,9 +60,14 @@ export function moveFocus(direction: Direction): void {
   };
   // Explicit entry/return routes take priority over geometry when a page has a
   // preferred control column. Left/right still follow the spatial layout.
-  const route = current.closest(`[data-focus-${direction}]`)?.getAttribute(`data-focus-${direction}`);
-  const preferred = route ? nodes.find((candidate) => candidate.dataset.focusable === route) : undefined;
-  const target = preferred?.dataset.focusable ?? nextFocus(rect(current), nodes.map(rect), direction);
+  const route = current
+    .closest(`[data-focus-${direction}]`)
+    ?.getAttribute(`data-focus-${direction}`);
+  const preferred = route
+    ? nodes.find((candidate) => candidate.dataset.focusable === route)
+    : undefined;
+  const target =
+    preferred?.dataset.focusable ?? nextFocus(rect(current), nodes.map(rect), direction);
   const node = preferred ?? nodes.find((candidate) => candidate.dataset.focusable === target);
   if (node) {
     node.focus({ preventScroll: true });

@@ -14,7 +14,10 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
     <section className="settings-page" aria-label="Luma settings">
       <h1 className="sr-only">Settings</h1>
       <div className="settings-layout">
-        <section className="settings-panel settings-backgrounds" aria-labelledby="background-heading">
+        <section
+          className="settings-panel settings-backgrounds"
+          aria-labelledby="background-heading"
+        >
           <h2 className="settings-section-title" id="background-heading">
             Background
           </h2>
