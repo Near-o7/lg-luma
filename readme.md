@@ -23,7 +23,7 @@ Open **http://127.0.0.1:5173**. Desktop preview shows clearly identified sample 
 pnpm run package
 ```
 
-Output: `dist/com.luma.launcher_0.1.4_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
+Output: `dist/com.luma.launcher_0.1.5_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
 
 Photographs, fonts, and app-logo SVGs are checked in locally. `pnpm assets` prepares them again if you deliberately remove them; it downloads from Unsplash, jsDelivr, Wikimedia Commons, and the Inter/Jellyfin repositories at build time. Normal builds and TV use require no asset downloads. Logo sources and licenses are documented in [assets.md](assets.md).
 
@@ -32,7 +32,7 @@ Photographs, fonts, and app-logo SVGs are checked in locally. `pnpm assets` prep
 1. Open Homebrew Channel on your TV; check **Settings → Root status: ok**.
 2. Open [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop) on your Mac.
 3. Connect to `10.120.1.99`, port `22`, user `root`, using your existing SSH password or key.
-4. Install `dist/com.luma.launcher_0.1.4_all.ipk` and launch **Luma**.
+4. Install `dist/com.luma.launcher_0.1.5_all.ipk` and launch **Luma**.
 
 Or register your root SSH connection with the locally installed CLI:
 
@@ -49,7 +49,7 @@ The package has its own ID and installs alongside LG Home and LG-XMB.
 Manual IPK installation is supported. From your Mac, copy the built package:
 
 ```sh
-scp -O dist/com.luma.launcher_0.1.4_all.ipk root@10.120.1.99:/tmp/luma-0.1.4.ipk
+scp -O dist/com.luma.launcher_0.1.5_all.ipk root@10.120.1.99:/tmp/luma-0.1.5.ipk
 ssh root@10.120.1.99
 ```
 
@@ -57,7 +57,7 @@ Then, inside the TV's root shell:
 
 ```sh
 luna-send -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma-0.1.4.ipk","subscribe":true}'
+  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma-0.1.5.ipk","subscribe":true}'
 ```
 
 Wait for the terminal installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma so the new package permissions are used.

@@ -1,6 +1,6 @@
 {
   "id": "com.luma.launcher",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "vendor": "Luma",
   "type": "web",
   "main": "index.html",
