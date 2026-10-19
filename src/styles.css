@@ -784,15 +784,6 @@ button svg {
 .keycap-ok {
   border-radius: 0.45rem;
 }
-.footer-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.75rem;
-  color: #f6efe943;
-  letter-spacing: 0.02em;
-  padding-bottom: 0.2rem;
-}
 .footer-right {
   display: flex;
   align-items: center;
@@ -1335,20 +1326,6 @@ button svg {
   width: 0.85rem;
   height: 0.85rem;
 }
-.privacy-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  font-size: 0.65rem;
-  color: #f1ead260;
-  line-height: 1.5;
-  margin-top: 1rem;
-}
-.privacy-note svg {
-  width: 0.85rem;
-  height: 0.85rem;
-}
 .dialog-footer {
   display: flex;
   align-items: center;
@@ -1581,7 +1558,6 @@ button svg {
     background: #222;
   }
   .footer,
-  .footer-center,
   .preview-badge {
     color: #eee;
   }
@@ -1595,9 +1571,6 @@ button svg {
     min-height: 22rem;
   }
   .landscape-credit {
-    display: none;
-  }
-  .footer-center {
     display: none;
   }
   .dialog {

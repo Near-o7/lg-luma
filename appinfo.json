@@ -7,7 +7,7 @@
   "title": "Luma",
   "icon": "icon.png",
   "largeIcon": "large-icon.png",
-  "appDescription": "A quieter home for your TV.",
+  "appDescription": "A modern webOS launcher.",
   "resolution": "1920x1080",
   "appCategory": ["home"],
   "requiredACG": ["application.launcher", "application.query", "lunabus.query"],

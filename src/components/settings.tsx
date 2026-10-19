@@ -8,7 +8,6 @@ import {
   Moon,
   RefreshCw,
   Settings2,
-  ShieldCheck,
   Tv,
 } from 'lucide-react';
 import { Dialog } from './dialog';
@@ -147,16 +146,12 @@ export function Settings({
             <strong>
               Luma <small>0.1.1</small>
             </strong>
-            <small>A quieter home for your TV.</small>
           </span>
           <span className="local-badge">
             {isTV() ? <Tv size={15} /> : <Monitor size={15} />}
             {isTV() ? 'webOS' : 'Desktop preview'}
           </span>
         </div>
-        <p className="privacy-note">
-          <ShieldCheck size={14} /> Local by design. No accounts, tracking, or external requests.
-        </p>
       </div>
     </Dialog>
   );

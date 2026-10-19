@@ -1,6 +1,6 @@
 # Luma
 
-**A quieter home for your TV.** A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity and feel of Apple TV.
+A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity and feel of Apple TV.
 
 Luma brings your installed apps and HDMI inputs into a locally rendered home screen: cinematic backdrops, large app tiles, spring-based focus, editable favorites, and a full app library. No accounts, recommendations, tracking, weather services, or runtime internet requests.
 

@@ -379,14 +379,12 @@ export function App() {
         ) : (
           <div className="shell">
             <header className="header">
-              <button
-                className="logo"
-                aria-label="Luma home"
-                data-focusable="logo"
-                onClick={() => openPage('home')}
-              >
-                luma<span className="logo-spark">✦</span>
-              </button>
+              <div className="logo">
+                luma
+                <span className="logo-spark" aria-hidden="true">
+                  ✦
+                </span>
+              </div>
               <nav className="navigation" aria-label="Main navigation">
                 {tabs.map((tab) => (
                   <button
@@ -689,7 +687,6 @@ export function App() {
                   Hold OK for options
                 </span>
               </div>
-              <span className="footer-center">A quieter home for your TV.</span>
               <div className="footer-right">
                 {!isTV() ? (
                   <span className="preview-badge">
