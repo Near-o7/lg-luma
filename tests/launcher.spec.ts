@@ -227,3 +227,51 @@ test('ambient mode wakes without launching an app and restores remote focus', as
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await expect(page.getByRole('status')).toHaveCount(0);
 });
+
+test('card focus stays the same size and navigation outlines have room beside the selected pill', async ({ page }) => {
+  await page.goto('/');
+  const netflix = page.getByRole('button', { name: 'Open Netflix', exact: true });
+  await expect(netflix).toBeFocused();
+  const initial = await netflix.locator('.app-face').boundingBox();
+  await page.keyboard.press('ArrowRight');
+  const next = await netflix.locator('.app-face').boundingBox();
+  expect(next!.width).toBe(initial!.width);
+  expect(next!.height).toBe(initial!.height);
+  expect(await netflix.locator('.app-face').evaluate((element) => getComputedStyle(element).transform)).toBe('none');
+  await page.getByRole('button', { name: 'Home', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('button', { name: 'Apps', exact: true })).toBeFocused();
+  const gap = await page.evaluate(() => {
+    const selected = document.querySelector<HTMLElement>('.nav-item.active')!;
+    const focused = document.activeElement as HTMLElement;
+    const styles = getComputedStyle(focused);
+    return { available: focused.getBoundingClientRect().left - selected.getBoundingClientRect().right, required: parseFloat(styles.outlineWidth) + parseFloat(styles.outlineOffset) };
+  });
+  expect(gap.available).toBeGreaterThan(gap.required);
+});
+
+test('compact library filters can reset, long names wrap, and inputs stay compact', async ({ page }) => {
+  await installMockTV(page, false, [
+    { id: 'com.webos.app.lgchannels', title: 'LG Channels', visible: true },
+    { id: 'com.example.long', title: 'An application with a much longer name that should remain completely readable', visible: true },
+  ]);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  const label = page.locator('.library-grid .app-label').filter({ hasText: 'An application with a much longer name' });
+  const dimensions = await label.evaluate((element) => ({ width: element.clientWidth, scrollWidth: element.scrollWidth, height: element.clientHeight, scrollHeight: element.scrollHeight, whiteSpace: getComputedStyle(element).whiteSpace }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+  expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.height);
+  expect(dimensions.whiteSpace).toBe('normal');
+  await expect(page.getByRole('button', { name: 'Open LG Channels', exact: true })).toBeVisible();
+  const toolbar = await page.locator('.library-toolbar').boundingBox();
+  const search = await page.getByRole('searchbox', { name: 'Find an app' }).boundingBox();
+  expect(search!.y).toBeLessThan(toolbar!.y + toolbar!.height);
+  await page.getByRole('button', { name: 'Music', exact: true }).click();
+  await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Music', exact: true }).click();
+  await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Inputs', exact: true }).click();
+  const input = await page.locator('.full-input-grid .input-card').first().boundingBox();
+  expect(input!.height).toBeLessThan(140);
+  expect(input!.y).toBeLessThan(250);
+});
