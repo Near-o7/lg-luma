@@ -145,7 +145,7 @@ export function Settings({
           <img src="./mark.svg" width="36" height="36" alt="" />
           <span>
             <strong>
-              Luma <small>0.1.0</small>
+              Luma <small>0.1.1</small>
             </strong>
             <small>A quieter home for your TV.</small>
           </span>

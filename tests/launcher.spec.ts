@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -115,8 +116,9 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
 });
 
 async function installMockTV(page: Page, denied: boolean) {
+  const manifest = JSON.parse(readFileSync(path.resolve('appinfo.json'), 'utf8'));
   await page.addInitScript(
-    ({ denied }) => {
+    ({ denied, requiredACG }) => {
       const w = window as typeof window & { __calls: { uri: string; payload: any }[] };
       w.__calls = [];
       w.PalmSystem = { identifier: 'com.luma.launcher' };
@@ -130,6 +132,14 @@ async function installMockTV(page: Page, denied: boolean) {
           if (uri.includes('/exec')) {
             if (denied)
               response = { returnValue: false, errorText: 'Mock: service is not elevated.' };
+            // Model Homebrew 0.8.0-rc1's webOS 26 access group. The real-inventory
+            // test must fail when the packaged caller forgets this permission.
+            else if (!requiredACG.includes('lunabus.query'))
+              response = {
+                returnValue: false,
+                errorCode: -1,
+                errorText: 'Denied method call "exec" for category "/"',
+              };
             else
               response = {
                 returnValue: true,
@@ -160,7 +170,7 @@ async function installMockTV(page: Page, denied: boolean) {
         }
       };
     },
-    { denied },
+    { denied, requiredACG: manifest.requiredACG as string[] },
   );
 }
 

@@ -58,6 +58,8 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
   const actual = appinfo && JSON.parse(appinfo.data.toString());
   if (actual?.id !== manifest.id || actual?.version !== manifest.version)
     throw new Error('Packaged app metadata does not match the source.');
+  if (JSON.stringify(actual.requiredACG) !== JSON.stringify(manifest.requiredACG))
+    throw new Error('Packaged app permissions do not match the source.');
   for (const required of [
     'index.html',
     'app.js',
