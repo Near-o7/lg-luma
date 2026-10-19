@@ -28,13 +28,15 @@ test('hold OK opens options, favorites persist and hidden apps can be restored',
   page,
 }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Netflix', exact: true }).focus();
   await page.keyboard.down('Enter');
   await page.waitForTimeout(700);
   await page.keyboard.up('Enter');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Remove from favorites' }).click();
   await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toHaveCount(0);
@@ -377,4 +379,45 @@ test('connection artwork follows the reported device labels without changing the
       ),
     )
     .toEqual(['com.webos.app.hdmi1']);
+});
+
+test('Home favorites move inline with hold OK and left/right, and Back keeps the order', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+  await page.keyboard.down('Enter');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('Enter');
+  const moving = page.getByRole('button', { name: 'Move Netflix', exact: true });
+  await expect(moving).toBeFocused();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => page.locator('.favorites-grid [data-app-id]').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => (node as HTMLElement).dataset.appId))).toEqual(['youtube.leanback.v4', 'netflix']);
+  await expect(moving).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+  await expect(page.locator('.favorites-grid.is-reordering')).toHaveCount(0);
+  await page.reload();
+  await expect.poll(() => page.locator('.favorites-grid [data-app-id]').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => (node as HTMLElement).dataset.appId))).toEqual(['youtube.leanback.v4', 'netflix']);
+  await page.getByRole('button', { name: 'Open Netflix', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status')).toContainText('Desktop preview');
+});
+
+test('moving up to the Apps categories restores the complete top of the scroller', async ({ page }) => {
+  const apps = Array.from({ length: 36 }, (_, index) => ({ id: `com.example.scroll${index + 1}`, title: `App ${String(index + 1).padStart(2, '0')}`, visible: true }));
+  await installMockTV(page, false, apps);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await page.getByRole('button', { name: 'Open App 08', exact: true }).focus();
+  await page.locator('main').evaluate((main) => main.scrollTo({ top: 200, behavior: 'instant' }));
+  await expect.poll(() => page.locator('main').evaluate((main) => main.scrollTop)).toBe(200);
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('button', { name: 'Open App 02', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('button', { name: 'Utilities', exact: true })).toBeFocused();
+  await expect.poll(() => page.locator('main').evaluate((main) => main.scrollTop)).toBe(0);
 });

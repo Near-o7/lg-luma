@@ -772,7 +772,7 @@ export function App() {
                       ) : (
                         <>
                           <MoreHorizontal size={19} />
-                          Hold OK for options
+                      {page === 'home' ? 'Hold OK to move apps' : 'Hold OK for options'}
                         </>
                       )}
                     </span>

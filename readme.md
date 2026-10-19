@@ -81,15 +81,15 @@ The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunab
 | ---------------------- | -------------------------------------------------------- |
 | Arrow keys             | Spatial navigation between tiles and controls            |
 | OK / Enter             | Open the focused app, input, or control                  |
-| Hold OK                | App options: favorite, hide, or reorder                  |
+| Hold OK                | Home favorite: move mode; library app: options           |
 | Menu / right-click / M | Options for the focused app                              |
 | Back / Escape          | Close the current panel; return from Apps/Inputs to Home |
 | Back on Home           | webOS's normal platform Back behavior                    |
 | Magic Remote pointer   | Point, click, or hold a tile for options                 |
 
-Apps → select an app → hold OK to edit favorites. Move pinned apps left or right from the same panel. Hidden apps remain installed and can be restored with **Apps → Hidden apps**. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
+On Home, hold OK on a favorite to enter move mode, press Left/Right to change its position, then press Back to finish. The new order is saved immediately and the selected app stays focused. Apps → select an app → hold OK to add/remove favorites or hide apps. Hidden apps remain installed and can be restored with **Apps → Hidden apps**. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
 
-The top navigation includes a full-page **Settings** view, with Backdrops beside Weather and Preferences. The sliders icon at the top right opens **TV settings** directly. Luma settings includes six bundled backdrops (including San Francisco, Munich, and Tokyo), weather location, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
+The top navigation includes a full-page **Settings** view, with Backdrops beside Weather and **Look & Feel**. The sliders icon at the top right opens **TV settings** directly. Luma settings includes six bundled backdrops (including San Francisco, Munich, and Tokyo), weather location, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
 
 Apple TV, Prime Video, Disney+, Jellyfin, Netflix, YouTube, ARTE, ZDF, and Das Erste use bundled SVG logos. Input cards choose connection artwork from the reported device name: PlayStation uses the supplied PlayStation mark, USB uses the USB symbol, unnamed HDMI ports use an HDMI connector, and other devices use a suitable generic icon. Icon selection does not change the input's launch target.
 
