@@ -480,6 +480,9 @@ button svg {
   color: #ead8aa;
   font-size: 0.9rem;
 }
+#reorder-instructions > span {
+  display: flex;
+}
 .pin-badge {
   position: absolute;
   top: 0.7rem;
