@@ -1,0 +1,60 @@
+import type { Preferences } from './types';
+
+export const STORAGE_KEY = 'luma.preferences.v1';
+export const defaults: Preferences = {
+  version: 1,
+  favorites: null,
+  hidden: [],
+  recent: [],
+  wallpaper: 'dunes',
+  reducedMotion: false,
+  clock24: false,
+};
+
+const ids = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? [
+        ...new Set(
+          value.filter(
+            (id): id is string => typeof id === 'string' && /^[a-zA-Z0-9._-]{1,128}$/.test(id),
+          ),
+        ),
+      ].slice(0, 1000)
+    : [];
+
+export function parsePreferences(raw: string | null): Preferences {
+  try {
+    const value = JSON.parse(raw ?? 'null');
+    if (!value || value.version !== 1) return { ...defaults };
+    return {
+      version: 1,
+      favorites: !Array.isArray(value.favorites) ? null : ids(value.favorites),
+      hidden: ids(value.hidden),
+      recent: ids(value.recent).slice(0, 12),
+      wallpaper: ['dunes', 'alpine', 'aurora'].includes(value.wallpaper)
+        ? value.wallpaper
+        : 'dunes',
+      reducedMotion: value.reducedMotion === true,
+      clock24: value.clock24 === true,
+    };
+  } catch {
+    return { ...defaults };
+  }
+}
+
+export function loadPreferences(): Preferences {
+  try {
+    return parsePreferences(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return { ...defaults };
+  }
+}
+
+export function savePreferences(value: Preferences): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}

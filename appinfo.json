@@ -1,0 +1,18 @@
+{
+  "id": "com.luma.launcher",
+  "version": "0.1.0",
+  "vendor": "Luma",
+  "type": "web",
+  "main": "index.html",
+  "title": "Luma",
+  "icon": "icon.png",
+  "largeIcon": "large-icon.png",
+  "appDescription": "A quieter home for your TV.",
+  "resolution": "1920x1080",
+  "appCategory": ["home"],
+  "requiredACG": ["application.launcher", "application.query"],
+  "disableBackHistoryAPI": true,
+  "handlesRelaunch": false,
+  "iconColor": "#25272d",
+  "accessibility": { "supportsAudioGuidance": true }
+}
