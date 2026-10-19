@@ -25,6 +25,7 @@ import { isTV, launchApp, loadInventory, platformBack } from './bridge';
 import { moveFocus, type Direction } from './navigation';
 import { loadPreferences, savePreferences } from './storage';
 import { wallpapers } from './wallpapers';
+import { moveFavorite } from './favorites';
 import type { Category, Inventory, Page, Preferences, TVApp, TVInput } from './types';
 
 const tabs: { id: Page; title: string }[] = [
@@ -47,6 +48,7 @@ export function App() {
   const [error, setError] = useState('');
   const [preferences, setPreferences] = useState(loadPreferences);
   const [optionsApp, setOptionsApp] = useState<TVApp | null>(null);
+  const [reordering, setReordering] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category | null>(null);
   const [showHidden, setShowHidden] = useState(false);
@@ -58,6 +60,7 @@ export function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reloadVersion = useRef(0);
   const wasAmbient = useRef(false);
+  const lastReordering = useRef<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const reducedMotion = preferences.reducedMotion || !!prefersReducedMotion;
   const appMap = useMemo(
@@ -166,7 +169,20 @@ export function App() {
     wasAmbient.current = ambient;
   }, [ambient]);
 
+  useLayoutEffect(() => {
+    const id = reordering ?? lastReordering.current;
+    if (id) {
+      const card = [
+        ...document.querySelectorAll<HTMLElement>('.favorites-grid [data-app-id]'),
+      ].find((node) => node.dataset.appId === id);
+      card?.focus({ preventScroll: true });
+      card?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+    }
+    lastReordering.current = reordering;
+  }, [reordering, preferences.favorites]);
+
   const openPage = useCallback((next: Page) => {
+    setReordering(null);
     setPage(next);
     setQuery('');
     setCategory(null);
@@ -176,7 +192,7 @@ export function App() {
 
   const onLaunch = useCallback(
     async (app: TVApp | TVInput) => {
-      if (pendingLaunch.current) return;
+      if (pendingLaunch.current || reordering) return;
       if (!isTV()) {
         notify(`Desktop preview · ${app.title} will open on your TV.`);
         return;
@@ -197,14 +213,41 @@ export function App() {
         setLaunching(null);
       }
     },
-    [notify],
+    [notify, reordering],
   );
 
-  const onOptions = useCallback((app: TVApp) => setOptionsApp(app), []);
+  const onOptions = useCallback(
+    (app: TVApp) => {
+      if (!reordering) setOptionsApp(app);
+    },
+    [reordering],
+  );
+  const startReordering = useCallback((app: TVApp) => setReordering(app.id), []);
+  const shiftFavorite = useCallback(
+    (id: string, direction: -1 | 1) => {
+      setPreferences((current) => {
+        const ids = current.favorites ?? defaultFavorites(inventory.apps);
+        const visible = new Set(
+          inventory.apps.filter((app) => !current.hidden.includes(app.id)).map((app) => app.id),
+        );
+        const next = moveFavorite(ids, id, direction, visible);
+        return next === ids ? current : { ...current, favorites: next };
+      });
+    },
+    [inventory.apps],
+  );
 
-  const actions = useRef<{ back: () => void; options: () => void; wake: () => boolean }>({
+  const actions = useRef<{
+    back: () => void;
+    options: () => void;
+    hold: () => void;
+    reorder: (key: string) => boolean;
+    wake: () => boolean;
+  }>({
     back: () => {},
     options: () => {},
+    hold: () => {},
+    reorder: () => false,
     wake: () => false,
   });
   useLayoutEffect(() => {
@@ -212,6 +255,10 @@ export function App() {
       back: () => {
         if (ambient) {
           setAmbient(false);
+          return;
+        }
+        if (reordering) {
+          setReordering(null);
           return;
         }
         if (optionsApp) {
@@ -231,7 +278,21 @@ export function App() {
       },
       options: () => {
         const id = (document.activeElement as HTMLElement | null)?.dataset.appId;
-        if (!optionsApp && id && appMap.has(id)) setOptionsApp(appMap.get(id)!);
+        if (!optionsApp && id && appMap.has(id)) onOptions(appMap.get(id)!);
+      },
+      hold: () => {
+        const node = document.activeElement as HTMLElement | null;
+        const app = node?.dataset.appId ? appMap.get(node.dataset.appId) : undefined;
+        if (!app || optionsApp) return;
+        if (page === 'home' && node?.dataset.focusable?.startsWith('favorite-'))
+          startReordering(app);
+        else onOptions(app);
+      },
+      reorder: (key) => {
+        if (!reordering) return false;
+        if (key === 'ArrowLeft' || key === 'ArrowRight')
+          shiftFavorite(reordering, key === 'ArrowLeft' ? -1 : 1);
+        return true;
       },
       wake: () => {
         if (!ambient) return false;
@@ -264,6 +325,10 @@ export function App() {
       ) {
         event.preventDefault();
         if (!event.repeat) actions.current.back();
+        return;
+      }
+      if (actions.current.reorder(event.key)) {
+        event.preventDefault();
         return;
       }
       if (event.key === 'Tab') {
@@ -301,7 +366,7 @@ export function App() {
           holdTimer = setTimeout(() => {
             held = true;
             pressed?.removeAttribute('data-pressed');
-            actions.current.options();
+            actions.current.hold();
           }, 600);
       }
     };
@@ -336,8 +401,10 @@ export function App() {
       prefix={prefix}
       pinned={pinned}
       launching={launching === app.id}
+      reordering={prefix === 'favorite' && reordering === app.id}
       onLaunch={onLaunch}
       onOptions={onOptions}
+      onHold={prefix === 'favorite' ? startReordering : undefined}
     />
   );
   const wallpaper = wallpapers.find((item) => item.id === preferences.wallpaper) ?? wallpapers[0];
@@ -453,6 +520,11 @@ export function App() {
                   <section className="favorites-section" aria-labelledby="favorites-heading">
                     <div className="section-heading">
                       <h2 id="favorites-heading">Your favorites</h2>
+                      {reordering ? (
+                        <span className="reorder-status" role="status">
+                          Move apps
+                        </span>
+                      ) : null}
                     </div>
                     {loading && !inventory.apps.length ? (
                       <div className="app-grid skeleton-grid" aria-label="Loading apps">
@@ -474,7 +546,9 @@ export function App() {
                         </button>
                       </div>
                     ) : favorites.length ? (
-                      <div className="app-grid favorites-grid">
+                      <div
+                        className={`app-grid favorites-grid${reordering ? ' is-reordering' : ''}`}
+                      >
                         {favorites.map((app) => renderTile(app, 'favorite'))}
                       </div>
                     ) : (
@@ -520,7 +594,12 @@ export function App() {
               {page === 'apps' ? (
                 <>
                   <h1 className="sr-only">Apps</h1>
-                  <div className="library-toolbar" onFocus={(event) => event.currentTarget.closest('main')?.scrollTo({ top: 0, behavior: 'instant' })}>
+                  <div
+                    className="library-toolbar"
+                    onFocus={(event) =>
+                      event.currentTarget.closest('main')?.scrollTo({ top: 0, behavior: 'instant' })
+                    }
+                  >
                     <div className="filter-tabs" aria-label="App categories">
                       {categories.map((item) => (
                         <button
@@ -669,23 +748,36 @@ export function App() {
               ) : null}
             </main>
             <footer className="footer">
-              <div className="remote-hints">
-                <span>
-                  <span className="keycap keycap-ok">OK</span>
-                  {page === 'settings' ? 'Select' : 'Open'}
-                </span>
-                <span>
-                  {page === 'settings' ? (
-                    <>
-                      <span className="keycap">Back</span>Home
-                    </>
-                  ) : (
-                    <>
-                      <MoreHorizontal size={19} />
-                      Hold OK for options
-                    </>
-                  )}
-                </span>
+              <div className="remote-hints" id={reordering ? 'reorder-instructions' : undefined}>
+                {reordering ? (
+                  <>
+                    <span>
+                      <span className="keycap">← →</span>Move
+                    </span>
+                    <span>
+                      <span className="keycap">Back</span>Done
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      <span className="keycap keycap-ok">OK</span>
+                      {page === 'settings' ? 'Select' : 'Open'}
+                    </span>
+                    <span>
+                      {page === 'settings' ? (
+                        <>
+                          <span className="keycap">Back</span>Home
+                        </>
+                      ) : (
+                        <>
+                          <MoreHorizontal size={19} />
+                          Hold OK for options
+                        </>
+                      )}
+                    </span>
+                  </>
+                )}
               </div>
               <div className="footer-right">
                 {page === 'settings' ? (
@@ -704,7 +796,10 @@ export function App() {
                       className="ambient-button"
                       data-focusable="ambient"
                       aria-label="Enter ambient mode"
-                      onClick={() => setAmbient(true)}
+                      onClick={() => {
+                        setReordering(null);
+                        setAmbient(true);
+                      }}
                     >
                       <Moon size={19} />
                     </button>

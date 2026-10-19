@@ -1,5 +1,5 @@
-import { memo, useRef } from 'react';
-import { LoaderCircle, Pin } from 'lucide-react';
+import { memo, useEffect, useRef } from 'react';
+import { ArrowLeft, ArrowRight, LoaderCircle, Pin } from 'lucide-react';
 import { Brand } from './brand';
 import type { TVApp } from '../types';
 
@@ -8,8 +8,10 @@ interface Props {
   prefix: string;
   pinned?: boolean;
   launching?: boolean;
+  reordering?: boolean;
   onLaunch: (app: TVApp) => void;
   onOptions: (app: TVApp) => void;
+  onHold?: (app: TVApp) => void;
 }
 
 export const AppTile = memo(function AppTile({
@@ -17,11 +19,14 @@ export const AppTile = memo(function AppTile({
   prefix,
   pinned,
   launching,
+  reordering,
   onLaunch,
   onOptions,
+  onHold,
 }: Props) {
   const hold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const held = useRef(false);
+  useEffect(() => () => clearTimeout(hold.current), []);
   const clearHold = () => {
     clearTimeout(hold.current);
   };
@@ -30,18 +35,25 @@ export const AppTile = memo(function AppTile({
       className="app-tile"
       data-focusable={`${prefix}-${app.id}`}
       data-app-id={app.id}
-      aria-label={`Open ${app.title}`}
-      aria-haspopup="dialog"
+      data-reordering={reordering || undefined}
+      aria-label={`${reordering ? 'Move' : 'Open'} ${app.title}`}
+      aria-haspopup={reordering ? undefined : 'dialog'}
+      aria-describedby={reordering ? 'reorder-instructions' : undefined}
       onBlur={clearHold}
       onPointerEnter={(event) => {
+        if (event.currentTarget.closest('.is-reordering')) return;
         if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true });
       }}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
+        if (!reordering && event.currentTarget.closest('.is-reordering')) {
+          event.preventDefault();
+          return;
+        }
         held.current = false;
         hold.current = setTimeout(() => {
           held.current = true;
-          onOptions(app);
+          (onHold ?? onOptions)(app);
         }, 600);
       }}
       onPointerUp={clearHold}
@@ -64,6 +76,12 @@ export const AppTile = memo(function AppTile({
       <span className={`app-face brand-${app.brand}`}>
         <Brand app={app} />
         {pinned ? <Pin className="pin-badge" size={16} aria-label="Favorite" /> : null}
+        {reordering ? (
+          <span className="reorder-indicator" aria-hidden="true">
+            <ArrowLeft size={16} />
+            <ArrowRight size={16} />
+          </span>
+        ) : null}
         {launching ? (
           <span className="launch-overlay">
             <LoaderCircle className="spin" />

@@ -449,6 +449,37 @@ button svg {
 .app-tile[data-pressed='true'] {
   filter: none;
 }
+.favorites-grid.is-reordering .app-tile:not([data-reordering]) {
+  opacity: 0.48;
+}
+.app-tile[data-reordering] .app-face {
+  box-shadow:
+    0 12px 32px #0006,
+    0 0 0 0.2rem #ead8aa,
+    0 0 0 0.43rem #ead8aa24;
+}
+.reorder-indicator {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 1rem;
+  background: #101318c9;
+  color: #f7e8c7;
+  pointer-events: none;
+}
+.reorder-indicator svg {
+  width: 1rem;
+  height: 1rem;
+}
+.reorder-status {
+  color: #ead8aa;
+  font-size: 0.9rem;
+}
 .pin-badge {
   position: absolute;
   top: 0.7rem;
