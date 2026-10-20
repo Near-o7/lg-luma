@@ -93,7 +93,7 @@ Home shows Favorites and Inputs without a recent-app section or permanent contro
 
 The top navigation includes a full-page **Settings** view, with **Background** on the left and **Interface** above **Weather** on the right. The sliders icon at the top right opens **TV settings** directly. Interface controls Home app names, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
 
-The nine bundled backgrounds are Slate (a lighter gradient), Midnight (a dark gradient), Prism (a brighter colorful gradient), Monument Valley, San Francisco, Summit, Forest, Yosemite, and Northern lights. From the Settings tab, Down enters Interface and continues into Weather; Left reaches the background gallery.
+The nine bundled backgrounds are Slate (a lighter gradient), Midnight (a dark gradient), Prism (a saturated color gradient), Monument Valley, San Francisco, Summit, Forest, Yosemite, and Northern lights. From the Settings tab, Down enters Interface and continues into Weather; Left reaches the background gallery.
 
 Apple TV, Prime Video, Disney+, Jellyfin, Netflix, YouTube, ARTE, ZDF, and Das Erste use bundled SVG logos. Input cards choose connection artwork from the reported device name: PlayStation and Apple TV use their supplied marks, USB uses the USB symbol, unnamed HDMI ports use an HDMI connector, and other devices use a suitable generic icon. Icon selection does not change the input's launch target.
 
