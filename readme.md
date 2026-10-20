@@ -6,65 +6,45 @@ Luma brings your installed apps and HDMI inputs into a locally rendered home scr
 
 ![Luma home screen, desktop preview](docs/home.png)
 
-## Run on your Mac
+## Install
 
-Node.js 22+ and pnpm 10 (the project pins pnpm 10.34.5):
+Use [Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel) on your rooted LG TV.
 
-```sh
-pnpm install --frozen-lockfile
-pnpm dev
-```
+1. Open Homebrew Channel and check **Settings → Root status: ok**.
+2. Go to **Settings → Add repository**, enter this URL, and confirm:
 
-Open **http://127.0.0.1:5173**. Desktop preview shows clearly identified sample apps and inputs; app launches display a preview message. On a TV, only its actual inventory is shown.
+   ```text
+   https://github.com/ecklf/lg-luma/releases/latest/download/repo.json
+   ```
 
-## Build an installable package
+3. Return to the app list, select **Luma**, and choose **Install**.
+4. Open **Luma** from your TV's apps.
 
-```sh
-pnpm run package
-```
+Use Homebrew Channel to update Luma too. The feed is published with each versioned release. Luma installs alongside LG Home and LG-XMB with its own app ID.
 
-Output: `dist/com.luma.launcher_0.1.7_all.ipk`, plus `dist/sha256sums`. The standalone app is also in `dist/app/`, and works directly from `index.html` without a server.
+### Manual installation
 
-Photographs, fonts, and app-logo SVGs are checked in locally. `pnpm assets` prepares them again if you deliberately remove them; it downloads from Unsplash, jsDelivr, Wikimedia Commons, and the Inter/Jellyfin repositories at build time. Normal builds and TV use require no asset downloads. Logo sources and licenses are documented in [assets.md](assets.md).
+Download the `.ipk` from the [latest release](https://github.com/ecklf/lg-luma/releases/latest). Open [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop), connect to your TV's IP address on port `22` as `root`, and install the downloaded package.
 
-## Install on your rooted TV
-
-1. Open Homebrew Channel on your TV; check **Settings → Root status: ok**.
-2. Open [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop) on your Mac.
-3. Connect to `10.120.1.99`, port `22`, user `root`, using your existing SSH password or key.
-4. Install `dist/com.luma.launcher_0.1.7_all.ipk` and launch **Luma**.
-
-Or register your root SSH connection with the locally installed CLI:
+You can also install over SSH. Replace `TV_IP` with your TV's address and use the filename you downloaded:
 
 ```sh
-pnpm exec ares-setup-device
-# Add profile "tv": host 10.120.1.99, port 22, user root; choose your SSH authentication.
-pnpm run deploy --device tv
+scp -O com.luma.launcher_0.1.7_all.ipk root@TV_IP:/tmp/luma.ipk
+ssh root@TV_IP
 ```
 
-The package has its own ID and installs alongside LG Home and LG-XMB.
-
-### Installing with luna-send
-
-Manual IPK installation is supported. From your Mac, copy the built package:
-
-```sh
-scp -O dist/com.luma.launcher_0.1.7_all.ipk root@10.120.1.99:/tmp/luma-0.1.7.ipk
-ssh root@10.120.1.99
-```
-
-Then, inside the TV's root shell:
+Then run in the TV's root shell:
 
 ```sh
 luna-send -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma-0.1.7.ipk","subscribe":true}'
+  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma.ipk","subscribe":true}'
 ```
 
-Wait for the terminal installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma so the new package permissions are used.
+Wait for the installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma after updating.
 
 ### webOS 26: denied exec method
 
-Homebrew Channel 0.8.0-rc1 adds the `lunabus.query` API permission mapping for elevated services ([upstream fix](https://github.com/webosbrew/webos-homebrew-channel/pull/233)). Luma 0.1.1 declares that group alongside its app-launch permissions. Reinstall 0.1.1 if an older Luma build reports `Denied method call "exec" for category "/"`.
+Homebrew Channel 0.8.0-rc1 or newer provides the `lunabus.query` API permission mapping for elevated services ([upstream fix](https://github.com/webosbrew/webos-homebrew-channel/pull/233)). Luma declares that group alongside its app-launch permissions. Update Homebrew Channel and reinstall the latest Luma release if an older installation reports `Denied method call "exec" for category "/"`.
 
 If the denial persists after reopening Luma, perform a full TV reboot. If it still occurs, inspect the installed caller permissions and the Homebrew service mapping from the root SSH shell:
 
@@ -110,5 +90,43 @@ Luma does not inject code into LG services, replace the stock launcher, bind-mou
 - All app names and IDs come from inventory on the TV. A failure never substitutes desktop sample apps.
 - Preferences, recent launches, weather location, and cached readings stay in this app's local storage. Forecast requests require an enabled widget and a configured location; city searches are sent only when you press Search. The packaged Content Security Policy limits web network connections to Open-Meteo's weather and geocoding APIs.
 - Homebrew Channel permissions and native service behavior need verification on the physical TV, particularly webOS 26. Browser tests cannot establish hardware compatibility.
+
+## Development
+
+Use Node.js 22+ and pnpm 10 (the project pins pnpm 10.34.5):
+
+```sh
+git clone https://github.com/ecklf/lg-luma.git
+cd lg-luma
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open **http://127.0.0.1:5173**. The browser preview uses sample apps and inputs; TV actions show a preview message. On a TV, Luma loads the actual inventory.
+
+### Build a package
+
+```sh
+pnpm run package
+```
+
+Output: `dist/com.luma.launcher_0.1.7_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
+
+Photographs, fonts, and app-logo SVGs are bundled locally. `pnpm assets` prepares them again if deliberately removed; normal builds and TV use need no asset downloads.
+
+To deploy a local build, register your TV's root SSH connection with `pnpm exec ares-setup-device`, then run `pnpm run deploy --device tv`.
+
+### Releases
+
+GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. Pushing a version tag matching `package.json` and `appinfo.json` publishes the tested IPK, checksum, icon, and Homebrew feed:
+
+```sh
+git tag v0.1.7
+git push origin v0.1.7
+```
+
+For subsequent releases, update both version fields and tag that version. The stable feed URL always serves the latest release. Contributor checks, controls, weather behavior, and the code map are documented in [agents.md](agents.md).
+
+## License
 
 MIT for Luma's source. See [assets.md](assets.md) for artwork, font, icon, and integration references.

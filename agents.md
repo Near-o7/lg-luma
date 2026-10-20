@@ -23,6 +23,12 @@ Build before running browser tests so packaged `file://` tests exercise the curr
 
 Project filenames use lowercase kebab-case, including React components (for example, `app-tile.tsx`). Keep `package.json` and `appinfo.json` versions synchronized; change the version only when requested.
 
+## CI and releases
+
+`.github/workflows/ci.yml` checks pull requests, pushes to `main`, and `v*` tags on Ubuntu with Node.js 24. It checks formatting, runs unit tests, builds and verifies the IPK, and runs Chromium browser tests. Successful builds upload the release files as a workflow artifact. Version-tag pushes publish those tested files to a GitHub release using the workflow's `GITHUB_TOKEN`.
+
+`tools/repository.mjs` runs after packaging. It creates `dist/repo.json` in Homebrew Channel's paginated package format and copies the native large icon into `dist/`. The feed uses version-specific release URLs and the SHA-256 and size of the normalized IPK. It rejects mismatched package/app versions and release tags. The install URL is `https://github.com/ecklf/lg-luma/releases/latest/download/repo.json`; it requires public repository/release access and an initial published release. Publishing the feed as a release asset avoids bot commits to the default branch.
+
 ## Remote and pointer controls
 
 | Input                 | Action                                                  |
