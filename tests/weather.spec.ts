@@ -81,6 +81,56 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   expect(forecasts).toBe(1);
 });
 
+test('temperature units persist, work with the remote, and convert cached readings on Home and ambient', async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.addInitScript((location) => {
+    if (!localStorage.getItem('luma.preferences.v1'))
+      localStorage.setItem(
+        'luma.preferences.v1',
+        JSON.stringify({ version: 1, weatherLocation: location }),
+      );
+  }, location);
+  await page.route('https://api.open-meteo.com/**', (route) => {
+    requests++;
+    expect(new URL(route.request().url()).searchParams.get('temperature_unit')).toBe('celsius');
+    return route.fulfill({
+      json: { current: { temperature_2m: 14.2, weather_code: 2, is_day: 1 } },
+    });
+  });
+  await page.goto('/');
+  await expect(page.locator('.weather-temperature')).toHaveText('14°C');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const celsius = page.getByRole('button', { name: 'Celsius', exact: true });
+  const fahrenheit = page.getByRole('button', { name: 'Fahrenheit', exact: true });
+  await expect(celsius).toHaveAttribute('aria-pressed', 'true');
+  await celsius.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(fahrenheit).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(fahrenheit).toHaveAttribute('aria-pressed', 'true');
+  await expect(celsius).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.weather-temperature')).toHaveText('58°F');
+  await page.reload();
+  await expect(page.locator('.weather-temperature')).toHaveText('58°F');
+  await page.getByRole('button', { name: 'Enter ambient mode' }).click();
+  await expect(page.locator('.ambient-hint .weather-temperature')).toHaveText('58°F');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(fahrenheit).toHaveAttribute('aria-pressed', 'true');
+  await fahrenheit.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(celsius).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.weather-temperature')).toHaveText('14°C');
+  await page.reload();
+  await expect(page.locator('.weather-temperature')).toHaveText('14°C');
+  expect(requests).toBe(1);
+});
+
 test('a configured city with failed weather remains usable and shows an honest fallback', async ({
   page,
 }) => {

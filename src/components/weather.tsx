@@ -10,9 +10,9 @@ import {
   Moon,
   Sun,
 } from 'lucide-react';
-import type { WeatherLocation } from '../types';
+import type { TemperatureUnit, WeatherLocation } from '../types';
 import { useWeather } from '../use-weather';
-import { weatherCondition } from '../weather';
+import { formatTemperature, weatherCondition } from '../weather';
 
 const icons = {
   sun: Sun,
@@ -28,9 +28,11 @@ const icons = {
 
 export function Weather({
   location,
+  unit,
   onConfigure,
 }: {
   location: WeatherLocation | null;
+  unit: TemperatureUnit;
   onConfigure?: () => void;
 }) {
   const { reading, failed, loading } = useWeather(location);
@@ -47,7 +49,9 @@ export function Weather({
           </span>
           {reading ? (
             <>
-              <span className="weather-temperature">{Math.round(reading.temperature)}°C</span>
+              <span className="weather-temperature">
+                {formatTemperature(reading.temperature, unit)}
+              </span>
               <span className="weather-condition">{condition!.label}</span>
               {failed ? <small className="weather-stale">Last saved reading</small> : null}
             </>

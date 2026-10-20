@@ -1,4 +1,4 @@
-import type { WeatherLocation, WeatherReading } from './types';
+import type { TemperatureUnit, WeatherLocation, WeatherReading } from './types';
 
 export const WEATHER_CACHE_KEY = 'luma.weather.v1';
 export const WEATHER_REFRESH_MS = 15 * 60 * 1000;
@@ -40,6 +40,11 @@ export const locationDetail = (location: WeatherLocation) =>
       [location.region, location.country].filter((part) => part && part !== location.name),
     ),
   ].join(', ');
+
+export function formatTemperature(celsius: number, unit: TemperatureUnit): string {
+  const temperature = unit === 'fahrenheit' ? (celsius * 9) / 5 + 32 : celsius;
+  return `${Math.round(temperature)}°${unit === 'fahrenheit' ? 'F' : 'C'}`;
+}
 
 async function requestJSON(url: URL, signal?: AbortSignal): Promise<unknown> {
   const controller = new AbortController();

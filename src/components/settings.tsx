@@ -114,6 +114,8 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
               onChange={(weatherLocation) => onUpdate({ weatherLocation })}
               enabled={preferences.showWeather}
               onEnabledChange={(showWeather) => onUpdate({ showWeather })}
+              unit={preferences.temperatureUnit}
+              onUnitChange={(temperatureUnit) => onUpdate({ temperatureUnit })}
             />
           </section>
         </div>

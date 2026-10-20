@@ -763,17 +763,6 @@ button svg {
   align-items: center;
   gap: 1.4rem;
 }
-.preview-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: #f4eed45e;
-  font-size: 0.7rem;
-}
-.preview-badge svg {
-  width: 0.8rem;
-  height: 0.8rem;
-}
 .ambient-button {
   width: 1.9rem;
   height: 1.9rem;
@@ -1401,8 +1390,7 @@ button svg {
   .navigation {
     background: #222;
   }
-  .footer,
-  .preview-badge {
+  .footer {
     color: #eee;
   }
 }

@@ -6,7 +6,6 @@ import {
   Grid2X2,
   Heart,
   LoaderCircle,
-  Monitor,
   Moon,
   MoreHorizontal,
   Search,
@@ -433,7 +432,10 @@ export function App() {
             <span className="ambient-time">{time}</span>
             <span className="ambient-hint">
               {preferences.showWeather && preferences.weatherLocation ? (
-                <Weather location={preferences.weatherLocation} />
+                <Weather
+                  location={preferences.weatherLocation}
+                  unit={preferences.temperatureUnit}
+                />
               ) : (
                 'Press any button to return'
               )}
@@ -497,6 +499,7 @@ export function App() {
                       {preferences.showWeather ? (
                         <Weather
                           location={preferences.weatherLocation}
+                          unit={preferences.temperatureUnit}
                           onConfigure={() => {
                             openPage('settings');
                             requestAnimationFrame(() => {
@@ -779,25 +782,17 @@ export function App() {
                     v0.1.7
                   </span>
                 ) : (
-                  <>
-                    {!isTV() ? (
-                      <span className="preview-badge">
-                        <Monitor size={14} />
-                        Desktop preview
-                      </span>
-                    ) : null}
-                    <button
-                      className="ambient-button"
-                      data-focusable="ambient"
-                      aria-label="Enter ambient mode"
-                      onClick={() => {
-                        setReordering(null);
-                        setAmbient(true);
-                      }}
-                    >
-                      <Moon size={19} />
-                    </button>
-                  </>
+                  <button
+                    className="ambient-button"
+                    data-focusable="ambient"
+                    aria-label="Enter ambient mode"
+                    onClick={() => {
+                      setReordering(null);
+                      setAmbient(true);
+                    }}
+                  >
+                    <Moon size={19} />
+                  </button>
                 )}
               </div>
             </footer>

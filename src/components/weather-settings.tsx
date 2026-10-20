@@ -1,18 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Eye, LoaderCircle, MapPin, Search, X } from 'lucide-react';
-import type { WeatherLocation } from '../types';
+import { Check, Eye, LoaderCircle, MapPin, Search, Thermometer, X } from 'lucide-react';
+import type { TemperatureUnit, WeatherLocation } from '../types';
 import { clearWeatherCache, locationDetail, locationKey, searchLocations } from '../weather';
+
+const temperatureUnits = [
+  { value: 'celsius', label: 'Celsius', symbol: '°C' },
+  { value: 'fahrenheit', label: 'Fahrenheit', symbol: '°F' },
+] as const;
 
 export function WeatherSettings({
   location,
   onChange,
   enabled,
   onEnabledChange,
+  unit,
+  onUnitChange,
 }: {
   location: WeatherLocation | null;
   onChange: (location: WeatherLocation | null) => void;
   enabled: boolean;
   onEnabledChange: (enabled: boolean) => void;
+  unit: TemperatureUnit;
+  onUnitChange: (unit: TemperatureUnit) => void;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<WeatherLocation[]>([]);
@@ -67,6 +76,26 @@ export function WeatherSettings({
           <i />
         </span>
       </button>
+      <div className="setting-row weather-temperature-setting">
+        <Thermometer aria-hidden="true" />
+        <span id="temperature-unit-label">
+          <strong>Temperature</strong>
+        </span>
+        <div className="temperature-units" role="group" aria-labelledby="temperature-unit-label">
+          {temperatureUnits.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-label={option.label}
+              aria-pressed={unit === option.value}
+              data-focusable={`setting-temperature-${option.value}`}
+              onClick={() => onUnitChange(option.value)}
+            >
+              {option.symbol}
+            </button>
+          ))}
+        </div>
+      </div>
       {location ? (
         <div className="saved-location">
           <MapPin size={18} />

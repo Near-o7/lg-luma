@@ -23,16 +23,23 @@ test('old saved preferences migrate without enabling weather and invalid coordin
   assert.deepEqual(preferences.weatherLocation, vienna);
   assert.equal(preferences.showWeather, true);
   assert.equal(preferences.showHomeAppNames, false);
+  assert.equal(preferences.temperatureUnit, 'celsius');
+  assert.equal(
+    parsePreferences('{"version":1,"temperatureUnit":"kelvin"}').temperatureUnit,
+    'celsius',
+  );
   const configured = parsePreferences(
     JSON.stringify({
       version: 1,
       weatherLocation: vienna,
       showWeather: false,
       showHomeAppNames: true,
+      temperatureUnit: 'fahrenheit',
     }),
   );
   assert.equal(configured.showWeather, false);
   assert.equal(configured.showHomeAppNames, true);
+  assert.equal(configured.temperatureUnit, 'fahrenheit');
   assert.deepEqual(configured.weatherLocation, vienna);
   assert.equal(parseLocation({ ...vienna, latitude: Infinity }), null);
   assert.equal(parseLocation({ ...vienna, longitude: 181 }), null);

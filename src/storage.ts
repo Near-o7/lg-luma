@@ -13,6 +13,7 @@ export const defaults: Preferences = {
   clock24: false,
   showHomeAppNames: false,
   showWeather: true,
+  temperatureUnit: 'celsius',
   weatherLocation: null,
 };
 
@@ -43,6 +44,7 @@ export function parsePreferences(raw: string | null): Preferences {
       clock24: value.clock24 === true,
       showHomeAppNames: value.showHomeAppNames === true,
       showWeather: value.showWeather !== false,
+      temperatureUnit: value.temperatureUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius',
       weatherLocation: parseLocation(value.weatherLocation),
     };
   } catch {

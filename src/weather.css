@@ -41,8 +41,33 @@
 .weather-settings {
   margin-bottom: 1.7rem;
 }
-.weather-visibility-toggle {
+.weather-temperature-setting {
   margin-bottom: 1rem;
+}
+.temperature-units {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.65rem;
+  margin-left: auto;
+  padding: 0.25rem;
+  border: 1px solid #ffffff12;
+  border-radius: 0.6rem;
+  background: #151b204d;
+}
+.temperature-units button {
+  min-width: 2.7rem;
+  min-height: 2.1rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.35rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.temperature-units button:hover {
+  background: #ffffff0c;
+}
+.temperature-units button[aria-pressed='true'] {
+  background: #f4f1e8;
+  color: #282c2c;
 }
 .location-search {
   display: flex;
@@ -134,5 +159,11 @@
   }
   .weather-settings {
     margin-bottom: 1.3rem;
+  }
+  .weather-temperature-setting {
+    flex-wrap: wrap;
+  }
+  .weather-temperature-setting > span {
+    flex-basis: 6rem;
   }
 }

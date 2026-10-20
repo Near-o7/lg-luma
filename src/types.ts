@@ -10,6 +10,7 @@ export type Wallpaper =
   | 'yosemite'
   | 'northern-lights';
 export type Category = 'Streaming' | 'Music' | 'Gaming' | 'Utilities';
+export type TemperatureUnit = 'celsius' | 'fahrenheit';
 
 export interface TVApp {
   id: string;
@@ -36,6 +37,7 @@ export interface Preferences {
   clock24: boolean;
   showHomeAppNames: boolean;
   showWeather: boolean;
+  temperatureUnit: TemperatureUnit;
   weatherLocation: WeatherLocation | null;
 }
 
@@ -48,6 +50,7 @@ export interface WeatherLocation {
 }
 
 export interface WeatherReading {
+  // API readings and cached temperatures are always Celsius.
   temperature: number;
   code: number;
   isDay: boolean;
