@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "pnpm check && node tools/build.mjs",
-    "package": "pnpm build && node tools/package.mjs",
+    "package": "pnpm build && node tools/package.mjs && node tools/repository.mjs",
     "deploy": "pnpm run package && node tools/deploy.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:browser": "playwright test",
