@@ -684,6 +684,49 @@ test('clock advances at the minute boundary without re-sorting the app library',
   expect(await page.evaluate(() => (window as any).__sorts)).toBe(0);
 });
 
+test('app-action highlight follows pointer and remote input, and hiding keeps focus nearby', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  const browser = page.getByRole('button', { name: 'Open Web Browser', exact: true });
+  const neighbor = await browser.evaluate((node) => {
+    const cards = [...document.querySelectorAll<HTMLElement>('.library-grid [data-app-id]')];
+    const index = cards.indexOf(node as HTMLElement);
+    return (cards[index + 1] ?? cards[index - 1]).dataset.focusable!;
+  });
+  await browser.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  const favorite = page.getByRole('button', { name: 'Add to favorites', exact: true });
+  const hide = page.getByRole('button', { name: 'Hide app', exact: true });
+  await expect(favorite).toBeFocused();
+  const ring = await favorite.evaluate((node) => ({
+    outline: getComputedStyle(node).outlineStyle,
+    shadow: getComputedStyle(node).boxShadow,
+  }));
+  expect(ring.outline).toBe('none');
+  expect(ring.shadow).toContain('inset');
+  await hide.hover();
+  await expect(hide).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(favorite).toBeFocused();
+  expect(await page.locator('.app-actions .setting-row').evaluateAll((nodes) =>
+    nodes.filter((node) => getComputedStyle(node).boxShadow !== 'none').length,
+  )).toBe(1);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(browser).toHaveCount(0);
+  const next = page.locator(`[data-focusable="${neighbor}"]`);
+  await expect(next).toBeFocused();
+  await page.keyboard.press('m');
+  const close = page.getByRole('button', { name: 'Close', exact: true });
+  await close.hover();
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(next).toBeFocused();
+});
+
 test('app actions close immediately, keep favorites first, and filter hidden apps in the pills', async ({
   page,
 }) => {

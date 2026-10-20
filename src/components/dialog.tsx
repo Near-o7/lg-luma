@@ -19,17 +19,31 @@ export function Dialog({
   const panel = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
+    const apps = [...document.querySelectorAll<HTMLElement>('main [data-app-id]')];
+    const index = previous ? apps.indexOf(previous) : -1;
+    const neighbors = index < 0 ? [] : [...apps.slice(index + 1), ...apps.slice(0, index).reverse()];
+    const returnIds = [previous?.dataset.focusable, ...neighbors.map((node) => node.dataset.focusable)];
     (
       panel.current?.querySelector<HTMLElement>('[data-autofocus]') ??
       panel.current?.querySelector<HTMLElement>('[data-focusable]')
     )?.focus({ preventScroll: true });
     return () => {
-      const target = previous?.isConnected
-        ? previous
-        : (document.querySelector<HTMLElement>('main [data-app-id]') ??
-          document.querySelector<HTMLElement>('main [data-focusable]'));
-      target?.focus({ preventScroll: true });
-      target?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      // Restore after React has finished moving/removing the affected app cards.
+      queueMicrotask(() => {
+        if (document.querySelector('[data-focus-scope="dialog"]')) return;
+        let target: HTMLElement | null = null;
+        for (const id of returnIds) {
+          if (!id) continue;
+          const node = document.querySelector<HTMLElement>(`main [data-focusable="${CSS.escape(id)}"]`);
+          if (node && !node.hasAttribute('disabled')) {
+            target = node;
+            break;
+          }
+        }
+        target ??= document.querySelector<HTMLElement>('main [data-focusable]');
+        target?.focus({ preventScroll: true });
+        target?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      });
     };
   }, []);
   return (
@@ -57,6 +71,9 @@ export function Dialog({
             className="icon-button close-button"
             aria-label="Close"
             data-focusable="dialog-close"
+            onPointerEnter={(event) => {
+              if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true });
+            }}
             onClick={onClose}
           >
             <X />
