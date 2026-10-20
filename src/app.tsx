@@ -19,6 +19,7 @@ import { Settings } from './components/settings';
 import { AppOptions } from './components/app-options';
 import { Weather } from './components/weather';
 import { AmbientClock, Clock, Greeting } from './components/clock';
+import { Navigation } from './components/navigation';
 import { defaultFavorites, sortApps } from './catalog';
 import { isTV, launchApp, loadInventory, platformBack } from './bridge';
 import { moveFocus, type Direction } from './navigation';
@@ -27,12 +28,6 @@ import { wallpapers } from './wallpapers';
 import { moveFavorite } from './favorites';
 import type { Category, Inventory, Page, Preferences, TVApp, TVInput } from './types';
 
-const tabs: { id: Page; title: string }[] = [
-  { id: 'home', title: 'Home' },
-  { id: 'apps', title: 'Apps' },
-  { id: 'inputs', title: 'Inputs' },
-  { id: 'settings', title: 'Settings' },
-];
 const categories: Category[] = ['Streaming', 'Music', 'Gaming', 'Utilities'];
 const focusFirstApp = () =>
   (
@@ -434,20 +429,7 @@ export function App() {
             data-focus-down={page === 'settings' ? 'setting-home-app-names' : undefined}
           >
             <Clock clock24={preferences.clock24} />
-            <nav className="navigation" aria-label="Main navigation">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  className={`nav-item${page === tab.id ? ' active' : ''}`}
-                  data-focusable={`nav-${tab.id}`}
-                  aria-current={page === tab.id ? 'page' : undefined}
-                  onClick={() => openPage(tab.id)}
-                >
-                  {page === tab.id ? <span className="nav-indicator" /> : null}
-                  <span>{tab.title}</span>
-                </button>
-              ))}
-            </nav>
+            <Navigation page={page} onChange={openPage} />
             <div className="header-right">
               <button
                 className="icon-button settings-button"

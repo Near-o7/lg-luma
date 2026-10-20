@@ -313,6 +313,81 @@ test('ambient mode wakes without launching an app and restores remote focus', as
   await expect(page.getByRole('status')).toHaveCount(0);
 });
 
+test('one persistent navigation pill slides with native CSS and follows remote input and resizing', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const pill = page.locator('.nav-indicator');
+  await pill.evaluate((element) => {
+    (window as any).__navigationPill = element;
+    (window as any).__navigationTransitions = [];
+    element.addEventListener('transitionrun', (event) => {
+      (window as any).__navigationTransitions.push((event as TransitionEvent).propertyName);
+    });
+  });
+  const expectAligned = async () => {
+    await expect
+      .poll(() =>
+        pill.evaluate((element) => {
+          const actual = element.getBoundingClientRect();
+          const selected = document.querySelector('.nav-item.active')!.getBoundingClientRect();
+          return Math.max(
+            Math.abs(actual.x - selected.x),
+            Math.abs(actual.y - selected.y),
+            Math.abs(actual.width - selected.width),
+            Math.abs(actual.height - selected.height),
+          );
+        }),
+      )
+      .toBeLessThan(1.5);
+  };
+  await expectAligned();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expectAligned();
+  expect(await pill.evaluate((element) => element === (window as any).__navigationPill)).toBe(true);
+  const transitions = await page.evaluate(
+    () => (window as any).__navigationTransitions as string[],
+  );
+  expect(transitions).toContain('transform');
+  expect(transitions).toContain('width');
+  await page.keyboard.press('ArrowLeft');
+  const inputs = page.getByRole('button', { name: 'Inputs', exact: true });
+  await expect(inputs).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(inputs).toHaveAttribute('aria-current', 'page');
+  await expectAligned();
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expectAligned();
+  await expect(pill).toHaveCount(1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectAligned();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expectAligned();
+});
+
+test('navigation pill respects saved and system reduced-motion preferences', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  const home = page.getByRole('button', { name: 'Home', exact: true });
+  const motion = page.getByRole('switch', { name: 'Reduced motion', exact: true });
+  const pill = page.locator('.nav-indicator');
+  await settings.click();
+  await motion.click();
+  await home.click();
+  expect(await pill.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+  expect(await pill.evaluate((element) => element.getAnimations().length)).toBe(0);
+  await settings.click();
+  await motion.click();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await home.click();
+  expect(await pill.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+  expect(await pill.evaluate((element) => element.getAnimations().length)).toBe(0);
+});
+
 test('card focus stays the same size and navigation outlines have room beside the selected pill', async ({
   page,
 }) => {

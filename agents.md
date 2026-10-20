@@ -29,6 +29,8 @@ Keep focus feedback immediate. Spatial navigation caches control geometry and in
 
 Clock components update at minute boundaries and pause while hidden, independently of the launcher and app sorting. Library filtering/sorting is memoized and only runs on the Apps page. Concurrent inventory refreshes are deduplicated. Use small CSS opacity animations instead of a JavaScript animation runtime, and avoid live backdrop blur or full-screen filter textures in foreground controls. Reduced-motion preferences apply through CSS.
 
+The top navigation uses one persistent selection pill. CSS transitions animate its transform and width; JavaScript measures the selected tab only on selection changes and resize/font-size changes. Initial positioning and resizing are immediate. Both the saved and system reduced-motion preferences disable the pill transition.
+
 Settings uses bundled 480×270 photo thumbnails rather than decoding the full wallpapers for every gallery card. `pnpm assets` regenerates thumbnails. Run `pnpm benchmark` after installing Playwright Chromium to measure a 120-app library with 6× desktop CPU throttling; compare bundle size, keyboard-handler timings, geometry reads, and scroll calls. These measurements are a desktop proxy, not TV frame-rate claims.
 
 ## CI and releases
