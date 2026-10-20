@@ -2,6 +2,9 @@
 
 A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity and feel of Apple TV.
 
+> [!NOTE]
+> Tested on **LG OLED55C57** running **webOS 26**.
+
 ![Luma home screen, desktop preview](docs/home.png)
 
 ## Install
@@ -116,16 +119,11 @@ To deploy a local build, register your TV's root SSH connection with `pnpm exec 
 
 ### Releases
 
-GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. Release publishing is manual. First push a version tag matching `package.json` and `appinfo.json`:
+GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. After a successful build on `main`, CI publishes a new app version with its IPK, checksum, icon, and Homebrew feed. The version tag (for example, `v1.0.0`) is created automatically at the tested commit.
 
-```sh
-git tag v1.0.0
-git push origin v1.0.0
-```
+For each release, update the version in both `package.json` and `appinfo.json`, then merge to `main`. Already-published versions are skipped. To retry a failed run, use **Actions → CI → Run workflow** on `main`.
 
-Then open **Actions → CI → Run workflow**, enter `v1.0.0` as the **tag**, and run it. The workflow builds and tests that tagged commit before publishing the IPK, checksum, icon, and Homebrew feed.
-
-For subsequent releases, update both version fields and tag that version. The stable feed URL always serves the latest release. Contributor checks, controls, weather behavior, and the code map are documented in [agents.md](agents.md).
+The stable feed URL always serves the latest release. Contributor checks, controls, weather behavior, and the code map are documented in [agents.md](agents.md).
 
 ## License
 
