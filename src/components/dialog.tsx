@@ -20,13 +20,11 @@ export function Dialog({
   const panel = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLElement>('[data-focusable]')?.focus({ preventScroll: true });
+    (panel.current?.querySelector<HTMLElement>('[data-autofocus]') ?? panel.current?.querySelector<HTMLElement>('[data-focusable]'))?.focus({ preventScroll: true });
     return () => {
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
-      else
-        document
-          .querySelector<HTMLElement>('main [data-focusable]')
-          ?.focus({ preventScroll: true });
+      const target = previous?.isConnected ? previous : document.querySelector<HTMLElement>('main [data-app-id]') ?? document.querySelector<HTMLElement>('main [data-focusable]');
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
     };
   }, []);
   return (

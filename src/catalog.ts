@@ -112,6 +112,18 @@ export function normalizeInputs(raw: unknown): TVInput[] {
   });
 }
 
+export function sortApps(apps: TVApp[], favorites: readonly string[]): TVApp[] {
+  const ranks = new Map(favorites.map((id, index) => [id, index]));
+  return [...apps].sort((a, b) => {
+    const first = ranks.get(a.id);
+    const second = ranks.get(b.id);
+    if (first !== undefined && second !== undefined) return first - second;
+    if (first !== undefined) return -1;
+    if (second !== undefined) return 1;
+    return a.title.localeCompare(b.title);
+  });
+}
+
 export function defaultFavorites(apps: TVApp[]): string[] {
   const brands = ['netflix', 'youtube', 'apple', 'disney', 'prime', 'plex'];
   const preferred = brands.flatMap((brand) => apps.find((app) => app.brand === brand)?.id ?? []);

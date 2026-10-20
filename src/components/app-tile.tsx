@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, LoaderCircle, Pin } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Heart, LoaderCircle } from 'lucide-react';
 import { Brand } from './brand';
 import type { TVApp } from '../types';
 
@@ -75,7 +75,7 @@ export const AppTile = memo(function AppTile({
     >
       <span className={`app-face brand-${app.brand}`}>
         <Brand app={app} />
-        {pinned ? <Pin className="pin-badge" size={16} aria-label="Favorite" /> : null}
+        {pinned ? <Heart className="favorite-badge" size={16} fill="currentColor" strokeWidth={0} aria-label="Favorite" /> : null}
         {reordering ? (
           <span className="reorder-indicator" aria-hidden="true">
             <ArrowLeft size={16} />
