@@ -40,7 +40,7 @@ export function normalizeApps(raw: unknown): TVApp[] {
   if (!Array.isArray(raw) || raw.length > 1000)
     throw new Error('The TV returned an invalid app list.');
   const seen = new Set<string>();
-  const apps = raw
+  return raw
     .flatMap((entry) => {
       if (
         !entry ||
@@ -76,9 +76,6 @@ export function normalizeApps(raw: unknown): TVApp[] {
       return [appIdentity(entry.id, title || entry.id)];
     })
     .sort((a, b) => a.title.localeCompare(b.title));
-  if (!apps.some((app) => app.id === 'com.webos.app.livetv'))
-    apps.push(appIdentity('com.webos.app.livetv', 'Live TV'));
-  return apps.sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export function normalizeInputs(raw: unknown): TVInput[] {
@@ -133,7 +130,7 @@ export function sortApps(apps: TVApp[], favorites: readonly string[]): TVApp[] {
 }
 
 export function defaultFavorites(apps: TVApp[]): string[] {
-  const brands = ['live-tv', 'netflix', 'youtube', 'apple', 'disney', 'prime', 'plex'];
+  const brands = ['netflix', 'youtube', 'apple', 'disney', 'prime', 'plex'];
   const preferred = brands.flatMap((brand) => apps.find((app) => app.brand === brand)?.id ?? []);
   return [...new Set([...preferred, ...apps.map((app) => app.id)])].slice(0, 6);
 }
