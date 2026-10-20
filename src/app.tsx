@@ -778,8 +778,8 @@ export function App() {
               ) : null}
               <div className="footer-right">
                 {page === 'settings' ? (
-                  <span className="settings-version" aria-label="Luma version 1.1.0">
-                    v1.1.0
+                  <span className="settings-version" aria-label="Luma version 1.0.0">
+                    v1.0.0
                   </span>
                 ) : (
                   <button

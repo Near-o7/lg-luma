@@ -82,8 +82,8 @@ export function nativeCall(
 }
 
 async function inventoryRead(uri: string, field: string): Promise<unknown> {
-  // Same transport used successfully by LG-XMB: private inventory APIs run via
-  // the existing elevated Homebrew service. No credentials or environment reads.
+  // Read private inventory APIs through the existing elevated Homebrew service.
+  // No credentials or environment reads.
   const command = `if [ "$(id -u)" = "0" ]; then /usr/bin/luna-send -n 1 -w 4000 ${uri} '{}'; else printf '%s\\n' '{"returnValue":false,"errorText":"Homebrew Channel needs root access."}'; fi`;
   const envelope = await nativeCall('luna://org.webosbrew.hbchannel.service/exec', { command });
   if (

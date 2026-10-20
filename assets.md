@@ -31,6 +31,4 @@ The requested app logos use downloaded vector artwork, rather than font approxim
 
 The PlayStation and Apple TV input symbols use the SVG paths supplied by the user. PlayStation is a Sony Interactive Entertainment mark; Apple TV is an Apple mark. HDMI, USB, and generic device symbols are Lucide icons.
 
-TV integration was developed with [LG-XMB](https://github.com/Ripthulhu/LG-XMB)'s documented, working Homebrew Channel discovery transport as a reference. Luma does not include its code, native input hooks, shaders, or PS3 assets.
-
 The Apple design guidance supplied for this project informed motion, focus feedback, materials, typography, and reduced-motion behavior. It is not an Apple product.

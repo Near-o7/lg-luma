@@ -27,7 +27,7 @@ esac
     [ -f /tmp/luma-boot-done ] && exit 0
     [ -f "$APP_DIR/appinfo.json" ] || exit 0
     sleep 25
-    # webOS 10+ root-shell launch uses -t (LG-XMB's tested transport).
+    # webOS 10+ root-shell launch uses -t.
     case "$(cat /etc/starfish-release 2>/dev/null)" in
       *" 10."*|*" 11."*) MODE=-t ;;
       *) MODE=-n ;;

@@ -25,7 +25,7 @@ Download the `.ipk` from the [latest release](https://github.com/ecklf/lg-luma/r
 You can also install over SSH. Replace `TV_IP` with your TV's address and use the filename you downloaded:
 
 ```sh
-scp -O com.luma.launcher_1.1.0_all.ipk root@TV_IP:/tmp/luma.ipk
+scp -O com.luma.launcher_1.0.0_all.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -60,9 +60,9 @@ Use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/) to
 /usr/bin/luna-send -t 1 -w 5000 luna://com.webos.service.applicationmanager/launch '{"id":"com.luma.launcher"}'
 ```
 
-The `-t` launch route is based on LG-XMB's webOS 10+ root-shell behavior. Test the mapping on a spare button first. In LG-XMB, select **Settings → Remote → Home button → LG Home** before switching to another input hook. A Home event may otherwise be handled by two launchers. Disable the Luma mapping in Input Hook to restore the normal button.
+Test the mapping on a spare button first. Disable any other Home-button listener before enabling Luma's mapping. Disable the Luma mapping in Input Hook to restore the normal button.
 
-Luma does not inject code into LG services, replace the stock launcher, bind-mount system directories, or copy LG-XMB's native hooks. Root-only Home routing is separate from the app itself.
+Luma does not inject code into LG services, replace the stock launcher, or bind-mount system directories. Root-only Home routing is separate from the app itself.
 
 ## Troubleshooting
 
@@ -82,7 +82,7 @@ The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunab
 ## Compatibility and privacy
 
 - Targets webOS 24–26 / Chromium 108+. Graphics are packaged at 1920 × 1080 and scale for desktop preview.
-- App/input discovery uses Homebrew Channel's elevated `exec` service, following the integration approach documented by the working LG-XMB project. Fixed inventory commands read only app and physical-input lists.
+- App/input discovery uses Homebrew Channel's elevated `exec` service. Fixed inventory commands read only app and physical-input lists.
 - App launches use the public application manager API with the `application.launcher` and `application.query` ACGs. Homebrew service access declares `lunabus.query` for webOS 26 / Homebrew Channel 0.8.0-rc1. No service permissions are rewritten.
 - Service bridges are retained until completion, bounded by timeouts, and cancelled afterward. Partial refresh failures preserve the last valid inventory.
 - All app names and IDs come from inventory on the TV. A failure never substitutes desktop sample apps.
@@ -108,7 +108,7 @@ Open **http://127.0.0.1:5173**. The browser preview uses sample apps and inputs;
 pnpm run package
 ```
 
-Output: `dist/com.luma.launcher_1.1.0_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
+Output: `dist/com.luma.launcher_1.0.0_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
 
 Photographs, fonts, and app-logo SVGs are bundled locally. `pnpm assets` prepares them again if deliberately removed; normal builds and TV use need no asset downloads.
 
@@ -119,11 +119,11 @@ To deploy a local build, register your TV's root SSH connection with `pnpm exec 
 GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. Release publishing is manual. First push a version tag matching `package.json` and `appinfo.json`:
 
 ```sh
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-Then open **Actions → CI → Run workflow**, enter `v1.1.0` as the **tag**, and run it. The workflow builds and tests that tagged commit before publishing the IPK, checksum, icon, and Homebrew feed.
+Then open **Actions → CI → Run workflow**, enter `v1.0.0` as the **tag**, and run it. The workflow builds and tests that tagged commit before publishing the IPK, checksum, icon, and Homebrew feed.
 
 For subsequent releases, update both version fields and tag that version. The stable feed URL always serves the latest release. Contributor checks, controls, weather behavior, and the code map are documented in [agents.md](agents.md).
 
