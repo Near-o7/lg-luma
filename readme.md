@@ -2,8 +2,6 @@
 
 A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity and feel of Apple TV.
 
-Luma brings your installed apps and HDMI inputs into a locally rendered home screen: cinematic backdrops, static app tiles with clear focus outlines, editable favorites, compact inputs, and a searchable app library. Optional local weather is powered by Open-Meteo.
-
 ![Luma home screen, desktop preview](docs/home.png)
 
 ## Install
@@ -19,8 +17,6 @@ Use [Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel) on y
 
 3. Return to the app list, select **Luma**, and choose **Install**.
 4. Open **Luma** from your TV's apps.
-
-Use Homebrew Channel to update Luma too. The feed is published with each versioned release. Luma installs alongside LG Home and LG-XMB with its own app ID.
 
 ### Manual installation
 
@@ -41,19 +37,6 @@ luna-send -i luna://com.webos.appInstallService/dev/install \
 ```
 
 Wait for the installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma after updating.
-
-### webOS 26: denied exec method
-
-Homebrew Channel 0.8.0-rc1 or newer provides the `lunabus.query` API permission mapping for elevated services ([upstream fix](https://github.com/webosbrew/webos-homebrew-channel/pull/233)). Luma declares that group alongside its app-launch permissions. Update Homebrew Channel and reinstall the latest Luma release if an older installation reports `Denied method call "exec" for category "/"`.
-
-If the denial persists after reopening Luma, perform a full TV reboot. If it still occurs, inspect the installed caller permissions and the Homebrew service mapping from the root SSH shell:
-
-```sh
-cat /var/luna-service2*/client-permissions.d/com.luma.launcher*.json
-cat /var/luna-service2*/api-permissions.d/org.webosbrew.hbchannel.service.api.lunabus.query.json
-```
-
-The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunabus.query":["org.webosbrew.hbchannel.service/*"]}`. Homebrew Channel must also be elevated. Installing Luma via `luna-send` does not require elevating Luma itself.
 
 ## Optional: open at boot
 
@@ -80,6 +63,21 @@ Use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/) to
 The `-t` launch route is based on LG-XMB's webOS 10+ root-shell behavior. Test the mapping on a spare button first. In LG-XMB, select **Settings → Remote → Home button → LG Home** before switching to another input hook. A Home event may otherwise be handled by two launchers. Disable the Luma mapping in Input Hook to restore the normal button.
 
 Luma does not inject code into LG services, replace the stock launcher, bind-mount system directories, or copy LG-XMB's native hooks. Root-only Home routing is separate from the app itself.
+
+## Troubleshooting
+
+### webOS 26: denied exec method
+
+Homebrew Channel 0.8.0-rc1 or newer provides the `lunabus.query` API permission mapping for elevated services ([upstream fix](https://github.com/webosbrew/webos-homebrew-channel/pull/233)). Luma declares that group alongside its app-launch permissions. Update Homebrew Channel and reinstall the latest Luma release if an older installation reports `Denied method call "exec" for category "/"`.
+
+If the denial persists after reopening Luma, perform a full TV reboot. If it still occurs, inspect the installed caller permissions and the Homebrew service mapping from the root SSH shell:
+
+```sh
+cat /var/luna-service2*/client-permissions.d/com.luma.launcher*.json
+cat /var/luna-service2*/api-permissions.d/org.webosbrew.hbchannel.service.api.lunabus.query.json
+```
+
+The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunabus.query":["org.webosbrew.hbchannel.service/*"]}`. Homebrew Channel must also be elevated. Installing Luma via `luna-send` does not require elevating Luma itself.
 
 ## Compatibility and privacy
 
@@ -118,12 +116,14 @@ To deploy a local build, register your TV's root SSH connection with `pnpm exec 
 
 ### Releases
 
-GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. Pushing a version tag matching `package.json` and `appinfo.json` publishes the tested IPK, checksum, icon, and Homebrew feed:
+GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. Release publishing is manual. First push a version tag matching `package.json` and `appinfo.json`:
 
 ```sh
 git tag v0.1.7
 git push origin v0.1.7
 ```
+
+Then open **Actions → CI → Run workflow**, enter `v0.1.7` as the **tag**, and run it. The workflow builds and tests that tagged commit before publishing the IPK, checksum, icon, and Homebrew feed.
 
 For subsequent releases, update both version fields and tag that version. The stable feed URL always serves the latest release. Contributor checks, controls, weather behavior, and the code map are documented in [agents.md](agents.md).
 

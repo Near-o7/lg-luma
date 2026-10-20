@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to publish (for example v0.1.7)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  build:
+    name: Check, test, and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Run unit tests
+        run: pnpm test
+      - name: Lint, typecheck, and build the IPK and Homebrew feed
+        run: pnpm run package
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run browser tests
+        run: pnpm test:browser
+      - name: Upload release files
+        uses: actions/upload-artifact@v7
+        with:
+          name: luma-release
+          if-no-files-found: error
+          path: |
+            dist/*.ipk
+            dist/sha256sums
+            dist/repo.json
+            dist/app-icon-large.png
+      - name: Upload browser test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-results
+          if-no-files-found: ignore
+          retention-days: 7
+          path: test-results/
+
+  release:
+    name: Publish release and Homebrew feed
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: luma-release
+          path: release
+      - name: Publish tested release files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            release/*.ipk \
+            release/sha256sums \
+            release/repo.json \
+            release/app-icon-large.png \
+            --verify-tag \
+            --generate-notes \
+            --title "Luma ${RELEASE_TAG#v}"

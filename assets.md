@@ -11,7 +11,7 @@
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
 
-Luma's logo is a folded-light **L**: a slanted lavender ribbon turns into a peach-and-rose base. The browser mark and TV app icon share the same vector geometry, sized for a clear silhouette at small icon sizes.
+Luma's logo is a folded-light **L**: an icy-blue ribbon turns into a cyan-and-indigo base. The browser mark and TV app icon share the same vector geometry, sized for a clear silhouette at small icon sizes.
 
 ## Brand SVGs
 

@@ -8,7 +8,10 @@ const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version) || pkg.version !== manifest.version)
   throw new Error('package.json and appinfo.json must have the same numeric release version.');
 const tag = `v${manifest.version}`;
-if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== tag)
+const requestedTag =
+  process.env.RELEASE_TAG ||
+  (process.env.GITHUB_REF_TYPE === 'tag' ? process.env.GITHUB_REF_NAME : '');
+if (requestedTag && requestedTag !== tag)
   throw new Error(`Release tag must be ${tag}, matching the packaged app version.`);
 
 const repository = process.env.GITHUB_REPOSITORY || 'ecklf/lg-luma';
@@ -42,6 +45,9 @@ const feed = {
     },
   ],
 };
-await fs.copyFile(path.join(output, 'app', manifest.largeIcon), path.join(output, manifest.largeIcon));
+await fs.copyFile(
+  path.join(output, 'app', manifest.largeIcon),
+  path.join(output, manifest.largeIcon),
+);
 await fs.writeFile(path.join(output, 'repo.json'), JSON.stringify(feed, null, 2) + '\n');
 console.log(`Homebrew feed: dist/repo.json (${tag}, ${bytes.length} byte IPK)`);

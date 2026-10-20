@@ -25,21 +25,21 @@ Project filenames use lowercase kebab-case, including React components (for exam
 
 ## CI and releases
 
-`.github/workflows/ci.yml` checks pull requests, pushes to `main`, and `v*` tags on Ubuntu with Node.js 24. It checks formatting, runs unit tests, builds and verifies the IPK, and runs Chromium browser tests. Successful builds upload the release files as a workflow artifact. Version-tag pushes publish those tested files to a GitHub release using the workflow's `GITHUB_TOKEN`.
+`.github/workflows/ci.yml` checks pull requests and pushes to `main` on Ubuntu with Node.js 24. It checks formatting, runs unit tests, builds and verifies the IPK, and runs Chromium browser tests. Successful builds upload the release files as a workflow artifact. Release publishing is manual through `workflow_dispatch`: supply an existing version **tag**, and the workflow checks out and tests that tagged commit before publishing its files using `GITHUB_TOKEN`. The `RELEASE_TAG` environment variable validates that the selected tag matches the packaged version. Manual release runs are not cancelled by new pushes.
 
 `tools/repository.mjs` runs after packaging. It creates `dist/repo.json` in Homebrew Channel's paginated package format and copies the native large icon into `dist/`. The feed uses version-specific release URLs and the SHA-256 and size of the normalized IPK. It rejects mismatched package/app versions and release tags. The install URL is `https://github.com/ecklf/lg-luma/releases/latest/download/repo.json`; it requires public repository/release access and an initial published release. Publishing the feed as a release asset avoids bot commits to the default branch.
 
 ## Remote and pointer controls
 
-| Input                 | Action                                                  |
-| --------------------- | ------------------------------------------------------- |
-| Arrow keys            | Spatial navigation between tiles and controls           |
-| OK / Enter            | Open the focused app, input, or control                  |
-| Hold OK               | Home favorite: move mode; library app: options           |
-| Menu / right-click / M | Options for the focused app                             |
-| Back / Escape         | Close the current panel; return from Apps/Inputs to Home |
-| Back on Home          | webOS's normal platform Back behavior                   |
-| Magic Remote pointer  | Point, click, or hold a tile for options                 |
+| Input                  | Action                                                   |
+| ---------------------- | -------------------------------------------------------- |
+| Arrow keys             | Spatial navigation between tiles and controls            |
+| OK / Enter             | Open the focused app, input, or control                  |
+| Hold OK                | Home favorite: move mode; library app: options           |
+| Menu / right-click / M | Options for the focused app                              |
+| Back / Escape          | Close the current panel; return from Apps/Inputs to Home |
+| Back on Home           | webOS's normal platform Back behavior                    |
+| Magic Remote pointer   | Point, click, or hold a tile for options                 |
 
 On Home, hold OK on a favorite to enter move mode, press Left/Right to change its position, then press Back to finish. The new order is saved immediately and the selected app stays focused. Apps → select an app → hold OK to add/remove favorites or hide apps. The action menu shows the app name and category, and closes after either action. Favorites have a filled-heart badge and sort first in the saved Home order; other apps sort alphabetically. Hidden apps remain installed and can be restored from the **Hidden (count)** category pill, which shows only hidden apps. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
 
