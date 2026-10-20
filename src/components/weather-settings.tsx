@@ -66,6 +66,7 @@ export function WeatherSettings({
         role="switch"
         aria-checked={enabled}
         data-focusable="setting-show-weather"
+        data-focus-down={`setting-temperature-${unit}`}
         onClick={() => onEnabledChange(!enabled)}
       >
         <Eye />
@@ -81,7 +82,13 @@ export function WeatherSettings({
         <span id="temperature-unit-label">
           <strong>Temperature</strong>
         </span>
-        <div className="temperature-units" role="group" aria-labelledby="temperature-unit-label">
+        <div
+          className="temperature-units"
+          role="group"
+          aria-labelledby="temperature-unit-label"
+          data-focus-up="setting-show-weather"
+          data-focus-down="weather-location-query"
+        >
           {temperatureUnits.map((option) => (
             <button
               key={option.value}
@@ -135,6 +142,7 @@ export function WeatherSettings({
             type="search"
             aria-label="City or postcode"
             data-focusable="weather-location-query"
+            data-focus-up={`setting-temperature-${unit}`}
             value={query}
             onKeyDown={(event) => {
               if (event.key === 'Escape' || event.keyCode === 461) {
