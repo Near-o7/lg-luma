@@ -30,10 +30,13 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                 aria-pressed={preferences.wallpaper === wallpaper.id}
                 onClick={() => onUpdate({ wallpaper: wallpaper.id })}
               >
-                <span
-                  className="wallpaper-thumbnail"
-                  style={{ backgroundImage: `url('${wallpaperThumbnail(wallpaper.image)}')` }}
-                >
+                <span className="wallpaper-thumbnail">
+                  <img
+                    src={wallpaperThumbnail(wallpaper.image)}
+                    alt=""
+                    draggable={false}
+                    decoding="async"
+                  />
                   {preferences.wallpaper === wallpaper.id ? (
                     <span className="wallpaper-check">
                       <Check size={18} />

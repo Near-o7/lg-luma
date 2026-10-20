@@ -33,7 +33,12 @@ export function AppOptions({ app, favorites, hidden, onClose, onPin, onHide }: P
             <strong>{pinned ? 'Remove from favorites' : 'Add to favorites'}</strong>
           </span>
         </button>
-        <button className="setting-row" data-focusable="option-hide" onPointerEnter={focusAction} onClick={onHide}>
+        <button
+          className="setting-row"
+          data-focusable="option-hide"
+          onPointerEnter={focusAction}
+          onClick={onHide}
+        >
           {hidden ? <Eye /> : <EyeOff />}
           <span>
             <strong>{hidden ? 'Show app' : 'Hide app'}</strong>

@@ -148,11 +148,10 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
   await expect(page.getByRole('button', { name: /PlayStation 5/ })).toBeVisible();
   await page.screenshot({ path: info.outputPath('luma-inputs.png') });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const thumbnails = await page.locator('.wallpaper-thumbnail').evaluateAll((nodes) =>
+  const thumbnails = await page.locator('.wallpaper-thumbnail > img').evaluateAll((nodes) =>
     Promise.all(
       nodes.map(async (node) => {
-        const image = new Image();
-        image.src = getComputedStyle(node).backgroundImage.slice(5, -2);
+        const image = node as HTMLImageElement;
         await image.decode();
         return { src: image.src, width: image.naturalWidth, height: image.naturalHeight };
       }),
@@ -684,7 +683,9 @@ test('clock advances at the minute boundary without re-sorting the app library',
   expect(await page.evaluate(() => (window as any).__sorts)).toBe(0);
 });
 
-test('app-action highlight follows pointer and remote input, and hiding keeps focus nearby', async ({ page }) => {
+test('app-action highlight follows pointer and remote input, and hiding keeps focus nearby', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Apps', exact: true }).click();
   const browser = page.getByRole('button', { name: 'Open Web Browser', exact: true });
@@ -710,14 +711,24 @@ test('app-action highlight follows pointer and remote input, and hiding keeps fo
   await expect(hide).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await expect(favorite).toBeFocused();
-  expect(await page.locator('.app-actions .setting-row').evaluateAll((nodes) =>
-    nodes.filter((node) => getComputedStyle(node).boxShadow !== 'none').length,
-  )).toBe(1);
+  expect(
+    await page
+      .locator('.app-actions .setting-row')
+      .evaluateAll(
+        (nodes) => nodes.filter((node) => getComputedStyle(node).boxShadow !== 'none').length,
+      ),
+  ).toBe(1);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(browser).toHaveCount(0);
   const next = page.locator(`[data-focusable="${neighbor}"]`);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
   await expect(next).toBeFocused();
   await page.keyboard.press('m');
   const close = page.getByRole('button', { name: 'Close', exact: true });

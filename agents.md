@@ -33,6 +33,8 @@ The top navigation uses one persistent selection pill. CSS transitions animate i
 
 Settings uses bundled 480×270 photo thumbnails rather than decoding the full wallpapers for every gallery card. `pnpm assets` regenerates thumbnails. Run `pnpm benchmark` after installing Playwright Chromium to measure a 120-app library with 6× desktop CPU throttling; compare bundle size, keyboard-handler timings, geometry reads, and scroll calls. These measurements are a desktop proxy, not TV frame-rate claims.
 
+Gallery previews use clipped image elements with an inset border, avoiding repeated background-image strips at fractional-sized edges. Neutral interface text, surfaces, icons, and focus rings use gray rather than cream/gold tints. App-action rows have contained focus rings and synchronize pointer hover with keyboard focus; closing the menu restores the selected app, or its nearest surviving neighbor after hiding, after the React commit.
+
 ## CI and releases
 
 `.github/workflows/ci.yml` checks pull requests and pushes to `main` on Ubuntu with Node.js 24. It checks formatting, runs unit tests, builds and verifies the IPK, and runs Chromium browser tests. Successful builds upload the release files as a workflow artifact. Successful `main` builds publish new versions using `GITHUB_TOKEN`, automatically creating the version tag at the tested commit. Published versions are skipped; a draft can be resumed when its tag matches that commit. An existing tag pointing elsewhere stops publication. `workflow_dispatch` on `main` provides a manual retry without a tag input. Main runs are serialized so new pushes do not interrupt publication; outdated PR runs can be cancelled.

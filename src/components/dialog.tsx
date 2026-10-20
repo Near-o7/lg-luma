@@ -21,8 +21,12 @@ export function Dialog({
     const previous = document.activeElement as HTMLElement | null;
     const apps = [...document.querySelectorAll<HTMLElement>('main [data-app-id]')];
     const index = previous ? apps.indexOf(previous) : -1;
-    const neighbors = index < 0 ? [] : [...apps.slice(index + 1), ...apps.slice(0, index).reverse()];
-    const returnIds = [previous?.dataset.focusable, ...neighbors.map((node) => node.dataset.focusable)];
+    const neighbors =
+      index < 0 ? [] : [...apps.slice(index + 1), ...apps.slice(0, index).reverse()];
+    const returnIds = [
+      previous?.dataset.focusable,
+      ...neighbors.map((node) => node.dataset.focusable),
+    ];
     (
       panel.current?.querySelector<HTMLElement>('[data-autofocus]') ??
       panel.current?.querySelector<HTMLElement>('[data-focusable]')
@@ -34,7 +38,7 @@ export function Dialog({
         let target: HTMLElement | null = null;
         for (const id of returnIds) {
           if (!id) continue;
-          const node = document.querySelector<HTMLElement>(`main [data-focusable="${CSS.escape(id)}"]`);
+          const node = document.querySelector<HTMLElement>(`[data-focusable="${CSS.escape(id)}"]`);
           if (node && !node.hasAttribute('disabled')) {
             target = node;
             break;
