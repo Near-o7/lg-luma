@@ -1,7 +1,7 @@
 import { Accessibility, Check, ChevronRight, Clock3, RefreshCw, Type } from 'lucide-react';
 import { WeatherSettings } from './weather-settings';
 import type { Preferences } from '../types';
-import { wallpapers } from '../wallpapers';
+import { wallpapers, wallpaperThumbnail } from '../wallpapers';
 
 interface Props {
   preferences: Preferences;
@@ -32,7 +32,7 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
               >
                 <span
                   className="wallpaper-thumbnail"
-                  style={{ backgroundImage: `url('./wallpapers/${wallpaper.image}')` }}
+                  style={{ backgroundImage: `url('${wallpaperThumbnail(wallpaper.image)}')` }}
                 >
                   {preferences.wallpaper === wallpaper.id ? (
                     <span className="wallpaper-check">

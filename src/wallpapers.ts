@@ -1,5 +1,8 @@
 import type { Wallpaper } from './types';
 
+export const wallpaperThumbnail = (image: string) =>
+  `./${image.endsWith('.jpg') ? 'wallpaper-thumbnails' : 'wallpapers'}/${image}`;
+
 export const wallpapers: {
   id: Wallpaper;
   title: string;

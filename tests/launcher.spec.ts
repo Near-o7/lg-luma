@@ -147,6 +147,24 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
   await page.getByRole('button', { name: 'Inputs', exact: true }).click();
   await expect(page.getByRole('button', { name: /PlayStation 5/ })).toBeVisible();
   await page.screenshot({ path: info.outputPath('luma-inputs.png') });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const thumbnails = await page.locator('.wallpaper-thumbnail').evaluateAll((nodes) =>
+    Promise.all(
+      nodes.map(async (node) => {
+        const image = new Image();
+        image.src = getComputedStyle(node).backgroundImage.slice(5, -2);
+        await image.decode();
+        return { src: image.src, width: image.naturalWidth, height: image.naturalHeight };
+      }),
+    ),
+  );
+  expect(thumbnails).toHaveLength(9);
+  const photos = thumbnails.filter((image) => image.src.endsWith('.jpg'));
+  expect(photos).toHaveLength(6);
+  for (const photo of photos) {
+    expect(photo.src).toContain('/wallpaper-thumbnails/');
+    expect([photo.width, photo.height]).toEqual([480, 270]);
+  }
   expect(remote).toEqual([]);
   expect(failed).toEqual([]);
   expect(errors).toEqual([]);
@@ -502,6 +520,93 @@ test('Home card captions are opt-in, persist, and do not affect library captions
   await expect(page.locator('.library-grid .app-label').first()).toBeVisible();
   await page.reload();
   await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
+});
+
+test('repeated remote moves reuse geometry instead of measuring the whole library', async ({
+  page,
+}) => {
+  await installMockTV(
+    page,
+    false,
+    Array.from({ length: 120 }, (_, index) => ({
+      id: `com.example.fast${index}`,
+      title: `App ${String(index + 1).padStart(3, '0')}`,
+      visible: true,
+    })),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(120);
+  await page.evaluate(() => document.fonts.ready);
+  await page.locator('.library-grid [data-app-id]').first().focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowLeft');
+  await page.evaluate(() => {
+    const original = Element.prototype.getBoundingClientRect;
+    (window as any).__layoutReads = 0;
+    Element.prototype.getBoundingClientRect = function () {
+      (window as any).__layoutReads++;
+      return original.call(this);
+    };
+  });
+  for (let index = 0; index < 12; index++) {
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowLeft');
+  }
+  await expect(page.locator('.library-grid [data-app-id]').first()).toBeFocused();
+  expect(await page.evaluate(() => (window as any).__layoutReads)).toBeLessThan(400);
+});
+
+test('cached remote geometry follows disabled controls and resized grids', async ({ page }) => {
+  await installMockTV(
+    page,
+    false,
+    Array.from({ length: 36 }, (_, index) => ({
+      id: `com.example.resize${index}`,
+      title: `App ${String(index + 1).padStart(3, '0')}`,
+      visible: true,
+    })),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  const cards = page.locator('.library-grid [data-app-id]');
+  await expect(cards).toHaveCount(36);
+  await cards.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await cards.first().focus();
+  await cards.nth(1).evaluate((node) => ((node as HTMLButtonElement).disabled = true));
+  await page.keyboard.press('ArrowRight');
+  await expect(cards.nth(2)).toBeFocused();
+  await cards.nth(1).evaluate((node) => ((node as HTMLButtonElement).disabled = false));
+  await cards.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(cards.nth(1)).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await cards.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(cards.nth(3)).toBeFocused();
+});
+
+test('clock advances at the minute boundary without re-sorting the app library', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-10-20T11:59:50') });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Good morning.', exact: true })).toBeVisible();
+  await page.clock.fastForward(20000);
+  await expect(page.getByRole('heading', { name: 'Good afternoon.', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await page.evaluate(() => {
+    const original = String.prototype.localeCompare;
+    (window as any).__sorts = 0;
+    String.prototype.localeCompare = function (this: string, ...args: Parameters<typeof original>) {
+      (window as any).__sorts++;
+      return original.apply(this, args);
+    };
+  });
+  await page.clock.fastForward(60000);
+  await expect(page.locator('.header-time')).toContainText('12:01');
+  expect(await page.evaluate(() => (window as any).__sorts)).toBe(0);
 });
 
 test('app actions close immediately, keep favorites first, and filter hidden apps in the pills', async ({

@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 
 export function Dialog({
@@ -34,27 +33,20 @@ export function Dialog({
     };
   }, []);
   return (
-    <motion.div
+    <div
       className="dialog-scrim"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
+      role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <motion.div
+      <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
         data-focus-scope="dialog"
         className={`dialog${wide ? ' dialog-wide' : ''}`}
-        initial={{ opacity: 0, scale: 0.97, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.97, y: 12 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 38 }}
       >
         <div className="dialog-heading">
           <div>
@@ -77,7 +69,7 @@ export function Dialog({
           </div>
           {footerEnd ? <div className="dialog-footer-end">{footerEnd}</div> : null}
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

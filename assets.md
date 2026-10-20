@@ -13,6 +13,8 @@
 
 Luma's logo is a folded-light **L**: an icy-blue ribbon turns into a cyan-and-indigo base. The browser mark and TV app icon share the same vector geometry, sized for a clear silhouette at small icon sizes.
 
+`public/wallpaper-thumbnails/` contains 480×270 JPEG derivatives of the photographs listed above. They are resized/cropped for the Settings gallery and retain each source photograph's license and attribution.
+
 ## Brand SVGs
 
 The requested app logos use downloaded vector artwork, rather than font approximations. SVG outlines are preserved; Apple TV, Disney+, Prime Video, and Das Erste use a white monochrome display treatment for contrast. YouTube's wordmark is recolored white for its dark card, while its play icon stays red. All files are bundled locally under `public/logos/`.

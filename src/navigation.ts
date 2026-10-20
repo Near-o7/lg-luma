@@ -35,42 +35,152 @@ export function nextFocus(
   return best?.id ?? null;
 }
 
+interface FocusEntry {
+  node: HTMLElement;
+  rect: FocusRect;
+}
+interface FocusSnapshot {
+  entries: FocusEntry[];
+  rects: FocusRect[];
+  main: HTMLElement | null;
+  bounds: FocusRect;
+  scrollTop: number;
+  scrollLeft: number;
+}
+
+let snapshot: FocusSnapshot | null = null;
+let observedScope: HTMLElement | Document | null = null;
+let mutations: MutationObserver | undefined;
+let sizes: ResizeObserver | undefined;
+const invalidate = () => {
+  snapshot = null;
+};
+
+function measureFocus(scope: HTMLElement | Document): FocusSnapshot {
+  if (!mutations) {
+    mutations = new MutationObserver(invalidate);
+    sizes = new ResizeObserver(invalidate);
+    window.addEventListener('resize', invalidate);
+    window.addEventListener('scroll', invalidate, true);
+    document.fonts.addEventListener('loadingdone', invalidate);
+  }
+  if (scope !== observedScope) {
+    mutations.disconnect();
+    sizes?.disconnect();
+    mutations.observe(scope, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: [
+        'class',
+        'style',
+        'hidden',
+        'disabled',
+        'data-focusable',
+        'data-focus-up',
+        'data-focus-down',
+        'data-focus-left',
+        'data-focus-right',
+      ],
+    });
+    sizes?.observe(scope instanceof HTMLElement ? scope : document.documentElement);
+    observedScope = scope;
+    invalidate();
+  }
+  // Keyboard repeats can arrive before observer callbacks or scroll events.
+  if (
+    mutations.takeRecords().length ||
+    (snapshot?.main &&
+      (snapshot.main.scrollTop !== snapshot.scrollTop ||
+        snapshot.main.scrollLeft !== snapshot.scrollLeft))
+  )
+    invalidate();
+  if (snapshot) return snapshot;
+
+  const entries: FocusEntry[] = [];
+  for (const node of scope.querySelectorAll<HTMLElement>('[data-focusable]:not([disabled])')) {
+    const box = node.getBoundingClientRect();
+    if (!box.width || !box.height) continue;
+    entries.push({
+      node,
+      rect: {
+        id: node.dataset.focusable!,
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+      },
+    });
+  }
+  const main = document.querySelector<HTMLElement>('main');
+  const box = main?.getBoundingClientRect();
+  if (main) sizes?.observe(main);
+  snapshot = {
+    entries,
+    rects: entries.map((entry) => entry.rect),
+    main,
+    bounds: {
+      id: 'viewport',
+      x: box?.x ?? 0,
+      y: box?.y ?? 0,
+      width: box?.width ?? window.innerWidth,
+      height: box?.height ?? window.innerHeight,
+    },
+    scrollTop: main?.scrollTop ?? 0,
+    scrollLeft: main?.scrollLeft ?? 0,
+  };
+  return snapshot;
+}
+
 export function moveFocus(direction: Direction): void {
   const scope =
-    document.querySelector('[data-focus-scope="dialog"]') ??
+    document.querySelector<HTMLElement>('[data-focus-scope="dialog"]') ??
     document.querySelector('main')?.parentElement ??
     document;
-  const nodes = [...scope.querySelectorAll<HTMLElement>('[data-focusable]:not([disabled])')].filter(
-    (node) => node.getClientRects().length > 0,
-  );
-  const current = nodes.find((node) => node === document.activeElement);
+  const measured = measureFocus(scope);
+  const current = measured.entries.find((entry) => entry.node === document.activeElement);
   if (!current) {
-    nodes[0]?.focus();
+    measured.entries[0]?.node.focus();
     return;
   }
-  const rect = (node: HTMLElement): FocusRect => {
-    const box = node.getBoundingClientRect();
-    return {
-      id: node.dataset.focusable!,
-      x: box.x,
-      y: box.y,
-      width: box.width,
-      height: box.height,
-    };
-  };
   // Explicit entry/return routes take priority over geometry when a page has a
   // preferred control column. Left/right still follow the spatial layout.
-  const route = current
+  const route = current.node
     .closest(`[data-focus-${direction}]`)
     ?.getAttribute(`data-focus-${direction}`);
-  const preferred = route
-    ? nodes.find((candidate) => candidate.dataset.focusable === route)
-    : undefined;
-  const target =
-    preferred?.dataset.focusable ?? nextFocus(rect(current), nodes.map(rect), direction);
-  const node = preferred ?? nodes.find((candidate) => candidate.dataset.focusable === target);
-  if (node) {
-    node.focus({ preventScroll: true });
-    node.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+  const preferred = route ? measured.entries.find((entry) => entry.rect.id === route) : undefined;
+  const target = preferred?.rect.id ?? nextFocus(current.rect, measured.rects, direction);
+  const entry = preferred ?? measured.entries.find((entry) => entry.rect.id === target);
+  if (entry) {
+    entry.node.focus({ preventScroll: true });
+    const bounds = measured.main?.contains(entry.node)
+      ? measured.bounds
+      : { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
+    let box = entry.rect;
+    if (
+      measured.main &&
+      (measured.main.scrollTop !== measured.scrollTop ||
+        measured.main.scrollLeft !== measured.scrollLeft)
+    ) {
+      const currentBox = entry.node.getBoundingClientRect();
+      box = {
+        id: entry.rect.id,
+        x: currentBox.x,
+        y: currentBox.y,
+        width: currentBox.width,
+        height: currentBox.height,
+      };
+      invalidate();
+    }
+    if (
+      box.x < bounds.x ||
+      box.y < bounds.y ||
+      box.x + box.width > bounds.x + bounds.width ||
+      box.y + box.height > bounds.y + bounds.height
+    ) {
+      entry.node.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      invalidate();
+    }
   }
 }
