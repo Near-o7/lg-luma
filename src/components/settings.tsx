@@ -1,7 +1,7 @@
 import { Accessibility, Check, ChevronRight, Clock3, RefreshCw, Type } from 'lucide-react';
 import { WeatherSettings } from './weather-settings';
 import type { Preferences } from '../types';
-import { wallpapers } from '../wallpapers';
+import { wallpapers, wallpaperThumbnail } from '../wallpapers';
 
 interface Props {
   preferences: Preferences;
@@ -30,10 +30,13 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                 aria-pressed={preferences.wallpaper === wallpaper.id}
                 onClick={() => onUpdate({ wallpaper: wallpaper.id })}
               >
-                <span
-                  className="wallpaper-thumbnail"
-                  style={{ backgroundImage: `url('./wallpapers/${wallpaper.image}')` }}
-                >
+                <span className="wallpaper-thumbnail">
+                  <img
+                    src={wallpaperThumbnail(wallpaper.image)}
+                    alt=""
+                    draggable={false}
+                    decoding="async"
+                  />
                   {preferences.wallpaper === wallpaper.id ? (
                     <span className="wallpaper-check">
                       <Check size={18} />

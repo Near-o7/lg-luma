@@ -147,6 +147,23 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
   await page.getByRole('button', { name: 'Inputs', exact: true }).click();
   await expect(page.getByRole('button', { name: /PlayStation 5/ })).toBeVisible();
   await page.screenshot({ path: info.outputPath('luma-inputs.png') });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const thumbnails = await page.locator('.wallpaper-thumbnail > img').evaluateAll((nodes) =>
+    Promise.all(
+      nodes.map(async (node) => {
+        const image = node as HTMLImageElement;
+        await image.decode();
+        return { src: image.src, width: image.naturalWidth, height: image.naturalHeight };
+      }),
+    ),
+  );
+  expect(thumbnails).toHaveLength(9);
+  const photos = thumbnails.filter((image) => image.src.endsWith('.jpg'));
+  expect(photos).toHaveLength(6);
+  for (const photo of photos) {
+    expect(photo.src).toContain('/wallpaper-thumbnails/');
+    expect([photo.width, photo.height]).toEqual([480, 270]);
+  }
   expect(remote).toEqual([]);
   expect(failed).toEqual([]);
   expect(errors).toEqual([]);
@@ -293,6 +310,81 @@ test('ambient mode wakes without launching an app and restores remote focus', as
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await expect(page.getByRole('status')).toHaveCount(0);
+});
+
+test('one persistent navigation pill slides with native CSS and follows remote input and resizing', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const pill = page.locator('.nav-indicator');
+  await pill.evaluate((element) => {
+    (window as any).__navigationPill = element;
+    (window as any).__navigationTransitions = [];
+    element.addEventListener('transitionrun', (event) => {
+      (window as any).__navigationTransitions.push((event as TransitionEvent).propertyName);
+    });
+  });
+  const expectAligned = async () => {
+    await expect
+      .poll(() =>
+        pill.evaluate((element) => {
+          const actual = element.getBoundingClientRect();
+          const selected = document.querySelector('.nav-item.active')!.getBoundingClientRect();
+          return Math.max(
+            Math.abs(actual.x - selected.x),
+            Math.abs(actual.y - selected.y),
+            Math.abs(actual.width - selected.width),
+            Math.abs(actual.height - selected.height),
+          );
+        }),
+      )
+      .toBeLessThan(1.5);
+  };
+  await expectAligned();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expectAligned();
+  expect(await pill.evaluate((element) => element === (window as any).__navigationPill)).toBe(true);
+  const transitions = await page.evaluate(
+    () => (window as any).__navigationTransitions as string[],
+  );
+  expect(transitions).toContain('transform');
+  expect(transitions).toContain('width');
+  await page.keyboard.press('ArrowLeft');
+  const inputs = page.getByRole('button', { name: 'Inputs', exact: true });
+  await expect(inputs).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(inputs).toHaveAttribute('aria-current', 'page');
+  await expectAligned();
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expectAligned();
+  await expect(pill).toHaveCount(1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectAligned();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expectAligned();
+});
+
+test('navigation pill respects saved and system reduced-motion preferences', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  const home = page.getByRole('button', { name: 'Home', exact: true });
+  const motion = page.getByRole('switch', { name: 'Reduced motion', exact: true });
+  const pill = page.locator('.nav-indicator');
+  await settings.click();
+  await motion.click();
+  await home.click();
+  expect(await pill.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+  expect(await pill.evaluate((element) => element.getAnimations().length)).toBe(0);
+  await settings.click();
+  await motion.click();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await home.click();
+  expect(await pill.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+  expect(await pill.evaluate((element) => element.getAnimations().length)).toBe(0);
 });
 
 test('card focus stays the same size and navigation outlines have room beside the selected pill', async ({
@@ -502,6 +594,148 @@ test('Home card captions are opt-in, persist, and do not affect library captions
   await expect(page.locator('.library-grid .app-label').first()).toBeVisible();
   await page.reload();
   await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
+});
+
+test('repeated remote moves reuse geometry instead of measuring the whole library', async ({
+  page,
+}) => {
+  await installMockTV(
+    page,
+    false,
+    Array.from({ length: 120 }, (_, index) => ({
+      id: `com.example.fast${index}`,
+      title: `App ${String(index + 1).padStart(3, '0')}`,
+      visible: true,
+    })),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(120);
+  await page.evaluate(() => document.fonts.ready);
+  await page.locator('.library-grid [data-app-id]').first().focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowLeft');
+  await page.evaluate(() => {
+    const original = Element.prototype.getBoundingClientRect;
+    (window as any).__layoutReads = 0;
+    Element.prototype.getBoundingClientRect = function () {
+      (window as any).__layoutReads++;
+      return original.call(this);
+    };
+  });
+  for (let index = 0; index < 12; index++) {
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowLeft');
+  }
+  await expect(page.locator('.library-grid [data-app-id]').first()).toBeFocused();
+  expect(await page.evaluate(() => (window as any).__layoutReads)).toBeLessThan(400);
+});
+
+test('cached remote geometry follows disabled controls and resized grids', async ({ page }) => {
+  await installMockTV(
+    page,
+    false,
+    Array.from({ length: 36 }, (_, index) => ({
+      id: `com.example.resize${index}`,
+      title: `App ${String(index + 1).padStart(3, '0')}`,
+      visible: true,
+    })),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  const cards = page.locator('.library-grid [data-app-id]');
+  await expect(cards).toHaveCount(36);
+  await cards.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await cards.first().focus();
+  await cards.nth(1).evaluate((node) => ((node as HTMLButtonElement).disabled = true));
+  await page.keyboard.press('ArrowRight');
+  await expect(cards.nth(2)).toBeFocused();
+  await cards.nth(1).evaluate((node) => ((node as HTMLButtonElement).disabled = false));
+  await cards.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(cards.nth(1)).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await cards.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(cards.nth(3)).toBeFocused();
+});
+
+test('clock advances at the minute boundary without re-sorting the app library', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-10-20T11:59:50') });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Good morning.', exact: true })).toBeVisible();
+  await page.clock.fastForward(20000);
+  await expect(page.getByRole('heading', { name: 'Good afternoon.', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  await page.evaluate(() => {
+    const original = String.prototype.localeCompare;
+    (window as any).__sorts = 0;
+    String.prototype.localeCompare = function (this: string, ...args: Parameters<typeof original>) {
+      (window as any).__sorts++;
+      return original.apply(this, args);
+    };
+  });
+  await page.clock.fastForward(60000);
+  await expect(page.locator('.header-time')).toContainText('12:01');
+  expect(await page.evaluate(() => (window as any).__sorts)).toBe(0);
+});
+
+test('app-action highlight follows pointer and remote input, and hiding keeps focus nearby', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  const browser = page.getByRole('button', { name: 'Open Web Browser', exact: true });
+  const neighbor = await browser.evaluate((node) => {
+    const cards = [...document.querySelectorAll<HTMLElement>('.library-grid [data-app-id]')];
+    const index = cards.indexOf(node as HTMLElement);
+    return (cards[index + 1] ?? cards[index - 1]).dataset.focusable!;
+  });
+  await browser.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  const favorite = page.getByRole('button', { name: 'Add to favorites', exact: true });
+  const hide = page.getByRole('button', { name: 'Hide app', exact: true });
+  await expect(favorite).toBeFocused();
+  const ring = await favorite.evaluate((node) => ({
+    outline: getComputedStyle(node).outlineStyle,
+    shadow: getComputedStyle(node).boxShadow,
+  }));
+  expect(ring.outline).toBe('none');
+  expect(ring.shadow).toContain('inset');
+  await hide.hover();
+  await expect(hide).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(favorite).toBeFocused();
+  expect(
+    await page
+      .locator('.app-actions .setting-row')
+      .evaluateAll(
+        (nodes) => nodes.filter((node) => getComputedStyle(node).boxShadow !== 'none').length,
+      ),
+  ).toBe(1);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(browser).toHaveCount(0);
+  const next = page.locator(`[data-focusable="${neighbor}"]`);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await expect(next).toBeFocused();
+  await page.keyboard.press('m');
+  const close = page.getByRole('button', { name: 'Close', exact: true });
+  await close.hover();
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(next).toBeFocused();
 });
 
 test('app actions close immediately, keep favorites first, and filter hidden apps in the pills', async ({

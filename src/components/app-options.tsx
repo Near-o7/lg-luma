@@ -1,4 +1,5 @@
 import { Eye, EyeOff, Heart } from 'lucide-react';
+import type { PointerEvent } from 'react';
 import { Dialog } from './dialog';
 import type { TVApp } from '../types';
 
@@ -11,6 +12,10 @@ interface Props {
   onHide: () => void;
 }
 
+function focusAction(event: PointerEvent<HTMLButtonElement>) {
+  if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true });
+}
+
 export function AppOptions({ app, favorites, hidden, onClose, onPin, onHide }: Props) {
   const pinned = favorites.includes(app.id);
   return (
@@ -20,6 +25,7 @@ export function AppOptions({ app, favorites, hidden, onClose, onPin, onHide }: P
           className="setting-row"
           data-focusable="option-pin"
           data-autofocus="true"
+          onPointerEnter={focusAction}
           onClick={onPin}
         >
           <Heart fill={pinned ? 'currentColor' : 'none'} />
@@ -27,7 +33,12 @@ export function AppOptions({ app, favorites, hidden, onClose, onPin, onHide }: P
             <strong>{pinned ? 'Remove from favorites' : 'Add to favorites'}</strong>
           </span>
         </button>
-        <button className="setting-row" data-focusable="option-hide" onClick={onHide}>
+        <button
+          className="setting-row"
+          data-focusable="option-hide"
+          onPointerEnter={focusAction}
+          onClick={onHide}
+        >
           {hidden ? <Eye /> : <EyeOff />}
           <span>
             <strong>{hidden ? 'Show app' : 'Hide app'}</strong>

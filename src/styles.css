@@ -3,16 +3,16 @@
 :root {
   font-family: 'Luma Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: clamp(10px, 0.833333333vw, 20px);
-  color: #f6f5f3;
+  color: #f5f5f5;
   background: #17191c;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   color-scheme: dark;
-  --muted: rgba(249, 247, 242, 0.56);
-  --soft: rgba(249, 247, 242, 0.72);
+  --muted: rgba(245, 245, 245, 0.56);
+  --soft: rgba(245, 245, 245, 0.72);
   --surface: rgba(37, 38, 40, 0.7);
-  --ring: rgba(255, 255, 255, 0.95);
+  --ring: rgba(240, 240, 240, 0.95);
 }
 * {
   box-sizing: border-box;
@@ -56,7 +56,7 @@ input {
   color: inherit;
 }
 ::selection {
-  background: #b6c5b64d;
+  background: #bdbdbd4d;
 }
 button,
 a,
@@ -92,8 +92,7 @@ button svg {
 }
 .wallpaper,
 .landscape-fallback,
-.wallpaper-shade,
-.grain {
+.wallpaper-shade {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -137,10 +136,6 @@ button svg {
     ),
     linear-gradient(90deg, rgba(17, 20, 23, 0.42), transparent 75%);
 }
-.grain {
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.6' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
-}
 .shell {
   height: 100%;
   display: flex;
@@ -157,17 +152,18 @@ button svg {
   z-index: 2;
 }
 .navigation {
+  --nav-padding: 0.55rem;
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  padding: 0.55rem;
-  background: rgba(23, 28, 32, 0.34);
+  padding: var(--nav-padding);
+  isolation: isolate;
+  background: rgba(23, 28, 32, 0.72);
   border: 1px solid #ffffff12;
   border-radius: 3rem;
-  backdrop-filter: blur(24px);
   box-shadow: 0 4px 18px #00000010;
 }
 .nav-item {
@@ -177,13 +173,13 @@ button svg {
   min-width: 6.2rem;
   padding: 0.75rem 1.45rem;
   position: relative;
-  z-index: 0;
+  z-index: 1;
   isolation: isolate;
   border-radius: 2rem;
-  color: #f4f2edba;
+  color: #eeeeeeba;
 }
 .nav-item.active {
-  color: #2c3030;
+  color: #2c2c2c;
 }
 .nav-item:hover:not(.active) {
   color: white;
@@ -191,10 +187,17 @@ button svg {
 }
 .nav-indicator {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, #fffef6f5, #e9e8e0eb);
+  top: var(--nav-padding);
+  bottom: var(--nav-padding);
+  left: 0;
+  width: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, #fafafa, #e5e5e5);
   border-radius: 2rem;
-  z-index: -1;
+  z-index: 0;
+  transition:
+    transform 0.2s cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
   box-shadow:
     0 2px 6px #0000001a,
     inset 0 1px 1px white;
@@ -222,9 +225,8 @@ button svg {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #23282c42;
+  background: #23282c80;
   border: 1px solid #ffffff12;
-  backdrop-filter: blur(12px);
 }
 .icon-button:hover,
 .icon-button:focus-visible {
@@ -246,7 +248,8 @@ button svg {
   padding: 0 1.25rem 2rem;
   margin: 0 -1.25rem;
   scrollbar-width: none;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
+  scroll-padding-block: 0.75rem;
 }
 .main::-webkit-scrollbar {
   display: none;
@@ -271,7 +274,7 @@ button svg {
   font-size: 0.9rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #fffaf0b8;
+  color: #f5f5f5b8;
   margin-bottom: 1.3rem;
 }
 .hero h1 {
@@ -284,7 +287,7 @@ button svg {
 .hero-subtitle {
   font-size: 1.45rem;
   letter-spacing: -0.025em;
-  color: #fff9efb8;
+  color: #f5f5f5b8;
   margin-top: 1.15rem;
   font-weight: 400;
 }
@@ -306,7 +309,7 @@ button svg {
   font-weight: 550;
 }
 .section-heading h2 svg {
-  color: #d8d2c18a;
+  color: #d0d0d08a;
   width: 1.05rem;
   height: 1.05rem;
 }
@@ -381,7 +384,7 @@ button svg {
   font-size: 1.1rem;
   line-height: 1.4;
   letter-spacing: -0.02em;
-  color: #eeece8a8;
+  color: #ecececa8;
   font-weight: 450;
   max-width: 100%;
   min-height: 2.8em;
@@ -396,7 +399,7 @@ button svg {
 .app-tile:focus .app-face {
   box-shadow:
     0 14px 34px #0006,
-    0 0 0 0.2rem #f9f5e9,
+    0 0 0 0.2rem #f0f0f0,
     0 0 0 0.43rem #ffffff19;
 }
 .app-tile:focus .app-label {
@@ -415,8 +418,8 @@ button svg {
 .app-tile[data-reordering] .app-face {
   box-shadow:
     0 12px 32px #0006,
-    0 0 0 0.2rem #ead8aa,
-    0 0 0 0.43rem #ead8aa24;
+    0 0 0 0.2rem #dedede,
+    0 0 0 0.43rem #dedede24;
 }
 .reorder-indicator {
   position: absolute;
@@ -429,7 +432,7 @@ button svg {
   padding: 0.25rem 0.55rem;
   border-radius: 1rem;
   background: #101318c9;
-  color: #f7e8c7;
+  color: #ededed;
   pointer-events: none;
 }
 .reorder-indicator svg {
@@ -437,7 +440,7 @@ button svg {
   height: 1rem;
 }
 .reorder-status {
-  color: #ead8aa;
+  color: #dedede;
   font-size: 0.9rem;
 }
 #reorder-instructions > span {
@@ -478,7 +481,7 @@ button svg {
   color: #fff;
 }
 .brand-apple {
-  background: linear-gradient(145deg, #242528, #07090b);
+  background: linear-gradient(145deg, #252525, #080808);
 }
 .brand-disney {
   background: radial-gradient(ellipse at 50% 110%, #16466b, #0b244c 60%, #091936);
@@ -522,7 +525,7 @@ button svg {
 .brand-logo-disney,
 .brand-logo-prime,
 .brand-logo-das-erste {
-  filter: brightness(0) invert(1);
+  filter: brightness(0) invert(0.96);
 }
 .brand-arte {
   background: linear-gradient(145deg, #242323, #121212);
@@ -630,35 +633,32 @@ button svg {
   align-items: center;
   gap: 1rem;
   background: linear-gradient(125deg, #20252b99, #171c228c);
-  border: 1px solid #fffdf010;
+  border: 1px solid #ffffff10;
   padding: 1.1rem 1.25rem;
   min-height: 6.5rem;
   text-align: left;
-  box-shadow: inset 0 1px 0 #ffffef04;
-  transition:
-    background 0.16s,
-    border-color 0.16s;
+  box-shadow: inset 0 1px 0 #ffffff04;
 }
 .input-card:hover,
 .input-card:focus {
   background: linear-gradient(125deg, #30363cb3, #242a30a6);
-  border-color: #fff9e83d;
+  border-color: #ffffff3d;
 }
 .input-card:focus {
   outline: none;
   box-shadow:
     0 14px 34px #0006,
-    0 0 0 0.2rem #f9f5e9,
+    0 0 0 0.2rem #f0f0f0,
     0 0 0 0.43rem #ffffff19;
 }
 .input-art {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.8rem;
-  background: linear-gradient(145deg, #e2e4d61c, #e2e4d604);
+  background: linear-gradient(145deg, #e0e0e030, #e0e0e014);
   display: grid;
   place-items: center;
-  color: #e6e8df;
+  color: #e4e4e4;
   flex-shrink: 0;
 }
 .input-art svg {
@@ -670,12 +670,12 @@ button svg {
   height: 2.6rem;
 }
 .input-console .input-art {
-  color: #d8dfeb;
-  background: linear-gradient(145deg, #b4c4ef26, #6275a40c);
+  color: #dedede;
+  background: linear-gradient(145deg, #d6d6d63d, #a0a0a01a);
 }
 .input-streamer .input-art {
-  color: #e7dfc6;
-  background: linear-gradient(145deg, #d6ba7b1f, #d6ba7b07);
+  color: #dedede;
+  background: linear-gradient(145deg, #d6d6d633, #d6d6d614);
 }
 .input-info {
   display: flex;
@@ -696,7 +696,7 @@ button svg {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  color: #ece8db7a;
+  color: #e8e8e87a;
 }
 .status-dot {
   width: 0.35rem;
@@ -721,7 +721,7 @@ button svg {
   position: relative;
   gap: 1rem;
   padding-top: 1rem;
-  color: #f3eee45e;
+  color: #eeeeee5e;
   font-size: 0.77rem;
   letter-spacing: 0.005em;
 }
@@ -750,7 +750,7 @@ button svg {
   align-items: center;
   justify-content: center;
   padding: 0.1rem 0.3rem;
-  color: #f5f3e9a3;
+  color: #f3f3f3a3;
   font-weight: 500;
   letter-spacing: 0;
 }
@@ -770,7 +770,7 @@ button svg {
   place-items: center;
   border-radius: 50%;
   margin-bottom: -0.25rem;
-  color: #f3eee48a;
+  color: #eeeeee8a;
 }
 .ambient-button:hover,
 .ambient-button:focus-visible {
@@ -796,13 +796,12 @@ button svg {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  background: #22272b67;
+  background: #22272ba6;
   border: 1px solid #ffffff20;
   border-radius: 0.8rem;
   padding: 0.9rem 1.1rem;
-  backdrop-filter: blur(16px);
   width: 19rem;
-  color: #f4f2eb80;
+  color: #f0f0f080;
   margin-top: 0;
 }
 .search-field:focus-within {
@@ -818,7 +817,7 @@ button svg {
   min-width: 0;
 }
 .search-field input::placeholder {
-  color: #f4f2eb80;
+  color: #f0f0f080;
 }
 .search-field > svg {
   width: 1.2rem;
@@ -861,16 +860,16 @@ button svg {
   font-size: 1rem;
   padding: 0.65rem 1.05rem;
   border-radius: 2rem;
-  color: #f5f2e4a8;
+  color: #f0f0f0a8;
   border: 1px solid transparent;
 }
 .filter-tab.selected {
-  background: #fffdf01c;
-  color: #f8f6ec;
-  border-color: #fffdf012;
+  background: #ffffff1c;
+  color: #f5f5f5;
+  border-color: #ffffff12;
 }
 .filter-tab:hover {
-  background: #fffdf00c;
+  background: #ffffff0c;
   color: white;
 }
 .library-grid {
@@ -910,7 +909,7 @@ button svg {
   width: 2.2rem;
   height: 2.2rem;
   stroke-width: 1.3;
-  color: #ddd8ca99;
+  color: #d8d8d899;
 }
 .empty-state h3 {
   font-size: 1.5rem;
@@ -928,8 +927,8 @@ button svg {
 .primary-button {
   padding: 0.9rem 1.3rem;
   border-radius: 0.7rem;
-  background: #f2f0e8;
-  color: #242723;
+  background: #ededed;
+  color: #242424;
   font-size: 0.95rem;
   font-weight: 600;
   display: inline-flex;
@@ -973,8 +972,8 @@ button svg {
 .dialog-scrim {
   position: fixed;
   inset: 0;
-  background: #080b1278;
-  backdrop-filter: blur(10px);
+  background: #080b12b3;
+  animation: fade-in 0.12s ease-out;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -1056,21 +1055,34 @@ button svg {
   position: relative;
   width: 100%;
   height: 5.6rem;
-  background-size: cover;
-  background-position: center;
+  overflow: hidden;
+  background: #24272b;
   display: block;
   border-radius: 0.65rem;
-  border: 1px solid #ffffff16;
   box-shadow: 0 3px 15px #0002;
 }
+.wallpaper-thumbnail > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wallpaper-thumbnail:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px #ffffff16;
+  pointer-events: none;
+}
 .wallpaper-option.selected .wallpaper-thumbnail {
-  box-shadow: 0 0 0 2px #e6dfcb;
-  outline: 3px solid #e6dfcb1a;
+  box-shadow: 0 0 0 2px #dedede;
+  outline: 3px solid #dedede1a;
   outline-offset: 2px;
 }
 .wallpaper-option > span:not(.wallpaper-thumbnail) {
   font-size: 0.85rem;
-  color: #f5f1e4dd;
+  color: #f0f0f0dd;
   margin-top: 0.2rem;
 }
 .wallpaper-check {
@@ -1079,8 +1091,8 @@ button svg {
   right: 0.4rem;
   display: grid;
   place-items: center;
-  background: #f7f4e7;
-  color: #373d37;
+  background: #f3f3f3;
+  color: #333;
   border-radius: 50%;
   width: 1.35rem;
   height: 1.35rem;
@@ -1123,7 +1135,7 @@ button svg {
   width: 1.35rem;
   height: 1.35rem;
   stroke-width: 1.65;
-  color: #f1e8cf9c;
+  color: #e4e4e49c;
 }
 .setting-row > span:not(.toggle) {
   display: flex;
@@ -1147,7 +1159,7 @@ button svg {
   margin-left: auto;
   width: 1rem;
   height: 1rem;
-  color: #f1ead26b;
+  color: #e0e0e06b;
 }
 .toggle {
   width: 2.6rem;
@@ -1165,12 +1177,12 @@ button svg {
   width: 1.1rem;
   height: 1.1rem;
   border-radius: 50%;
-  background: #f4f1e8;
+  background: #f4f4f4;
   box-shadow: 0 1px 3px #0002;
   transition: transform 0.2s;
 }
 .toggle.on {
-  background: #9ba98e;
+  background: #999;
 }
 .toggle.on i {
   transform: translateX(1.1rem);
@@ -1180,7 +1192,7 @@ button svg {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 0.4rem;
-  color: #ede7d759;
+  color: #e0e0e059;
   font-size: 0.65rem;
   margin-top: 1.2rem;
   padding-top: 0.9rem;
@@ -1207,6 +1219,29 @@ button svg {
 .app-actions .setting-row {
   min-height: 4.2rem;
   padding: 1.1rem;
+  background: #ffffff04;
+  border: 1px solid #ffffff0d;
+}
+.app-actions {
+  display: grid;
+  gap: 0.6rem;
+  background: none;
+  border: 0;
+}
+.app-actions .setting-row + .setting-row:before {
+  content: none;
+}
+.app-actions .setting-row:focus {
+  outline: none;
+  background: #ffffff12;
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+.app-actions .setting-row:focus > svg {
+  color: inherit;
+}
+.dialog .close-button:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ring);
 }
 .app-actions .setting-row strong {
   font-size: 1.1rem;
@@ -1237,18 +1272,18 @@ button svg {
   align-items: center;
   gap: 0.8rem;
   padding: 1rem 1.2rem;
-  background: #eeeee5f5;
-  color: #30352f;
+  background: #edededf5;
+  color: #303030;
   box-shadow: 0 8px 40px #0005;
   border: 1px solid #ffffff80;
   border-radius: 1rem;
   font-size: 1rem;
   max-width: calc(100vw - 4rem);
   width: max-content;
-  backdrop-filter: blur(16px);
+  animation: fade-in 0.12s ease-out;
 }
 .toast > svg {
-  color: #747b60;
+  color: #727272;
   flex-shrink: 0;
   width: 1.3rem;
   height: 1.3rem;
@@ -1260,7 +1295,7 @@ button svg {
   display: grid;
   place-items: center;
   margin-left: 0.8rem;
-  color: #6b6d65;
+  color: #6b6b6b;
   border-radius: 0.3rem;
 }
 .toast button svg {
@@ -1281,7 +1316,7 @@ button svg {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  color: #f5f2e8c4;
+  color: #f0f0f0c4;
   font-size: 1rem;
   background: #242830df;
   border: 1px solid #ffffff20;
@@ -1307,7 +1342,7 @@ button svg {
 .ambient-date {
   font-size: 1.3rem;
   letter-spacing: 0.06em;
-  color: #fff9e9a6;
+  color: #f5f5f5a6;
 }
 .ambient-time {
   font-size: 10rem;
@@ -1321,22 +1356,30 @@ button svg {
   position: absolute;
   bottom: 3.7rem;
   font-size: 0.8rem;
-  color: #fff9e97a;
+  color: #f5f5f57a;
 }
 .reduce-motion * {
   scroll-behavior: auto !important;
 }
 .reduce-motion .toggle i,
 .reduce-motion .wallpaper,
-.reduce-motion .input-card {
+.reduce-motion .input-card,
+.reduce-motion .nav-indicator {
   transition: none;
 }
-.reduce-motion .skeleton {
+.reduce-motion .skeleton,
+.reduce-motion .dialog-scrim,
+.reduce-motion .toast {
   animation: none;
 }
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
   }
 }
 @keyframes shimmer {
@@ -1350,12 +1393,15 @@ button svg {
   *:after {
     scroll-behavior: auto !important;
   }
-  .skeleton {
+  .skeleton,
+  .dialog-scrim,
+  .toast {
     animation: none;
   }
   .toggle i,
   .wallpaper,
-  .input-card {
+  .input-card,
+  .nav-indicator {
     transition: none;
   }
 }
@@ -1374,8 +1420,8 @@ button svg {
 }
 @media (prefers-contrast: more) {
   :root {
-    --muted: #ede9e0;
-    --soft: #f5efe5;
+    --muted: #e8e8e8;
+    --soft: #f0f0f0;
   }
   .input-card,
   .settings-group {
@@ -1437,12 +1483,12 @@ button svg {
     align-items: flex-start;
   }
   .navigation {
+    --nav-padding: 0.5rem;
     top: 4.4rem;
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     gap: 0.5rem;
-    padding: 0.5rem;
   }
   .nav-item {
     min-width: 4.4rem;

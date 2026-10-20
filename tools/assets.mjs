@@ -99,3 +99,14 @@ for (const [relative, url] of assets) {
   await fs.writeFile(destination, output);
   console.log(`Bundled ${relative} (${output.length} bytes)`);
 }
+
+const thumbnails = path.join(root, 'public/wallpaper-thumbnails');
+await fs.mkdir(thumbnails, { recursive: true });
+for (const [relative] of assets) {
+  if (!relative.endsWith('.jpg')) continue;
+  await sharp(path.join(root, relative))
+    .resize(480, 270, { fit: 'cover' })
+    .jpeg({ quality: 78 })
+    .toFile(path.join(thumbnails, path.basename(relative)));
+  console.log(`Prepared thumbnail: ${path.basename(relative)}`);
+}
