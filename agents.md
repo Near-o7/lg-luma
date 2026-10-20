@@ -27,6 +27,8 @@ Project filenames use lowercase kebab-case, including React components (for exam
 
 Keep focus feedback immediate. Spatial navigation caches control geometry and invalidates it on DOM/layout changes, scrolling, resizing, and font loads; fully visible targets do not call `scrollIntoView`. New focusable controls must use `data-focusable` and explicit routes where appropriate.
 
+`data-focus-scroll-top="true"` normalizes the Apps toolbar's scroll position only during remote navigation. Do not scroll the toolbar from a generic focus handler: pointer-down focuses a button before pointer-up, so moving it at that point can swallow the click.
+
 Clock components update at minute boundaries and pause while hidden, independently of the launcher and app sorting. Library filtering/sorting is memoized and only runs on the Apps page. Concurrent inventory refreshes are deduplicated. Use small CSS opacity animations instead of a JavaScript animation runtime, and avoid live backdrop blur or full-screen filter textures in foreground controls. Reduced-motion preferences apply through CSS.
 
 The top navigation uses one persistent selection pill. CSS transitions animate its transform and width; JavaScript measures the selected tab only on selection changes and resize/font-size changes. Initial positioning and resizing are immediate. Both the saved and system reduced-motion preferences disable the pill transition.

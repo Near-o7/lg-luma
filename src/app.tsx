@@ -539,12 +539,7 @@ export function App() {
             {page === 'apps' ? (
               <>
                 <h1 className="sr-only">Apps</h1>
-                <div
-                  className="library-toolbar"
-                  onFocus={(event) =>
-                    event.currentTarget.closest('main')?.scrollTo({ top: 0, behavior: 'instant' })
-                  }
-                >
+                <div className="library-toolbar" data-focus-scroll-top="true">
                   <div className="filter-tabs" aria-label="App categories">
                     {categories.map((item) => (
                       <button
@@ -736,8 +731,8 @@ export function App() {
             ) : null}
             <div className="footer-right">
               {page === 'settings' ? (
-                <span className="settings-version" aria-label="Luma version 1.0.0">
-                  v1.0.0
+                <span className="settings-version" aria-label="Luma version 1.0.1">
+                  v1.0.1
                 </span>
               ) : (
                 <button

@@ -82,6 +82,7 @@ function measureFocus(scope: HTMLElement | Document): FocusSnapshot {
         'data-focus-down',
         'data-focus-left',
         'data-focus-right',
+        'data-focus-scroll-top',
       ],
     });
     sizes?.observe(scope instanceof HTMLElement ? scope : document.documentElement);
@@ -154,6 +155,8 @@ export function moveFocus(direction: Direction): void {
   const entry = preferred ?? measured.entries.find((entry) => entry.rect.id === target);
   if (entry) {
     entry.node.focus({ preventScroll: true });
+    if (entry.node.closest('[data-focus-scroll-top="true"]'))
+      measured.main?.scrollTo({ top: 0, behavior: 'instant' });
     const bounds = measured.main?.contains(entry.node)
       ? measured.bounds
       : { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
