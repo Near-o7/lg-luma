@@ -1,5 +1,5 @@
 import { demoApps, demoInputs, normalizeApps, normalizeInputs, validAppId } from './catalog';
-import type { Inventory, NativeBridge, TVAppReport } from './types';
+import type { Inventory, NativeBridge } from './types';
 
 const active = new Set<NativeBridge>();
 export const isTV = () =>
@@ -106,12 +106,11 @@ export async function loadInventory(): Promise<Inventory> {
   if (!isTV())
     return {
       apps: demoApps,
-      appReport: demoApps.map(({ id, title }) => ({ id, title, visible: true })),
       inputs: demoInputs,
       warnings: [],
     };
   const [apps, inputs] = await Promise.allSettled([
-    inventoryRead(`${manager}listApps`, 'apps'),
+    inventoryRead(`${manager}listApps`, 'apps').then(normalizeApps),
     inventoryRead('luna://com.webos.service.eim/getAllInputStatus', 'devices').then(
       normalizeInputs,
     ),
@@ -120,24 +119,8 @@ export async function loadInventory(): Promise<Inventory> {
     throw new Error(
       `Couldn’t load your apps. ${apps.reason instanceof Error ? apps.reason.message : 'Check Homebrew Channel’s root status.'}`,
     );
-  const rawApps = apps.value as Record<string, unknown>[];
-  const appReport: TVAppReport[] = rawApps.flatMap((app) =>
-    typeof app.id === 'string'
-      ? [
-          {
-            id: app.id.slice(0, 128),
-            title: typeof app.title === 'string' ? app.title.slice(0, 120) : '',
-            visible:
-              app.visible === true || app.visible === false || typeof app.visible === 'string'
-                ? app.visible
-                : null,
-          },
-        ]
-      : [],
-  );
   return {
-    apps: normalizeApps(rawApps),
-    appReport,
+    apps: apps.value,
     inputs: inputs.status === 'fulfilled' ? inputs.value : [],
     warnings:
       inputs.status === 'rejected' ? ['Inputs couldn’t be loaded. Refresh to try again.'] : [],

@@ -57,7 +57,6 @@ function Launcher({
   const [page, setPage] = useState<Page>('home');
   const [inventory, setInventory] = useState<Inventory>({
     apps: [],
-    appReport: [],
     inputs: [],
     warnings: [],
   });

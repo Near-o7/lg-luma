@@ -60,15 +60,8 @@ export interface WeatherReading {
 
 export interface Inventory {
   apps: TVApp[];
-  appReport: TVAppReport[];
   inputs: TVInput[];
   warnings: string[];
-}
-
-export interface TVAppReport {
-  id: string;
-  title: string;
-  visible: boolean | string | null;
 }
 
 export interface NativeBridge {

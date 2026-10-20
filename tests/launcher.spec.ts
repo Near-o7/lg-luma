@@ -78,12 +78,17 @@ test('full-page settings support remote navigation, Back, and persistent prefere
     'setting-clock',
     'setting-motion',
     'setting-language',
-    'setting-refresh',
-    'setting-show-weather',
   ]) {
-    await page.keyboard.press('ArrowDown');
-    await expect(page.locator(':focus')).toHaveAttribute('data-focusable', id);
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator(':focus')).toHaveAttribute('data-focusable', id);
   }
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('[data-focusable="language-option-en"]')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator(':focus')).toHaveAttribute('data-focusable', 'setting-refresh');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator(':focus')).toHaveAttribute('data-focusable', 'setting-show-weather');
   await page.getByRole('button', { name: 'Summit', exact: true }).click();
   await page.getByRole('switch', { name: '24-hour clock', exact: false }).click();
   await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();
@@ -135,30 +140,6 @@ test('Interface D-pad moves down to the language selector and up from refresh', 
   await page.locator('[data-focusable="setting-refresh"]').focus();
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('[data-focusable="setting-language"]')).toBeFocused();
-});
-
-test('TV app report exposes raw IDs and visibility flags', async ({ page }) => {
-  await installMockTV(page, false, [
-    { id: 'com.webos.app.livetv', title: 'Live TV', visible: false },
-    { id: 'com.webos.app.lgchannels', title: 'LG Channels', visible: false },
-    { id: 'com.example.real', title: 'A real TV app', visible: true },
-  ]);
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: /Inspect TV app report/ }).click();
-  const report = page.getByRole('textbox', { name: 'TV-reported apps' });
-  await expect(report).toContainText('com.webos.app.livetv');
-  await expect(report).toContainText('"visible": false');
-  await expect(page.getByRole('button', { name: 'Open Live TV', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Inspect TV app report/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Inspect TV app report/ })).toHaveAttribute(
-    'data-focusable',
-    'settings-debug',
-  );
-  await page.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Apps', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Live TV', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open LG Channels', exact: true })).toBeVisible();
 });
 
 test('Settings panels fit within the content width at desktop and compact sizes', async ({

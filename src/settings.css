@@ -161,33 +161,6 @@
 .language-menu-option[aria-selected='true'] {
   background: #ffffff14;
 }
-.app-report-help {
-  margin-bottom: 0.8rem;
-  color: #eeeeeead;
-  line-height: 1.5;
-}
-.app-report-json {
-  display: block;
-  width: 100%;
-  min-height: 18rem;
-  max-height: 48vh;
-  resize: vertical;
-  padding: 0.8rem;
-  border: 1px solid #ffffff20;
-  border-radius: 0.6rem;
-  background: #11161b;
-  color: #eee;
-  font:
-    0.8rem/1.45 ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-  white-space: pre;
-  overflow: auto;
-}
-.app-report-copy {
-  margin-top: 0.8rem;
-}
 .settings-version {
   font-size: 0.78rem;
   color: var(--muted);
