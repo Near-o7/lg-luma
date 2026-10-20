@@ -103,7 +103,12 @@ async function inventoryRead(uri: string, field: string): Promise<unknown> {
 }
 
 export async function loadInventory(): Promise<Inventory> {
-  if (!isTV()) return { apps: demoApps, inputs: demoInputs, warnings: [] };
+  if (!isTV())
+    return {
+      apps: demoApps,
+      inputs: demoInputs,
+      warnings: [],
+    };
   const [apps, inputs] = await Promise.allSettled([
     inventoryRead(`${manager}listApps`, 'apps').then(normalizeApps),
     inventoryRead('luna://com.webos.service.eim/getAllInputStatus', 'devices').then(
