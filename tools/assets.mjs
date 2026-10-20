@@ -1,6 +1,7 @@
 // One-time asset preparation. Downloads are build-time only, never TV runtime.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import sharp from 'sharp';
 
 const root = path.resolve(import.meta.dirname, '..');
 const assets = [
@@ -17,20 +18,16 @@ const assets = [
     'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=2560&q=88',
   ],
   [
-    'public/wallpapers/coast.jpg',
-    'https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?auto=format&fit=crop&w=2560&q=88',
-  ],
-  [
     'public/wallpapers/forest.jpg',
     'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2560&q=88',
   ],
   [
-    'public/wallpapers/sand-dunes.jpg',
-    'https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?auto=format&fit=crop&w=2560&q=88',
+    'public/wallpapers/lofoten.jpg',
+    'https://upload.wikimedia.org/wikipedia/commons/a/a6/Reine_Lofoten_2009.JPG',
   ],
   [
-    'public/wallpapers/lake.jpg',
-    'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=2560&q=88',
+    'public/wallpapers/yosemite.jpg',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Tunnel_View%2C_Yosemite_Valley%2C_Yosemite_NP_-_Diliff.jpg/3840px-Tunnel_View%2C_Yosemite_Valley%2C_Yosemite_NP_-_Diliff.jpg',
   ],
   [
     'public/wallpapers/northern-lights.jpg',
@@ -89,6 +86,13 @@ for (const [relative, url] of assets) {
   if (bytes.length < 100) throw new Error(`Unexpectedly small asset: ${relative}`);
   if (relative.endsWith('.svg') && !bytes.toString('utf8').includes('<svg'))
     throw new Error(`Not an SVG asset: ${relative}`);
-  await fs.writeFile(destination, bytes);
-  console.log(`Bundled ${relative} (${bytes.length} bytes)`);
+  const output = relative.endsWith('.jpg')
+    ? await sharp(bytes)
+        .rotate()
+        .resize({ width: 2560, withoutEnlargement: true })
+        .jpeg({ quality: 88 })
+        .toBuffer()
+    : bytes;
+  await fs.writeFile(destination, output);
+  console.log(`Bundled ${relative} (${output.length} bytes)`);
 }

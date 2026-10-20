@@ -6,8 +6,18 @@ export const wallpapers: {
   image: string;
 }[] = [
   {
+    id: 'slate',
+    title: 'Slate',
+    image: 'slate.svg',
+  },
+  {
+    id: 'midnight',
+    title: 'Midnight',
+    image: 'midnight.svg',
+  },
+  {
     id: 'dunes',
-    title: 'Golden hour',
+    title: 'Monument Valley',
     image: 'dunes.jpg',
   },
   {
@@ -16,19 +26,9 @@ export const wallpapers: {
     image: 'san-francisco.jpg',
   },
   {
-    id: 'midnight',
-    title: 'Midnight',
-    image: 'midnight.svg',
-  },
-  {
     id: 'summit',
     title: 'Summit',
     image: 'summit.jpg',
-  },
-  {
-    id: 'coast',
-    title: 'Coast',
-    image: 'coast.jpg',
   },
   {
     id: 'forest',
@@ -36,14 +36,14 @@ export const wallpapers: {
     image: 'forest.jpg',
   },
   {
-    id: 'sand-dunes',
-    title: 'Sand dunes',
-    image: 'sand-dunes.jpg',
+    id: 'lofoten',
+    title: 'Lofoten',
+    image: 'lofoten.jpg',
   },
   {
-    id: 'lake',
-    title: 'Lake',
-    image: 'lake.jpg',
+    id: 'yosemite',
+    title: 'Yosemite',
+    image: 'yosemite.jpg',
   },
   {
     id: 'northern-lights',

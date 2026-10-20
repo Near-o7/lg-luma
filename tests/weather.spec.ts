@@ -189,3 +189,24 @@ test('weather visibility preserves the city and prevents requests when the widge
   await page.getByRole('button', { name: 'Enter ambient mode' }).click();
   await expect(page.locator('.ambient-hint')).toHaveText('Press any button to return');
 });
+
+test('Back exits city editing before leaving Settings, including the TV Back key', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const field = page.getByRole('searchbox', { name: 'City or postcode' });
+  const search = page.getByRole('button', { name: 'Search locations', exact: true });
+  await field.fill('Berlin');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('region', { name: 'Luma settings', exact: true })).toBeVisible();
+  await expect(field).toHaveValue('Berlin');
+  await expect(search).toBeFocused();
+  await field.focus();
+  await field.dispatchEvent('keydown', { key: 'Unidentified', keyCode: 461, bubbles: true });
+  await expect(page.getByRole('region', { name: 'Luma settings', exact: true })).toBeVisible();
+  await expect(field).toHaveValue('Berlin');
+  await expect(search).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Favorites', exact: true })).toBeVisible();
+});

@@ -107,6 +107,16 @@ export function WeatherSettings({
             aria-label="City or postcode"
             data-focusable="weather-location-query"
             value={query}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' || event.keyCode === 461) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!event.repeat) {
+                  event.currentTarget.blur();
+                  searchButton.current?.focus({ preventScroll: true });
+                }
+              }
+            }}
             onChange={(event) => {
               controller.current?.abort();
               setLoading(false);

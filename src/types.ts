@@ -4,10 +4,10 @@ export type Wallpaper =
   | 'san-francisco'
   | 'midnight'
   | 'summit'
-  | 'coast'
+  | 'slate'
   | 'forest'
-  | 'sand-dunes'
-  | 'lake'
+  | 'lofoten'
+  | 'yosemite'
   | 'northern-lights';
 export type Category = 'Streaming' | 'Music' | 'Gaming' | 'Utilities';
 

@@ -1,13 +1,12 @@
 # Luma assets and references
 
-- `public/mark.svg`, `public/app-icon.svg`, and `public/wallpapers/midnight.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
+- `public/mark.svg`, `public/app-icon.svg`, `public/wallpapers/midnight.svg`, and `public/wallpapers/slate.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
 - `public/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`, https://images.unsplash.com/photo-1509316785289-025f5b846b35. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`, https://images.unsplash.com/photo-1501594907352-04cda38ebc29. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/summit.jpg`: Unsplash photo `1454496522488-7a8e488e8606`, https://images.unsplash.com/photo-1454496522488-7a8e488e8606. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/coast.jpg`: Unsplash photo `1475924156734-496f6cac6ec1`, https://images.unsplash.com/photo-1475924156734-496f6cac6ec1. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/forest.jpg`: Unsplash photo `1441974231531-c6227db76b6e`, https://images.unsplash.com/photo-1441974231531-c6227db76b6e. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/sand-dunes.jpg`: Unsplash photo `1473580044384-7ba9967e16a0`, https://images.unsplash.com/photo-1473580044384-7ba9967e16a0. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/lake.jpg`: Unsplash photo `1470770841072-f978cf4d019e`, https://images.unsplash.com/photo-1470770841072-f978cf4d019e. Bundled under the [Unsplash License](https://unsplash.com/license).
+- `public/wallpapers/lofoten.jpg`: [Reine Lofoten 2009](https://commons.wikimedia.org/wiki/File:Reine_Lofoten_2009.JPG), credit **Petr Šmerkl, Wikipedia**, [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Resized/re-encoded as a JPEG no wider than 2560px; the image retains its CC BY-SA 3.0 license.
+- `public/wallpapers/yosemite.jpg`: [Tunnel View, Yosemite Valley, Yosemite NP](https://commons.wikimedia.org/wiki/File:Tunnel_View,_Yosemite_Valley,_Yosemite_NP_-_Diliff.jpg) by David Iliff (Diliff), [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Resized to a 2560px-wide JPEG; the image retains its CC BY-SA 3.0 license.
 - `public/wallpapers/northern-lights.jpg`: Unsplash photo `1531366936337-7c912a4589a7`, https://images.unsplash.com/photo-1531366936337-7c912a4589a7. Bundled under the [Unsplash License](https://unsplash.com/license).
 - Inter variable font: Rasmus Andersson, SIL Open Font License 1.1. License bundled at `public/fonts/ofl.txt`.
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
@@ -29,7 +28,7 @@ The requested app logos use downloaded vector artwork, rather than font approxim
 | `zdf.svg`         | [ZDF logo](https://commons.wikimedia.org/wiki/File:ZDF_logo.svg)                                                                | ZDF; public-domain logo artwork                                                                                                     |
 | `das-erste.svg`   | [Das Erste 2014](https://commons.wikimedia.org/wiki/File:Das_Erste_2014.svg)                                                    | ARD; public-domain logo artwork                                                                                                     |
 
-The PlayStation input symbol uses the SVG path supplied by the user. PlayStation is a Sony Interactive Entertainment mark. HDMI, USB, and generic device symbols are Lucide icons.
+The PlayStation and Apple TV input symbols use the SVG paths supplied by the user. PlayStation is a Sony Interactive Entertainment mark; Apple TV is an Apple mark. HDMI, USB, and generic device symbols are Lucide icons.
 
 TV integration was developed with [LG-XMB](https://github.com/Ripthulhu/LG-XMB)'s documented, working Homebrew Channel discovery transport as a reference. Luma does not include its code, native input hooks, shaders, or PS3 assets.
 

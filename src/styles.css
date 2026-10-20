@@ -119,14 +119,11 @@ button svg {
   background-position: center 40%;
   filter: saturate(0.7) brightness(0.8);
 }
-.wallpaper-coast,
 .wallpaper-forest,
-.wallpaper-lake,
+.wallpaper-lofoten,
+.wallpaper-yosemite,
 .wallpaper-northern-lights {
   filter: saturate(0.8);
-}
-.wallpaper-sand-dunes {
-  filter: saturate(0.8) brightness(0.85);
 }
 .wallpaper-shade {
   background:
@@ -664,6 +661,10 @@ button svg {
 .input-art svg {
   width: 2.2rem;
   height: 2.2rem;
+}
+.input-art [data-connection-icon='apple-tv'] {
+  width: 2.6rem;
+  height: 2.6rem;
 }
 .input-console .input-art {
   color: #d8dfeb;

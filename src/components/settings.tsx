@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Clock3, Leaf, RefreshCw, Type } from 'lucide-react';
+import { Accessibility, Check, ChevronRight, Clock3, RefreshCw, Type } from 'lucide-react';
 import { WeatherSettings } from './weather-settings';
 import type { Preferences } from '../types';
 import { wallpapers } from '../wallpapers';
@@ -89,7 +89,7 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                 data-focusable="setting-motion"
                 onClick={() => onUpdate({ reducedMotion: !preferences.reducedMotion })}
               >
-                <Leaf />
+                <Accessibility />
                 <span>
                   <strong>Reduced motion</strong>
                 </span>

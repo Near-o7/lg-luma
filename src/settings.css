@@ -34,6 +34,13 @@
 .settings-page .wallpaper-thumbnail {
   height: auto;
   aspect-ratio: 16/9;
+  border-radius: 0.3rem;
+}
+.settings-page .wallpaper-option {
+  border-radius: 0.3rem;
+}
+.settings-page .wallpaper-option:focus-visible {
+  outline-offset: 3px;
 }
 .settings-page .wallpaper-option > span:not(.wallpaper-thumbnail) {
   font-size: 1.05rem;
