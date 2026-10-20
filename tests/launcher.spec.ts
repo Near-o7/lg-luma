@@ -35,7 +35,7 @@ test('hold OK opens options, favorites persist and hidden apps can be restored',
   await page.keyboard.up('Enter');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Remove from favorites' }).click();
-  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toHaveCount(0);
   await page.reload();
@@ -44,14 +44,18 @@ test('hold OK opens options, favorites persist and hidden apps can be restored',
   const netflix = page.getByRole('button', { name: 'Open Netflix', exact: true });
   await netflix.focus();
   await page.keyboard.press('m');
-  await page.getByRole('button', { name: 'Hide from library' }).click();
+  await page.getByRole('button', { name: 'Hide app', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(netflix).toHaveCount(0);
-  await page.getByRole('button', { name: 'Hidden apps (1)', exact: true }).click();
+  await page.getByRole('button', { name: 'Hidden (1)', exact: true }).click();
+  await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(1);
   await expect(netflix).toBeVisible();
   await netflix.focus();
   await page.keyboard.press('m');
-  await page.getByRole('button', { name: 'Show in library' }).click();
-  await expect(page.getByRole('button', { name: 'Hide hidden apps', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show app', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Hidden (1)', exact: true })).toHaveCount(0);
+  await expect(netflix).toBeVisible();
 });
 
 test('full-page settings support remote navigation, Back, and persistent preferences', async ({
@@ -373,6 +377,7 @@ test('connection artwork follows the reported device labels without changing the
     },
     { appId: 'com.webos.app.hdmi2', id: 'HDMI_2', port: 2, label: 'USB media', connected: true },
     { appId: 'com.webos.app.hdmi3', id: 'HDMI_3', port: 3, label: 'HDMI 3', connected: true },
+    { appId: 'com.webos.app.hdmi4', id: 'HDMI_4', port: 4, label: 'Apple TV', connected: true },
   ]);
   await page.goto('/');
   await page.getByRole('button', { name: 'Inputs', exact: true }).click();
@@ -384,6 +389,8 @@ test('connection artwork follows the reported device labels without changing the
   await expect(
     page.locator('[data-focusable="input-com.webos.app.hdmi3"] [data-connection-icon="hdmi"]'),
   ).toBeVisible();
+  const appleTV = page.locator('[data-focusable="input-com.webos.app.hdmi4"]');
+  await expect(appleTV.locator('[data-connection-icon="apple-tv"]')).toBeVisible();
   await playstation.click();
   await expect
     .poll(() =>
@@ -394,6 +401,9 @@ test('connection artwork follows the reported device labels without changing the
       ),
     )
     .toEqual(['com.webos.app.hdmi1']);
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await appleTV.click();
+  await expect.poll(() => page.evaluate(() => (window as any).__calls.filter((call: any) => call.uri.endsWith('/launch')).map((call: any) => call.payload.id))).toEqual(['com.webos.app.hdmi1', 'com.webos.app.hdmi4']);
 });
 
 test('Home favorites move inline with hold OK and left/right, and Back keeps the order', async ({
@@ -484,4 +494,48 @@ test('Home card captions are opt-in, persist, and do not affect library captions
   await expect(page.locator('.library-grid .app-label').first()).toBeVisible();
   await page.reload();
   await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
+});
+
+test('app actions close immediately, keep favorites first, and filter hidden apps in the pills', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Apps', exact: true }).click();
+  const browser = page.getByRole('button', { name: 'Open Web Browser', exact: true });
+  await browser.focus();
+  await page.keyboard.press('m');
+  const favorite = page.getByRole('button', { name: 'Add to favorites', exact: true });
+  await expect(favorite).toBeFocused();
+  await expect(page.getByRole('dialog').locator('img')).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(browser).toBeFocused();
+  const readFavoriteOrder = () => page.evaluate(() => JSON.parse(localStorage.getItem('luma.preferences.v1')!).favorites as string[]);
+  const readLibraryOrder = () => page.locator('.library-grid [data-app-id]').evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset.appId));
+  let favorites = await readFavoriteOrder();
+  expect((await readLibraryOrder()).slice(0, favorites.length)).toEqual(favorites);
+  await expect(browser.locator('.favorite-badge')).toBeVisible();
+  await page.keyboard.press('m');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('button', { name: 'Hide app', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(browser).toHaveCount(0);
+  await page.locator('.filter-tabs').getByRole('button', { name: 'Hidden (1)', exact: true }).click();
+  await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(1);
+  await browser.focus();
+  await page.keyboard.press('m');
+  await page.getByRole('button', { name: 'Show app', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Hidden (1)', exact: true })).toHaveCount(0);
+  await expect(browser).toBeVisible();
+  favorites = await readFavoriteOrder();
+  expect((await readLibraryOrder()).slice(0, favorites.length)).toEqual(favorites);
+  await browser.focus();
+  await page.keyboard.press('m');
+  await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(browser.locator('.favorite-badge')).toHaveCount(0);
+  favorites = await readFavoriteOrder();
+  expect((await readLibraryOrder()).slice(0, favorites.length)).toEqual(favorites);
 });

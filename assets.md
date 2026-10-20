@@ -1,11 +1,10 @@
 # Luma assets and references
 
-- `public/mark.svg`, `public/app-icon.svg`, `public/wallpapers/midnight.svg`, and `public/wallpapers/slate.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
+- `public/mark.svg`, `public/app-icon.svg`, `public/wallpapers/midnight.svg`, `public/wallpapers/slate.svg`, and `public/wallpapers/prism.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
 - `public/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`, https://images.unsplash.com/photo-1509316785289-025f5b846b35. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`, https://images.unsplash.com/photo-1501594907352-04cda38ebc29. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/summit.jpg`: Unsplash photo `1454496522488-7a8e488e8606`, https://images.unsplash.com/photo-1454496522488-7a8e488e8606. Bundled under the [Unsplash License](https://unsplash.com/license).
 - `public/wallpapers/forest.jpg`: Unsplash photo `1441974231531-c6227db76b6e`, https://images.unsplash.com/photo-1441974231531-c6227db76b6e. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/lofoten.jpg`: [Reine Lofoten 2009](https://commons.wikimedia.org/wiki/File:Reine_Lofoten_2009.JPG), credit **Petr Šmerkl, Wikipedia**, [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Resized/re-encoded as a JPEG no wider than 2560px; the image retains its CC BY-SA 3.0 license.
 - `public/wallpapers/yosemite.jpg`: [Tunnel View, Yosemite Valley, Yosemite NP](https://commons.wikimedia.org/wiki/File:Tunnel_View,_Yosemite_Valley,_Yosemite_NP_-_Diliff.jpg) by David Iliff (Diliff), [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Resized to a 2560px-wide JPEG; the image retains its CC BY-SA 3.0 license.
 - `public/wallpapers/northern-lights.jpg`: Unsplash photo `1531366936337-7c912a4589a7`, https://images.unsplash.com/photo-1531366936337-7c912a4589a7. Bundled under the [Unsplash License](https://unsplash.com/license).
 - Inter variable font: Rasmus Andersson, SIL Open Font License 1.1. License bundled at `public/fonts/ofl.txt`.
@@ -14,7 +13,7 @@
 
 ## Brand SVGs
 
-The requested app logos use downloaded vector artwork, rather than font approximations. SVG outlines are preserved; Apple TV, Disney+, Prime Video, and Das Erste use a white monochrome display treatment for contrast. All files are bundled locally under `public/logos/`.
+The requested app logos use downloaded vector artwork, rather than font approximations. SVG outlines are preserved; Apple TV, Disney+, Prime Video, and Das Erste use a white monochrome display treatment for contrast. YouTube's wordmark is recolored white for its dark card, while its play icon stays red. All files are bundled locally under `public/logos/`.
 
 | Asset             | Source                                                                                                                          | Source license / attribution                                                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |

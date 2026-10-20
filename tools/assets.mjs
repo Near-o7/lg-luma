@@ -22,10 +22,6 @@ const assets = [
     'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2560&q=88',
   ],
   [
-    'public/wallpapers/lofoten.jpg',
-    'https://upload.wikimedia.org/wikipedia/commons/a/a6/Reine_Lofoten_2009.JPG',
-  ],
-  [
     'public/wallpapers/yosemite.jpg',
     'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Tunnel_View%2C_Yosemite_Valley%2C_Yosemite_NP_-_Diliff.jpg/3840px-Tunnel_View%2C_Yosemite_Valley%2C_Yosemite_NP_-_Diliff.jpg',
   ],
@@ -86,13 +82,20 @@ for (const [relative, url] of assets) {
   if (bytes.length < 100) throw new Error(`Unexpectedly small asset: ${relative}`);
   if (relative.endsWith('.svg') && !bytes.toString('utf8').includes('<svg'))
     throw new Error(`Not an SVG asset: ${relative}`);
+  let prepared = bytes;
+  if (relative === 'public/logos/youtube.svg') {
+    const original = bytes.toString('utf8');
+    const whiteWordmark = original.replace('id="g2362"', 'id="g2362" fill="#ffffff"');
+    if (whiteWordmark === original) throw new Error('YouTube wordmark group was not found.');
+    prepared = Buffer.from(whiteWordmark);
+  }
   const output = relative.endsWith('.jpg')
-    ? await sharp(bytes)
+    ? await sharp(prepared)
         .rotate()
         .resize({ width: 2560, withoutEnlargement: true })
         .jpeg({ quality: 88 })
         .toBuffer()
-    : bytes;
+    : prepared;
   await fs.writeFile(destination, output);
   console.log(`Bundled ${relative} (${output.length} bytes)`);
 }

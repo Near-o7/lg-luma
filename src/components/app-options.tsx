@@ -15,7 +15,7 @@ export function AppOptions({ app, favorites, hidden, onClose, onPin, onHide }: P
   const pinned = favorites.includes(app.id);
   return (
     <Dialog title={app.title} subtitle={app.category} onClose={onClose}>
-      <div className="settings-group">
+      <div className="settings-group app-actions">
         <button className="setting-row" data-focusable="option-pin" data-autofocus="true" onClick={onPin}>
           <Heart fill={pinned ? 'currentColor' : 'none'} />
           <span>

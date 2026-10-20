@@ -6,7 +6,7 @@ export type Wallpaper =
   | 'summit'
   | 'slate'
   | 'forest'
-  | 'lofoten'
+  | 'prism'
   | 'yosemite'
   | 'northern-lights';
 export type Category = 'Streaming' | 'Music' | 'Gaming' | 'Utilities';

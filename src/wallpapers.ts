@@ -16,6 +16,11 @@ export const wallpapers: {
     image: 'midnight.svg',
   },
   {
+    id: 'prism',
+    title: 'Prism',
+    image: 'prism.svg',
+  },
+  {
     id: 'dunes',
     title: 'Monument Valley',
     image: 'dunes.jpg',
@@ -34,11 +39,6 @@ export const wallpapers: {
     id: 'forest',
     title: 'Forest',
     image: 'forest.jpg',
-  },
-  {
-    id: 'lofoten',
-    title: 'Lofoten',
-    image: 'lofoten.jpg',
   },
   {
     id: 'yosemite',

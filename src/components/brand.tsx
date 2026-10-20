@@ -1,4 +1,4 @@
-import { AppWindow, Coffee, Gamepad2, Globe2, MonitorPlay, Settings2 } from 'lucide-react';
+import { AppWindow, Coffee, Gamepad2, Globe, MonitorPlay, Settings2 } from 'lucide-react';
 import type { TVApp } from '../types';
 
 const logos: Record<string, string> = {
@@ -68,7 +68,7 @@ export function Brand({ app }: { app: TVApp }) {
     case 'browser':
       return (
         <span className="brand-symbol">
-          <Globe2 />
+          <Globe />
           <span>Browser</span>
         </span>
       );

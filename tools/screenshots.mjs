@@ -22,6 +22,7 @@ try {
   ]) {
     await action();
     await page.mouse.move(1, 1);
+    if (name === 'inputs') await page.locator('.input-card').first().focus();
     await page.waitForTimeout(500);
     await page.screenshot({ path: path.join(directory, `${name}.png`) });
   }

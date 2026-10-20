@@ -76,7 +76,7 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     'wallpapers/summit.jpg',
     'wallpapers/slate.svg',
     'wallpapers/forest.jpg',
-    'wallpapers/lofoten.jpg',
+    'wallpapers/prism.svg',
     'wallpapers/yosemite.jpg',
     'wallpapers/northern-lights.jpg',
     'logos/apple-tv.svg',
