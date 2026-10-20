@@ -75,7 +75,15 @@ export const AppTile = memo(function AppTile({
     >
       <span className={`app-face brand-${app.brand}`}>
         <Brand app={app} />
-        {pinned ? <Heart className="favorite-badge" size={16} fill="currentColor" strokeWidth={0} aria-label="Favorite" /> : null}
+        {pinned ? (
+          <Heart
+            className="favorite-badge"
+            size={16}
+            fill="currentColor"
+            strokeWidth={0}
+            aria-label="Favorite"
+          />
+        ) : null}
         {reordering ? (
           <span className="reorder-indicator" aria-hidden="true">
             <ArrowLeft size={16} />

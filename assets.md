@@ -11,6 +11,8 @@
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
 
+Luma's logo is a folded-light **L**: a slanted lavender ribbon turns into a peach-and-rose base. The browser mark and TV app icon share the same vector geometry, sized for a clear silhouette at small icon sizes.
+
 ## Brand SVGs
 
 The requested app logos use downloaded vector artwork, rather than font approximations. SVG outlines are preserved; Apple TV, Disney+, Prime Video, and Das Erste use a white monochrome display treatment for contrast. YouTube's wordmark is recolored white for its dark card, while its play icon stays red. All files are bundled locally under `public/logos/`.

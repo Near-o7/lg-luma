@@ -1215,8 +1215,13 @@ button svg {
   border-color: #ffffff20;
   margin-left: 0.5rem;
 }
-.app-actions .setting-row { min-height:4.2rem; padding:1.1rem; }
-.app-actions .setting-row strong { font-size:1.1rem; }
+.app-actions .setting-row {
+  min-height: 4.2rem;
+  padding: 1.1rem;
+}
+.app-actions .setting-row strong {
+  font-size: 1.1rem;
+}
 .small-button {
   width: 2.3rem;
   height: 2.3rem;

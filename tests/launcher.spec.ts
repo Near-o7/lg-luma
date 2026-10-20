@@ -403,7 +403,15 @@ test('connection artwork follows the reported device labels without changing the
     .toEqual(['com.webos.app.hdmi1']);
   await expect(page.getByRole('status')).toHaveCount(0);
   await appleTV.click();
-  await expect.poll(() => page.evaluate(() => (window as any).__calls.filter((call: any) => call.uri.endsWith('/launch')).map((call: any) => call.payload.id))).toEqual(['com.webos.app.hdmi1', 'com.webos.app.hdmi4']);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as any).__calls
+          .filter((call: any) => call.uri.endsWith('/launch'))
+          .map((call: any) => call.payload.id),
+      ),
+    )
+    .toEqual(['com.webos.app.hdmi1', 'com.webos.app.hdmi4']);
 });
 
 test('Home favorites move inline with hold OK and left/right, and Back keeps the order', async ({
@@ -496,7 +504,9 @@ test('Home card captions are opt-in, persist, and do not affect library captions
   await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
 });
 
-test('app actions close immediately, keep favorites first, and filter hidden apps in the pills', async ({ page }) => {
+test('app actions close immediately, keep favorites first, and filter hidden apps in the pills', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Apps', exact: true }).click();
   const browser = page.getByRole('button', { name: 'Open Web Browser', exact: true });
@@ -508,8 +518,14 @@ test('app actions close immediately, keep favorites first, and filter hidden app
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(browser).toBeFocused();
-  const readFavoriteOrder = () => page.evaluate(() => JSON.parse(localStorage.getItem('luma.preferences.v1')!).favorites as string[]);
-  const readLibraryOrder = () => page.locator('.library-grid [data-app-id]').evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset.appId));
+  const readFavoriteOrder = () =>
+    page.evaluate(
+      () => JSON.parse(localStorage.getItem('luma.preferences.v1')!).favorites as string[],
+    );
+  const readLibraryOrder = () =>
+    page
+      .locator('.library-grid [data-app-id]')
+      .evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset.appId));
   let favorites = await readFavoriteOrder();
   expect((await readLibraryOrder()).slice(0, favorites.length)).toEqual(favorites);
   await expect(browser.locator('.favorite-badge')).toBeVisible();
@@ -519,7 +535,10 @@ test('app actions close immediately, keep favorites first, and filter hidden app
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(browser).toHaveCount(0);
-  await page.locator('.filter-tabs').getByRole('button', { name: 'Hidden (1)', exact: true }).click();
+  await page
+    .locator('.filter-tabs')
+    .getByRole('button', { name: 'Hidden (1)', exact: true })
+    .click();
   await expect(page.locator('.library-grid [data-app-id]')).toHaveCount(1);
   await browser.focus();
   await page.keyboard.press('m');
@@ -532,7 +551,9 @@ test('app actions close immediately, keep favorites first, and filter hidden app
   expect((await readLibraryOrder()).slice(0, favorites.length)).toEqual(favorites);
   await browser.focus();
   await page.keyboard.press('m');
-  await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: 'Remove from favorites', exact: true }),
+  ).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(browser.locator('.favorite-badge')).toHaveCount(0);

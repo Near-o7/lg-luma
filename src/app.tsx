@@ -72,14 +72,17 @@ export function App() {
     appMap.get(id) && !preferences.hidden.includes(id) ? [appMap.get(id)!] : [],
   );
   const hiddenCount = inventory.apps.filter((app) => preferences.hidden.includes(app.id)).length;
-  const visibleApps = inventory.apps.filter(
-    (app) => showHidden ? preferences.hidden.includes(app.id) : !preferences.hidden.includes(app.id),
+  const visibleApps = inventory.apps.filter((app) =>
+    showHidden ? preferences.hidden.includes(app.id) : !preferences.hidden.includes(app.id),
   );
-  const filteredApps = sortApps(visibleApps.filter(
-    (app) =>
-      (!category || app.category === category) &&
-      app.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-  ), favoriteIds);
+  const filteredApps = sortApps(
+    visibleApps.filter(
+      (app) =>
+        (!category || app.category === category) &&
+        app.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+    ),
+    favoriteIds,
+  );
   const date = now.toLocaleDateString(undefined, {
     weekday: 'long',
     month: 'long',
@@ -587,18 +590,36 @@ export function App() {
                           className={`filter-tab${category === item ? ' selected' : ''}`}
                           data-focusable={`filter-${item}`}
                           aria-pressed={category === item}
-                          onClick={() => { setShowHidden(false); setCategory((current) => current === item ? null : item); }}
+                          onClick={() => {
+                            setShowHidden(false);
+                            setCategory((current) => (current === item ? null : item));
+                          }}
                         >
                           {item}
                         </button>
                       ))}
-                      {hiddenCount ? <button className={`filter-tab${showHidden ? ' selected' : ''}`} data-focusable="filter-hidden" aria-pressed={showHidden} onClick={() => { setCategory(null); setShowHidden((current) => !current); }}>Hidden ({hiddenCount})</button> : null}
+                      {hiddenCount ? (
+                        <button
+                          className={`filter-tab${showHidden ? ' selected' : ''}`}
+                          data-focusable="filter-hidden"
+                          aria-pressed={showHidden}
+                          onClick={() => {
+                            setCategory(null);
+                            setShowHidden((current) => !current);
+                          }}
+                        >
+                          Hidden ({hiddenCount})
+                        </button>
+                      ) : null}
                       {category || showHidden ? (
                         <button
                           className="filter-clear icon-button"
                           data-focusable="filter-clear"
                           aria-label="Clear category filter"
-                          onClick={() => { setCategory(null); setShowHidden(false); }}
+                          onClick={() => {
+                            setCategory(null);
+                            setShowHidden(false);
+                          }}
                         >
                           <X size={16} />
                         </button>
@@ -645,13 +666,17 @@ export function App() {
                           ? 'Finding your apps…'
                           : query
                             ? 'Nothing here. Yet.'
-                            : showHidden ? 'No hidden apps.' : 'A little room for something new.'}
+                            : showHidden
+                              ? 'No hidden apps.'
+                              : 'A little room for something new.'}
                       </h3>
                       <p>
                         {error ||
                           (query
                             ? `No apps match “${query}”. Try another name.`
-                            : showHidden ? 'Apps you hide will appear here.' : 'Apps in this category will appear here.')}
+                            : showHidden
+                              ? 'Apps you hide will appear here.'
+                              : 'Apps in this category will appear here.')}
                       </p>
                       {error ? (
                         <button
@@ -794,7 +819,8 @@ export function App() {
                     : [...favoriteIds, optionsApp.id],
                   hidden: preferences.hidden.filter((id) => id !== optionsApp.id),
                 });
-                if (showHidden && hiddenCount === 1 && preferences.hidden.includes(optionsApp.id)) setShowHidden(false);
+                if (showHidden && hiddenCount === 1 && preferences.hidden.includes(optionsApp.id))
+                  setShowHidden(false);
                 setOptionsApp(null);
                 notify(
                   pinned

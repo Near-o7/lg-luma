@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { appIdentity, defaultFavorites, normalizeApps, normalizeInputs, sortApps } from '../src/catalog.ts';
+import {
+  appIdentity,
+  defaultFavorites,
+  normalizeApps,
+  normalizeInputs,
+  sortApps,
+} from '../src/catalog.ts';
 import { parsePreferences } from '../src/storage.ts';
 import { nextFocus, type FocusRect } from '../src/navigation.ts';
 
@@ -78,8 +84,22 @@ test('D-pad navigation prefers the current row and nearest aligned column', () =
 });
 
 test('favorites sort first in saved order, with remaining apps alphabetical and source order intact', () => {
-  const apps = [['z', 'Zulu'], ['a', 'Alpha'], ['c', 'Charlie'], ['b', 'Beta']].map(([id, title]) => appIdentity(id, title));
-  assert.deepEqual(sortApps(apps, ['c', 'missing', 'a']).map((app) => app.id), ['c', 'a', 'b', 'z']);
-  assert.deepEqual(apps.map((app) => app.id), ['z', 'a', 'c', 'b']);
-  assert.deepEqual(sortApps(apps, []).map((app) => app.title), ['Alpha', 'Beta', 'Charlie', 'Zulu']);
+  const apps = [
+    ['z', 'Zulu'],
+    ['a', 'Alpha'],
+    ['c', 'Charlie'],
+    ['b', 'Beta'],
+  ].map(([id, title]) => appIdentity(id, title));
+  assert.deepEqual(
+    sortApps(apps, ['c', 'missing', 'a']).map((app) => app.id),
+    ['c', 'a', 'b', 'z'],
+  );
+  assert.deepEqual(
+    apps.map((app) => app.id),
+    ['z', 'a', 'c', 'b'],
+  );
+  assert.deepEqual(
+    sortApps(apps, []).map((app) => app.title),
+    ['Alpha', 'Beta', 'Charlie', 'Zulu'],
+  );
 });
