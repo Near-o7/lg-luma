@@ -1,6 +1,7 @@
 import type { TVApp, TVInput, Category } from './types';
 
 const identities: { match: RegExp; brand: string; category: Category }[] = [
+  { match: /(?:com\.webos\.app\.livetv|live[\s._-]*tv)/i, brand: 'live-tv', category: 'Streaming' },
   { match: /netflix/i, brand: 'netflix', category: 'Streaming' },
   { match: /youtube/i, brand: 'youtube', category: 'Streaming' },
   { match: /disney/i, brand: 'disney', category: 'Streaming' },
@@ -39,7 +40,7 @@ export function normalizeApps(raw: unknown): TVApp[] {
   if (!Array.isArray(raw) || raw.length > 1000)
     throw new Error('The TV returned an invalid app list.');
   const seen = new Set<string>();
-  return raw
+  const apps = raw
     .flatMap((entry) => {
       if (
         !entry ||
@@ -57,7 +58,11 @@ export function normalizeApps(raw: unknown): TVApp[] {
         entry.id.startsWith('com.webos.app.externalinput.')
       )
         return [];
-      if (entry.visible !== true && /^(com\.webos\.|com\.palm\.|com\.lge\.)/.test(entry.id))
+      if (
+        entry.visible !== true &&
+        entry.id !== 'com.webos.app.livetv' &&
+        /^(com\.webos\.|com\.palm\.|com\.lge\.)/.test(entry.id)
+      )
         return [];
       seen.add(entry.id);
       const title =
@@ -71,6 +76,9 @@ export function normalizeApps(raw: unknown): TVApp[] {
       return [appIdentity(entry.id, title || entry.id)];
     })
     .sort((a, b) => a.title.localeCompare(b.title));
+  if (!apps.some((app) => app.id === 'com.webos.app.livetv'))
+    apps.push(appIdentity('com.webos.app.livetv', 'Live TV'));
+  return apps.sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export function normalizeInputs(raw: unknown): TVInput[] {
@@ -125,13 +133,14 @@ export function sortApps(apps: TVApp[], favorites: readonly string[]): TVApp[] {
 }
 
 export function defaultFavorites(apps: TVApp[]): string[] {
-  const brands = ['netflix', 'youtube', 'apple', 'disney', 'prime', 'plex'];
+  const brands = ['live-tv', 'netflix', 'youtube', 'apple', 'disney', 'prime', 'plex'];
   const preferred = brands.flatMap((brand) => apps.find((app) => app.brand === brand)?.id ?? []);
   return [...new Set([...preferred, ...apps.map((app) => app.id)])].slice(0, 6);
 }
 
 // Fixtures exist only in the desktop preview. A TV never falls back to these.
 export const demoApps = [
+  ['com.webos.app.livetv', 'Live TV'],
   ['netflix', 'Netflix'],
   ['youtube.leanback.v4', 'YouTube'],
   ['com.apple.appletv', 'Apple TV'],
