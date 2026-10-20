@@ -23,6 +23,22 @@ Build before running browser tests so packaged `file://` tests exercise the curr
 
 Project filenames use lowercase kebab-case, including React components (for example, `app-tile.tsx`). Keep `package.json` and `appinfo.json` versions synchronized; change the version only when requested.
 
+## Collecting app icons from a webOS TV
+
+The optional installed-app artwork prototype can collect icons from a developer's own rooted TV over SSH. Set `TV_IP` to the TV's address and run these commands from the repository root:
+
+```sh
+ssh root@TV_IP node < tools/collect-tv-icons.js
+ssh root@TV_IP 'tar -cf - -C /tmp/luma-artwork .' > icons.tar
+mkdir -p public/app-icons
+tar -xf icons.tar -C public/app-icons
+mv public/app-icons/app-icons.json src/app-icons.json
+node tools/icon-colours.mjs
+pnpm build
+```
+
+The collector checks `/media/developer/apps/usr/palm/applications`, `/media/cryptofs/apps/usr/palm/applications`, and `/usr/palm/applications`, preferring each app's `largeIcon`, then `icon`, then `icon.png`. It copies image files into `/tmp/luma-artwork` on the TV and writes an app-ID-to-image map. After copying that output into `public/app-icons/`, the map points to the bundled paths and `tools/icon-colours.mjs` generates matching tile background colors in `src/icon-colours.css`. Only icons found in those locations are collected; no icon set is supplied by the repository, so `src/app-icons.json` can be empty until collection is run. The collector requires SSH/root access to the developer's own TV.
+
 ## Performance
 
 Keep focus feedback immediate. Spatial navigation caches control geometry and invalidates it on DOM/layout changes, scrolling, resizing, and font loads; fully visible targets do not call `scrollIntoView`. New focusable controls must use `data-focusable` and explicit routes where appropriate.

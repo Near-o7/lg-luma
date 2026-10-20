@@ -1,5 +1,7 @@
-import { AppWindow, Coffee, Gamepad2, Globe, MonitorPlay, Settings2 } from 'lucide-react';
+import { AppWindow, Coffee, Gamepad2, Globe, MonitorPlay, Settings2, Tv } from 'lucide-react';
 import type { TVApp } from '../types';
+import appIcons from '../app-icons.json';
+import { useTranslation } from '../i18n';
 
 const logos: Record<string, string> = {
   apple: 'apple-tv',
@@ -14,6 +16,7 @@ const logos: Record<string, string> = {
 };
 
 export function Brand({ app }: { app: TVApp }) {
+  const { t } = useTranslation();
   const logo = logos[app.brand];
   if (logo)
     return (
@@ -24,7 +27,32 @@ export function Brand({ app }: { app: TVApp }) {
         draggable={false}
       />
     );
+  const installedIcon = (appIcons as Record<string, string>)[app.id];
+  if (installedIcon)
+    return (
+      <span className="brand-installed">
+        <img
+          className="brand-installed-icon"
+          src={installedIcon}
+          alt=""
+          draggable={false}
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+            const label = event.currentTarget.nextElementSibling as HTMLElement | null;
+            if (label) label.hidden = false;
+          }}
+        />
+        <span hidden>{app.title}</span>
+      </span>
+    );
   switch (app.brand) {
+    case 'live-tv':
+      return (
+        <span className="brand-symbol">
+          <Tv />
+          <span>{t('liveTV')}</span>
+        </span>
+      );
     case 'plex':
       return (
         <span className="wordmark wordmark-plex">
@@ -49,7 +77,7 @@ export function Brand({ app }: { app: TVApp }) {
       return (
         <span className="brand-symbol">
           <Coffee />
-          <span>Homebrew</span>
+          <span>{t('homebrew')}</span>
         </span>
       );
     case 'kodi':
@@ -69,7 +97,7 @@ export function Brand({ app }: { app: TVApp }) {
       return (
         <span className="brand-symbol">
           <Globe />
-          <span>Browser</span>
+          <span>{t('browser')}</span>
         </span>
       );
     case 'gaming':
@@ -83,7 +111,7 @@ export function Brand({ app }: { app: TVApp }) {
       return (
         <span className="brand-symbol">
           <Settings2 />
-          <span>Settings</span>
+          <span>{t('settings')}</span>
         </span>
       );
     default:
