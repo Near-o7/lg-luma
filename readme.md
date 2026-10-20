@@ -25,7 +25,7 @@ Download the `.ipk` from the [latest release](https://github.com/ecklf/lg-luma/r
 You can also install over SSH. Replace `TV_IP` with your TV's address and use the filename you downloaded:
 
 ```sh
-scp -O com.luma.launcher_0.1.7_all.ipk root@TV_IP:/tmp/luma.ipk
+scp -O com.luma.launcher_1.1.0_all.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -108,7 +108,7 @@ Open **http://127.0.0.1:5173**. The browser preview uses sample apps and inputs;
 pnpm run package
 ```
 
-Output: `dist/com.luma.launcher_0.1.7_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
+Output: `dist/com.luma.launcher_1.1.0_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
 
 Photographs, fonts, and app-logo SVGs are bundled locally. `pnpm assets` prepares them again if deliberately removed; normal builds and TV use need no asset downloads.
 
@@ -119,11 +119,11 @@ To deploy a local build, register your TV's root SSH connection with `pnpm exec 
 GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. Release publishing is manual. First push a version tag matching `package.json` and `appinfo.json`:
 
 ```sh
-git tag v0.1.7
-git push origin v0.1.7
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
-Then open **Actions → CI → Run workflow**, enter `v0.1.7` as the **tag**, and run it. The workflow builds and tests that tagged commit before publishing the IPK, checksum, icon, and Homebrew feed.
+Then open **Actions → CI → Run workflow**, enter `v1.1.0` as the **tag**, and run it. The workflow builds and tests that tagged commit before publishing the IPK, checksum, icon, and Homebrew feed.
 
 For subsequent releases, update both version fields and tag that version. The stable feed URL always serves the latest release. Contributor checks, controls, weather behavior, and the code map are documented in [agents.md](agents.md).
 
