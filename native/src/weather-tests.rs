@@ -161,6 +161,23 @@ fn removed_disabled_or_changed_locations_reject_in_flight_results() {
         weather.accept_forecast(id, &location.key(), Ok(reading()), 1004),
         (false, None)
     );
+    preferences.show_weather = true;
+    let Some(Command::Forecast { id: old, location: old_location }) = weather.sync(&preferences, true, 1005).0 else { panic!(); };
+    preferences.weather_location.as_mut().unwrap().latitude += 1.;
+    let Some(Command::Forecast { id: new, location: new_location }) = weather.sync(&preferences, true, 1006).0 else { panic!(); };
+    assert_eq!(weather.accept_forecast(old, &old_location.key(), Ok(reading()), 1007), (false, None));
+    assert!(weather.accept_forecast(new, &new_location.key(), Ok(reading()), 1007).0);
+    assert_eq!(weather.cache.as_ref().unwrap().key, new_location.key());
+}
+
+#[test]
+fn returning_home_retries_stale_weather_without_waiting_for_the_old_retry_timer() {
+    let mut weather = Weather { cache: Some(cache(1000)), ..Weather::default() };
+    let preferences = preferences();
+    let Some(Command::Forecast { id, location }) = weather.sync(&preferences, true, 2000).0 else { panic!(); };
+    weather.accept_forecast(id, &location.key(), Err("offline".into()), 2000);
+    assert!(weather.sync(&preferences, false, 2010).0.is_none());
+    assert!(weather.sync(&preferences, true, 2020).0.is_some());
 }
 
 #[test]

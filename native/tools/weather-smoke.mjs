@@ -186,6 +186,9 @@ try {
   assert.equal(hidden.preferences.show_weather, false);
   assert.equal(hidden.preferences.weather_location.name, 'Vienna');
   assert.equal(forecastCount(), 1);
+  await writeCache(20 * 60);
+  await scenario('disabled-stale-cache', 'home');
+  assert.equal(forecastCount(), 1, 'A disabled widget must not refresh even stale weather');
 
   await writePreferences({ weather_location: vienna });
   await writeCache(20 * 60);
@@ -199,6 +202,10 @@ try {
   assert.equal(unavailable.weather.failed, true);
   assert.equal(unavailable.weather.cache, null);
   assert.equal(forecastCount(), 3);
+  await writeCache(20 * 60); forecastMode = 'malformed';
+  const invalid = await scenario('invalid-reading', 'home,await-weather');
+  assert.equal(invalid.weather.failed, true); assert.equal(invalid.weather.cache.reading.temperature, 14.2);
+  await fs.rm(cache);
 
   forecastMode = 'slow';
   const removed = await scenario('remove-in-flight', `home,${locationPage},click:1716:201,home`);

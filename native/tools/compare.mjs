@@ -9,9 +9,11 @@ const root = path.resolve(import.meta.dirname, '../..');
 const out = path.join(root, '.build/native/comparison');
 await fs.mkdir(out, { recursive: true });
 const time = '2026-10-21T20:41:00+02:00';
+const weatherLocation = { name: 'Vienna', region: 'Vienna', country: 'Austria', latitude: 48.2085, longitude: 16.3721 };
 const scenarios = [
   { name: 'home', script: 'home,down' },
   { name: 'home-names', names: true, script: 'home,down' },
+  { name: 'home-weather', widget: true, location: true, script: 'home,down' },
   { name: 'empty-home', empty: true, script: 'home,down' },
   {
     name: 'apps',
@@ -90,6 +92,21 @@ const scenarios = [
     },
   },
   {
+    name: 'weather-settings', widget: true,
+    script: 'settings,down,down,down,enter',
+    web: async (p) => { await click(p, 'nav-settings'); await click(p, 'settings-section-weather'); },
+  },
+  {
+    name: 'weather-location', widget: true, location: true,
+    script: 'settings,down,down,down,enter,down,enter',
+    web: async (p) => { await click(p, 'nav-settings'); await focus(p, 'settings-section-weather'); await click(p, 'setting-weather-location'); },
+  },
+  {
+    name: 'weather-temperature', widget: true, location: true,
+    script: 'settings,down,down,down,enter,down,down,enter',
+    web: async (p) => { await click(p, 'nav-settings'); await focus(p, 'settings-section-weather'); await click(p, 'setting-temperature'); },
+  },
+  {
     name: 'inputs',
     script: 'settings,down,down,down,down',
     web: async (p) => {
@@ -123,23 +140,28 @@ if (!process.argv.includes('--native-only')) {
         timezoneId: 'Europe/Berlin',
       });
       await page.clock.setFixedTime(new Date(time));
+      await page.route('https://api.open-meteo.com/**', (route) => route.fulfill({ json: { current: { temperature_2m: 14.2, weather_code: 2, is_day: 1 } } }));
+      await page.route('https://geocoding-api.open-meteo.com/**', (route) => route.fulfill({ json: { results: [] } }));
       await page.addInitScript(
-        ({ names, hidden, empty }) =>
+        ({ names, hidden, empty, widget, location }) => {
           localStorage.setItem(
             'luma.preferences.v1',
             JSON.stringify({
               version: 1,
               wallpaper: 'dunes',
               reducedMotion: true,
-              showWeather: false,
+              showWeather: widget,
+              weatherLocation: location,
               clock24: false,
               showHomeAppNames: names,
               language: 'en',
               hidden: hidden ? ['netflix'] : [],
               favorites: empty ? [] : null,
             }),
-          ),
-        { names: !!scenario.names, hidden: !!scenario.hidden, empty: !!scenario.empty },
+          );
+          if (location) localStorage.setItem('luma.weather.v1', JSON.stringify({ key: '48.2085,16.3721', updatedAt: Date.now(), reading: { temperature: 14.2, code: 2, isDay: true } }));
+        },
+        { names: !!scenario.names, hidden: !!scenario.hidden, empty: !!scenario.empty, widget: !!scenario.widget, location: scenario.location ? weatherLocation : null },
       );
       await page.goto(pathToFileURL(path.join(root, 'dist/app/index.html')).href);
       await page
@@ -149,6 +171,7 @@ if (!process.argv.includes('--native-only')) {
         .first()
         .waitFor();
       await page.evaluate(() => document.fonts.ready);
+      if (scenario.location) await page.locator('.weather-temperature').waitFor();
       // Compare only the features requested for native parity.
       await page.addStyleTag({
         content: '[data-focusable="setting-language"] { display: none !important; }',
@@ -231,11 +254,13 @@ if (!process.argv.includes('--web-only')) {
         reduced_motion: true,
         hour_24: false,
         show_names: !!scenario.names,
-        show_weather: false,
+        show_weather: !!scenario.widget,
+        weather_location: scenario.location ? weatherLocation : null,
         hidden: scenario.hidden ? ['netflix'] : [],
         favorites: scenario.empty ? [] : null,
       }),
     );
+    if (scenario.location) await fs.writeFile(preferences.replace(/\.json$/, '.weather.json'), JSON.stringify({ key: '48.2085,16.3721', updated_at: Math.floor(Date.now() / 1000), reading: { temperature: 14.2, code: 2, is_day: true } }));
     const run = spawnSync(
       path.join(root, 'native/target/debug/luma-native'),
       [
