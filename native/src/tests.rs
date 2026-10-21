@@ -548,7 +548,9 @@ fn removing_weather_location_clears_cache_and_cancels_pending_results() {
 
 #[test]
 fn language_selection_restores_its_parent_and_is_saved_with_preferences() {
-    let mut state = ready(); state.open(2); state.focus = Target::Setting(4);
+    let mut state = ready();
+    state.open(2);
+    state.focus = Target::Setting(4);
     state.direction(Direction::Right, &controls(&state));
     assert_eq!(state.subpage, Some(crate::state::Subpage::Language));
     assert_eq!(state.focus, Target::Choice(0));
@@ -556,13 +558,18 @@ fn language_selection_restores_its_parent_and_is_saved_with_preferences() {
     assert_eq!(state.activate(), vec![Effect::Save]);
     assert_eq!(state.preferences.language, crate::i18n::Language::De);
     assert_eq!(state.focus, Target::Setting(4));
-    state.activate(); state.direction(Direction::Left, &controls(&state));
+    state.activate();
+    state.direction(Direction::Left, &controls(&state));
     assert_eq!(state.focus, Target::Setting(4));
 }
 
 #[test]
 fn unsupported_language_preferences_recover_without_losing_other_choices() {
-    let preferences: Preferences = serde_json::from_value(json!({"language":"unknown","favorites":["netflix"],"show_names":true})).unwrap();
+    let preferences: Preferences = serde_json::from_value(
+        json!({"language":"unknown","favorites":["netflix"],"show_names":true}),
+    )
+    .unwrap();
     assert_eq!(preferences.language, crate::i18n::Language::En);
-    assert!(preferences.show_names); assert_eq!(preferences.favorites, Some(vec!["netflix".into()]));
+    assert!(preferences.show_names);
+    assert_eq!(preferences.favorites, Some(vec!["netflix".into()]));
 }

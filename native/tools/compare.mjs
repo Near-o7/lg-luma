@@ -9,14 +9,28 @@ const root = path.resolve(import.meta.dirname, '../..');
 const out = path.join(root, '.build/native/comparison');
 await fs.mkdir(out, { recursive: true });
 const time = '2026-10-21T20:41:00+02:00';
-const weatherLocation = { name: 'Vienna', region: 'Vienna', country: 'Austria', latitude: 48.2085, longitude: 16.3721 };
+const weatherLocation = {
+  name: 'Vienna',
+  region: 'Vienna',
+  country: 'Austria',
+  latitude: 48.2085,
+  longitude: 16.3721,
+};
 const scenarios = [
   { name: 'home', script: 'home,down' },
   { name: 'home-names', names: true, script: 'home,down' },
   { name: 'home-weather', widget: true, location: true, script: 'home,down' },
   { name: 'home-de', language: 'de', widget: true, location: true, script: 'home,down' },
   { name: 'home-zh', language: 'zh', widget: true, location: true, script: 'home,down' },
-  { name: 'language-zh', language: 'zh', script: 'settings,down,enter,down,down,down,enter', web: async (p) => { await click(p, 'nav-settings'); await click(p, 'setting-language'); } },
+  {
+    name: 'language-zh',
+    language: 'zh',
+    script: 'settings,down,enter,down,down,down,enter',
+    web: async (p) => {
+      await click(p, 'nav-settings');
+      await click(p, 'setting-language');
+    },
+  },
   { name: 'empty-home', empty: true, script: 'home,down' },
   {
     name: 'apps',
@@ -95,19 +109,35 @@ const scenarios = [
     },
   },
   {
-    name: 'weather-settings', widget: true,
+    name: 'weather-settings',
+    widget: true,
     script: 'settings,down,down,down,enter',
-    web: async (p) => { await click(p, 'nav-settings'); await click(p, 'settings-section-weather'); },
+    web: async (p) => {
+      await click(p, 'nav-settings');
+      await click(p, 'settings-section-weather');
+    },
   },
   {
-    name: 'weather-location', widget: true, location: true,
+    name: 'weather-location',
+    widget: true,
+    location: true,
     script: 'settings,down,down,down,enter,down,enter',
-    web: async (p) => { await click(p, 'nav-settings'); await focus(p, 'settings-section-weather'); await click(p, 'setting-weather-location'); },
+    web: async (p) => {
+      await click(p, 'nav-settings');
+      await focus(p, 'settings-section-weather');
+      await click(p, 'setting-weather-location');
+    },
   },
   {
-    name: 'weather-temperature', widget: true, location: true,
+    name: 'weather-temperature',
+    widget: true,
+    location: true,
     script: 'settings,down,down,down,enter,down,down,enter',
-    web: async (p) => { await click(p, 'nav-settings'); await focus(p, 'settings-section-weather'); await click(p, 'setting-temperature'); },
+    web: async (p) => {
+      await click(p, 'nav-settings');
+      await focus(p, 'settings-section-weather');
+      await click(p, 'setting-temperature');
+    },
   },
   {
     name: 'inputs',
@@ -143,8 +173,12 @@ if (!process.argv.includes('--native-only')) {
         timezoneId: 'Europe/Berlin',
       });
       await page.clock.setFixedTime(new Date(time));
-      await page.route('https://api.open-meteo.com/**', (route) => route.fulfill({ json: { current: { temperature_2m: 14.2, weather_code: 2, is_day: 1 } } }));
-      await page.route('https://geocoding-api.open-meteo.com/**', (route) => route.fulfill({ json: { results: [] } }));
+      await page.route('https://api.open-meteo.com/**', (route) =>
+        route.fulfill({ json: { current: { temperature_2m: 14.2, weather_code: 2, is_day: 1 } } }),
+      );
+      await page.route('https://geocoding-api.open-meteo.com/**', (route) =>
+        route.fulfill({ json: { results: [] } }),
+      );
       await page.addInitScript(
         ({ names, hidden, empty, widget, location, language }) => {
           localStorage.setItem(
@@ -162,9 +196,24 @@ if (!process.argv.includes('--native-only')) {
               favorites: empty ? [] : null,
             }),
           );
-          if (location) localStorage.setItem('luma.weather.v1', JSON.stringify({ key: '48.2085,16.3721', updatedAt: Date.now(), reading: { temperature: 14.2, code: 2, isDay: true } }));
+          if (location)
+            localStorage.setItem(
+              'luma.weather.v1',
+              JSON.stringify({
+                key: '48.2085,16.3721',
+                updatedAt: Date.now(),
+                reading: { temperature: 14.2, code: 2, isDay: true },
+              }),
+            );
         },
-        { names: !!scenario.names, hidden: !!scenario.hidden, empty: !!scenario.empty, widget: !!scenario.widget, location: scenario.location ? weatherLocation : null, language: scenario.language ?? 'en' },
+        {
+          names: !!scenario.names,
+          hidden: !!scenario.hidden,
+          empty: !!scenario.empty,
+          widget: !!scenario.widget,
+          location: scenario.location ? weatherLocation : null,
+          language: scenario.language ?? 'en',
+        },
       );
       await page.goto(pathToFileURL(path.join(root, 'dist/app/index.html')).href);
       await page
@@ -260,7 +309,15 @@ if (!process.argv.includes('--web-only')) {
         favorites: scenario.empty ? [] : null,
       }),
     );
-    if (scenario.location) await fs.writeFile(preferences.replace(/\.json$/, '.weather.json'), JSON.stringify({ key: '48.2085,16.3721', updated_at: Math.floor(Date.now() / 1000), reading: { temperature: 14.2, code: 2, is_day: true } }));
+    if (scenario.location)
+      await fs.writeFile(
+        preferences.replace(/\.json$/, '.weather.json'),
+        JSON.stringify({
+          key: '48.2085,16.3721',
+          updated_at: Math.floor(Date.now() / 1000),
+          reading: { temperature: 14.2, code: 2, is_day: true },
+        }),
+      );
     const run = spawnSync(
       path.join(root, 'native/target/debug/luma-native'),
       [

@@ -202,9 +202,11 @@ try {
   assert.equal(unavailable.weather.failed, true);
   assert.equal(unavailable.weather.cache, null);
   assert.equal(forecastCount(), 3);
-  await writeCache(20 * 60); forecastMode = 'malformed';
+  await writeCache(20 * 60);
+  forecastMode = 'malformed';
   const invalid = await scenario('invalid-reading', 'home,await-weather');
-  assert.equal(invalid.weather.failed, true); assert.equal(invalid.weather.cache.reading.temperature, 14.2);
+  assert.equal(invalid.weather.failed, true);
+  assert.equal(invalid.weather.cache.reading.temperature, 14.2);
   await fs.rm(cache);
 
   forecastMode = 'slow';

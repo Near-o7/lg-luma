@@ -25,3 +25,10 @@ ureq = { version = "3.4", default-features = false, features = ["rustls"] }
 lto = "thin"
 strip = true
 codegen-units = 1
+
+# Keep bundled CJK font parsing responsive in debug previews and smoke tests.
+[profile.dev.package.fontdue]
+opt-level = 3
+
+[profile.dev.package.ttf-parser]
+opt-level = 3
