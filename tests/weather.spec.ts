@@ -38,8 +38,10 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   await expect(page.locator('.weather-summary')).toContainText('Vienna');
   await expect(page.locator('.weather-summary')).toContainText('14°C');
   await expect(page.locator('.weather-summary')).toContainText('Partly cloudy');
+  await expect(page.locator('[data-focusable="weather-configure"]')).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.weather-summary')).toContainText('14°C');
+  await expect(page.locator('[data-focusable="weather-configure"]')).toHaveCount(0);
   expect(forecasts).toBe(1);
   await page.getByRole('button', { name: 'Enter ambient mode' }).click();
   await expect(page.locator('.ambient-hint')).toContainText('Vienna');

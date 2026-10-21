@@ -69,14 +69,13 @@ export function Weather({
     </>
   );
   if (!onConfigure) return <span className="weather-summary">{content}</span>;
+  if (location) return <span className="hero-subtitle weather-summary">{content}</span>;
   return (
     <button
       className="hero-subtitle weather-summary"
       data-focusable="weather-configure"
       onClick={onConfigure}
-      aria-label={t(location ? 'weatherInLocation' : 'setWeatherLocation', {
-        city: location?.name ?? '',
-      })}
+      aria-label={t('setWeatherLocation')}
     >
       {content}
     </button>
