@@ -56,6 +56,18 @@ export const Navigation = memo(function Navigation({
           className={`nav-item${page === tab.id ? ' active' : ''}`}
           data-focusable={`nav-${tab.id}`}
           aria-current={page === tab.id ? 'page' : undefined}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            const index = tabs.findIndex((item) => item.id === tab.id);
+            const next = tabs[index + (event.key === 'ArrowRight' ? 1 : -1)];
+            if (!next) return;
+            event.preventDefault();
+            event.stopPropagation();
+            navigation.current
+              ?.querySelector<HTMLElement>(`[data-focusable="nav-${next.id}"]`)
+              ?.focus({ preventScroll: true });
+            onChange(next.id);
+          }}
           onClick={() => onChange(tab.id)}
         >
           <span>{t(tab.label)}</span>

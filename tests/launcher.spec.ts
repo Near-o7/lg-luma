@@ -24,6 +24,21 @@ test('home is remote navigable, opening a preview never pretends to launch a TV 
   expect(errors).toEqual([]);
 });
 
+test('Left and Right on focused navigation tabs switch pages immediately', async ({ page }) => {
+  await page.goto('/');
+  const home = page.getByRole('button', { name: 'Home', exact: true });
+  await home.focus();
+  await page.keyboard.press('ArrowRight');
+  const apps = page.getByRole('button', { name: 'Apps', exact: true });
+  await expect(apps).toHaveAttribute('aria-current', 'page');
+  await expect(apps).toBeFocused();
+  await expect(page.locator('main')).toHaveClass(/page-apps/);
+  await page.keyboard.press('ArrowLeft');
+  await expect(home).toHaveAttribute('aria-current', 'page');
+  await expect(home).toBeFocused();
+  await expect(page.locator('main')).toHaveClass(/page-home/);
+});
+
 test('hold OK opens options, favorites persist and hidden apps can be restored', async ({
   page,
 }) => {
@@ -461,7 +476,7 @@ test('navigation pill respects saved and system reduced-motion preferences', asy
   expect(await pill.evaluate((element) => element.getAnimations().length)).toBe(0);
 });
 
-test('card focus stays the same size and navigation outlines have room beside the selected pill', async ({
+test('card focus stays the same size and navigation tabs switch with the remote', async ({
   page,
 }) => {
   await page.goto('/');
@@ -477,17 +492,9 @@ test('card focus stays the same size and navigation outlines have room beside th
   ).toBe('none');
   await page.getByRole('button', { name: 'Home', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('button', { name: 'Apps', exact: true })).toBeFocused();
-  const gap = await page.evaluate(() => {
-    const selected = document.querySelector<HTMLElement>('.nav-item.active')!;
-    const focused = document.activeElement as HTMLElement;
-    const styles = getComputedStyle(focused);
-    return {
-      available: focused.getBoundingClientRect().left - selected.getBoundingClientRect().right,
-      required: parseFloat(styles.outlineWidth) + parseFloat(styles.outlineOffset),
-    };
-  });
-  expect(gap.available).toBeGreaterThan(gap.required);
+  const apps = page.getByRole('button', { name: 'Apps', exact: true });
+  await expect(apps).toBeFocused();
+  await expect(apps).toHaveAttribute('aria-current', 'page');
 });
 
 test('compact library filters can reset, long names wrap, and inputs stay compact', async ({
