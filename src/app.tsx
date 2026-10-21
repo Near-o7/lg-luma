@@ -752,8 +752,8 @@ function Launcher({
               )}
             </div>
             {page === 'settings' ? (
-              <span className="settings-version" aria-label="Luma version 1.0.3">
-                v1.0.3
+              <span className="settings-version" aria-label="Luma version 1.1.0">
+                v1.1.0
               </span>
             ) : null}
           </footer>

@@ -81,7 +81,9 @@ export function WeatherSettings({
           <span>
             <strong>{t('showWidget')}</strong>
           </span>
-          <span className="setting-state">{t(enabled ? 'stateOn' : 'stateOff')}</span>
+          <span className="setting-state" aria-hidden="true">
+            {t(enabled ? 'stateOn' : 'stateOff')}
+          </span>
         </button>
       ) : null}
       {showControls && showTemperature ? (

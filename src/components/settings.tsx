@@ -293,7 +293,7 @@ export function Settings({
                   <span>
                     <strong>{t('showAppNames')}</strong>
                   </span>
-                  <span className="setting-state">
+                  <span className="setting-state" aria-hidden="true">
                     {t(preferences.showHomeAppNames ? 'stateOn' : 'stateOff')}
                   </span>
                 </button>
@@ -341,7 +341,7 @@ export function Settings({
                   <span>
                     <strong>{t('reducedMotion')}</strong>
                   </span>
-                  <span className="setting-state">
+                  <span className="setting-state" aria-hidden="true">
                     {t(preferences.reducedMotion ? 'stateOn' : 'stateOff')}
                   </span>
                 </button>

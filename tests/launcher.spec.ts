@@ -266,7 +266,9 @@ for (const [section, control, selected, first, subpage] of [
 }
 
 for (const section of ['General', 'Background', 'Weather', 'Inputs']) {
-  test(`Back from the ${section} category returns to the Settings tab before Home`, async ({ page }) => {
+  test(`Back from the ${section} category returns to the Settings tab before Home`, async ({
+    page,
+  }) => {
     await page.goto('/');
     const settings = page.getByRole('button', { name: 'Settings', exact: true });
     await settings.click();
@@ -280,7 +282,10 @@ for (const section of ['General', 'Background', 'Weather', 'Inputs']) {
     await pressBack(page, 'TV Back');
     await expect(settings).toBeFocused();
     await pressBack(page, 'Escape');
-    await expect(page.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 }
 
@@ -595,27 +600,23 @@ test('Settings sidebar and content support remote navigation and persistent pref
   await expect(page.locator('[data-focusable="setting-show-weather"]')).toBeVisible();
   await expect(page.getByRole('switch', { name: /Show widget/ })).toBeVisible();
   await page.locator('[data-focusable="settings-section-interface"]').click();
-  await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
-  await page.keyboard.press('ArrowRight');
   await expect(page.locator('[data-focusable="setting-home-app-names"]')).toBeFocused();
-  await page.locator('[data-focusable="setting-home-app-names"]').focus();
   await page.keyboard.press('ArrowDown');
-  await page.locator('[data-focusable="setting-clock-format"]').focus();
+  await expect(page.locator('[data-focusable="setting-clock-format"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('[data-focusable="clock-format-option-12"]')).toBeFocused();
   await page.locator('[data-focusable="clock-format-option-24"]').click();
   await expect(page.locator('[data-focusable="setting-clock-format"]')).toContainText('24-hour');
   await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('[data-focusable="settings-section-weather"]')).toBeFocused();
-  await page.keyboard.press('ArrowUp');
-  await page.keyboard.press('ArrowUp');
   await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('switch', { name: 'Show app names', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Background', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Monument Valley', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Summit', exact: true }).click();
-  await page.locator('[data-focusable="setting-clock-format"]').focus();
-  await page.keyboard.press('ArrowRight');
-  await page.locator('[data-focusable="clock-format-option-24"]').click();
+  await page.getByRole('button', { name: 'General', exact: true }).click();
+  await expect(page.locator('[data-focusable="setting-home-app-names"]')).toBeFocused();
+  await expect(page.locator('[data-focusable="setting-clock-format"]')).toContainText('24-hour');
   await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();
   await page.screenshot({ path: info.outputPath('luma-settings.png') });
   await page.keyboard.press('Escape');
