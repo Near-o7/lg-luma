@@ -1,6 +1,7 @@
 import type { Preferences } from './types';
 import { parseLocation } from './weather';
 import { wallpapers } from './wallpapers';
+import { parseInputVisibility } from './inputs';
 
 export const STORAGE_KEY = 'luma.preferences.v1';
 export const defaults: Preferences = {
@@ -16,6 +17,7 @@ export const defaults: Preferences = {
   temperatureUnit: 'celsius',
   language: 'en',
   weatherLocation: null,
+  inputVisibility: {},
 };
 
 const ids = (value: unknown): string[] =>
@@ -48,6 +50,7 @@ export function parsePreferences(raw: string | null): Preferences {
       temperatureUnit: value.temperatureUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius',
       language: value.language === 'de' || value.language === 'zh' ? value.language : 'en',
       weatherLocation: parseLocation(value.weatherLocation),
+      inputVisibility: parseInputVisibility(value.inputVisibility),
     };
   } catch {
     return { ...defaults };

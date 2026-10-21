@@ -15,7 +15,7 @@ pnpm test:browser
 
 `pnpm check` runs Oxlint and TypeScript. Run `pnpm lint:fix` to apply automatic lint fixes. Oxlint checks TypeScript, React, hooks, and accessibility rules; generated output is excluded. Formatting uses Oxfmt: `pnpm format` writes formatting changes and `pnpm format:check` verifies them.
 
-Build before running browser tests so packaged `file://` tests exercise the current code. Browser checks cover remote navigation, hold-OK options, favorites, settings, search, persistence, focus restoration, weather configuration, temperature units, caching, and TV-service failure behavior with a mock bridge. Weather APIs are mocked; tests do not connect to a TV. On Linux, install Chromium's dependencies with `pnpm exec playwright install --with-deps chromium`.
+Build before running browser tests so packaged `file://` tests exercise the current code. Browser checks cover remote navigation, hold-OK options, favorites, settings, input visibility modes, search, persistence, focus restoration, weather configuration, temperature units, caching, and TV-service failure behavior with a mock bridge. Weather APIs are mocked; tests do not connect to a TV. On Linux, install Chromium's dependencies with `pnpm exec playwright install --with-deps chromium`.
 
 ## Structure
 
@@ -61,32 +61,42 @@ Gallery previews use clipped image elements with an inset border, avoiding repea
 
 ## Remote and pointer controls
 
-| Input                  | Action                                                   |
-| ---------------------- | -------------------------------------------------------- |
-| Arrow keys             | Spatial navigation between tiles and controls            |
-| OK / Enter             | Open the focused app, input, or control                  |
-| Hold OK                | Home favorite: move mode; library app: options           |
-| Menu / right-click / M | Options for the focused app                              |
-| Back / Escape          | Close the current panel; return from Apps/Inputs to Home |
-| Back on Home           | webOS's normal platform Back behavior                    |
-| Magic Remote pointer   | Point, click, or hold a tile for options                 |
+| Input                  | Action                                                     |
+| ---------------------- | ---------------------------------------------------------- |
+| Arrow keys             | Spatial navigation between tiles and controls              |
+| OK / Enter             | Open the focused app, input, or control                    |
+| Hold OK                | Home favorite: move mode; library app: options             |
+| Menu / right-click / M | Options for the focused app                                |
+| Back / Escape          | Close the current panel; return from Apps/Settings to Home |
+| Back on Home           | webOS's normal platform Back behavior                      |
+| Magic Remote pointer   | Point, click, or hold a tile for options                   |
+
+From the top navigation, Down enters Home at the first visible favorite, Apps at the first matching app, and Settings at General. Empty Home enters its primary action; Apps with no matching results enters the first category. In Background settings, Left/Right step through backgrounds in gallery order; Left from the first column returns to the section list, and OK applies the focused background. Up/Down follow the gallery columns, and Back returns focus to the Background category.
+
+Repeated Up returns to the active top navigation tab before other header controls. Settings subpages use Left or Back to return to the parent setting and restore its focus, without a visible Back button. Up from the first option goes to the Settings tab. The app search and city/postcode fields let Up/Left move focus out of the field; Left from app search enters Hidden when available, otherwise Utilities, and Left from the location query returns to its parent setting. Up from the first app enters the first category.
+
+Back from a Settings sidebar category focuses the Settings navigation tab while keeping Settings open. Back again from that tab returns Home.
+
+Back from the Apps search field or its clear button clears the query and focuses the Apps tab while keeping the library open. Back again from that tab returns Home.
 
 On Home, hold OK on a favorite to enter move mode, press Left/Right to change its position, then press Back to finish. The new order is saved immediately and the selected app stays focused. Apps → select an app → hold OK to add/remove favorites or hide apps. The action menu shows the app name and category, and closes after either action. Favorites have a filled-heart badge and sort first in the saved Home order; other apps sort alphabetically. Hidden apps remain installed and can be restored from the **Hidden (count)** category pill, which shows only hidden apps. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
 
-Home shows Favorites and Inputs without a recent-app section or permanent control hints. App names beneath Home cards are hidden by default; enable **Settings → Interface → Show app names on Home** to display them. The Apps library always shows names. The header clock is at the top left.
+Home shows Favorites and Inputs without a recent-app section or permanent control hints. App names beneath Home cards are hidden by default; enable **Settings → General → Show app names** to display them. The Apps library always shows names. The header clock is at the top left.
 
-The top navigation includes a full-page **Settings** view, with **Background** on the left and **Interface** above **Weather** on the right. The sliders icon at the top right opens **TV settings** directly. Interface controls Home app names, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings. The moon button in the footer opens the ambient clock on the other pages.
+The top navigation contains **Home**, **Apps**, and a full-page **Settings** view. Settings has sidebar sections for **General**, **Background**, **Weather**, and **Inputs**. The sliders icon at the top right opens **TV settings** directly. General controls Home app names, 12/24-hour time, reduced motion, and refresh. Back returns to Home, and the version number appears at the bottom right of Settings.
 
-The nine bundled backgrounds are Slate, Midnight, Prism (saturated red, yellow, and purple), Monument Valley, San Francisco, Summit, Forest, Yosemite, and Northern lights. From the Settings tab, Down enters Interface and continues into Weather; Left reaches the background gallery.
+Inputs are launched from Home and configured in **Settings → Inputs**. Every detected physical input has a submenu with **On** (always show), **Off** (never show), and **Auto** (show only when the TV reports it connected). Auto is the default; an unknown connection state is not treated as connected. All detected inputs remain in Settings, including hidden and disconnected ones. Choices are saved by the input's stable app ID, so renaming a device keeps its mode. Home shows every eligible input without a three-card limit. **Refresh inputs** updates the inventory and connection states; partial read failures retain the last valid inputs and saved choices.
+
+The nine bundled backgrounds are Slate, Midnight, Prism (saturated red, yellow, and purple), Monument Valley, San Francisco, Summit, Forest, Yosemite, and Northern lights. From the Settings tab, Down enters General; use the sidebar to reach Background, Weather, or Inputs, then Right to enter that section.
 
 Apple TV, Prime Video, Disney+, Jellyfin, Netflix, YouTube, ARTE, ZDF, and Das Erste use bundled SVG logos. Input cards choose connection artwork from the reported device name: PlayStation and Apple TV use their supplied marks, USB uses the USB symbol, unnamed HDMI ports use an HDMI connector, and other devices use a suitable generic icon. Icon selection does not change the input's launch target.
 
 ## Weather
 
-Open **Settings → Weather**, enter a city or postcode, press Search, and select the matching place. **Show widget** controls visibility on Home and the ambient screen; turning it off keeps your saved city. Choose **°C** or **°F** under **Temperature** to save your preferred unit for both screens. Switching units converts the cached reading immediately without another weather request. When enabled, the widget shows the chosen city, temperature, and current conditions. Nothing uses browser geolocation or automatic IP-based location lookup.
+Open **Settings → Weather**, enter a city or postcode, press Search, and select the matching place. **Show widget** controls visibility on Home; turning it off keeps your saved city. Choose **°C** or **°F** under **Temperature** to save your preferred unit. Switching units converts the cached reading immediately without another weather request. When enabled, the widget shows the chosen city, temperature, and current conditions. Nothing uses browser geolocation or automatic IP-based location lookup.
 
 Back while editing the city/postcode field leaves the field and keeps Settings open. Press Back again from a button to return Home.
 
-Weather refreshes every 15 minutes while Home or the ambient clock is visible. The ambient clock shows weather in place of the return hint when a location is configured. Recent readings are cached locally and reused after reopening the app. If the connection fails, an available cached reading is labeled as saved; otherwise the widget says weather is unavailable. Remove the weather location in Settings to turn it off. API and cached temperatures stay in Celsius; `formatTemperature` converts the unrounded value for display.
+Weather refreshes every 15 minutes while Home is visible. Recent readings are cached locally and reused after reopening the app. If the connection fails, an available cached reading is labeled as saved; otherwise the widget says weather is unavailable. Remove the weather location in Settings to turn it off. API and cached temperatures stay in Celsius; `formatTemperature` converts the unrounded value for display.
 
 Location search calls `geocoding-api.open-meteo.com`, and weather calls `api.open-meteo.com`. Those are the only network origins allowed by the packaged app's Content Security Policy. No API key or account is required. Data attribution: [Open-Meteo](https://open-meteo.com/) / [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

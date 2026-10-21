@@ -17,12 +17,11 @@ try {
   await page.screenshot({ path: path.join(directory, 'home.png') });
   for (const [name, action] of [
     ['apps', () => page.getByRole('button', { name: 'Apps', exact: true }).click()],
-    ['inputs', () => page.getByRole('button', { name: 'Inputs', exact: true }).click()],
     ['settings', () => page.getByRole('button', { name: 'Settings', exact: true }).click()],
+    ['inputs', () => page.getByRole('button', { name: 'Inputs', exact: true }).click()],
   ]) {
     await action();
     await page.mouse.move(1, 1);
-    if (name === 'inputs') await page.locator('.input-card').first().focus();
     await page.waitForTimeout(500);
     await page.screenshot({ path: path.join(directory, `${name}.png`) });
   }

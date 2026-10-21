@@ -1,4 +1,4 @@
-export type Page = 'home' | 'apps' | 'inputs' | 'settings';
+export type Page = 'home' | 'apps' | 'settings';
 export type Wallpaper =
   | 'dunes'
   | 'san-francisco'
@@ -12,6 +12,7 @@ export type Wallpaper =
 export type Category = 'Streaming' | 'Music' | 'Gaming' | 'Utilities';
 export type TemperatureUnit = 'celsius' | 'fahrenheit';
 export type Language = 'en' | 'de' | 'zh';
+export type InputVisibility = 'on' | 'off' | 'auto';
 
 export interface TVApp {
   id: string;
@@ -41,6 +42,7 @@ export interface Preferences {
   temperatureUnit: TemperatureUnit;
   language: Language;
   weatherLocation: WeatherLocation | null;
+  inputVisibility: Record<string, InputVisibility>;
 }
 
 export interface WeatherLocation {

@@ -5,7 +5,28 @@ A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity
 > [!NOTE]
 > Tested on **LG OLED55C57** running **webOS 26**.
 
-![Luma home screen, desktop preview](docs/home.png)
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Home</strong><br>
+      <img src="docs/home.png" alt="Luma Home screen, desktop preview">
+    </td>
+    <td width="50%" align="center">
+      <strong>Apps</strong><br>
+      <img src="docs/apps.png" alt="Luma Apps library, desktop preview">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Settings</strong><br>
+      <img src="docs/settings.png" alt="Luma Settings, desktop preview">
+    </td>
+    <td width="50%" align="center">
+      <strong>Inputs</strong><br>
+      <img src="docs/inputs.png" alt="Luma input settings, desktop preview">
+    </td>
+  </tr>
+</table>
 
 ## Install
 
@@ -28,7 +49,7 @@ Download the `.ipk` from the [latest release](https://github.com/ecklf/lg-luma/r
 You can also install over SSH. Replace `TV_IP` with your TV's address and use the filename you downloaded:
 
 ```sh
-scp -O com.luma.launcher_1.0.1_all.ipk root@TV_IP:/tmp/luma.ipk
+scp -O com.luma.launcher_1.1.0_all.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -40,6 +61,16 @@ luna-send -i luna://com.webos.appInstallService/dev/install \
 ```
 
 Wait for the installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma after updating.
+
+## Inputs on Home
+
+Open **Settings → Inputs** and select an input to choose when it appears on Home:
+
+- **On** — always show it.
+- **Off** — never show it.
+- **Auto** — show it only when the TV reports it connected (the default).
+
+Choices are saved per input. Hidden and disconnected inputs remain available in Settings, and **Refresh inputs** updates the detected devices and their connection states.
 
 ## Optional: open at boot
 
@@ -111,7 +142,7 @@ Open **http://127.0.0.1:5173**. The browser preview uses sample apps and inputs;
 pnpm run package
 ```
 
-Output: `dist/com.luma.launcher_1.0.1_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
+Output: `dist/com.luma.launcher_1.1.0_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
 
 Photographs, fonts, and app-logo SVGs are bundled locally. `pnpm assets` prepares them again if deliberately removed; normal builds and TV use need no asset downloads.
 
@@ -119,7 +150,7 @@ To deploy a local build, register your TV's root SSH connection with `pnpm exec 
 
 ### Releases
 
-GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. After a successful build on `main`, CI publishes a new app version with its IPK, checksum, icon, and Homebrew feed. The version tag (for example, `v1.0.1`) is created automatically at the tested commit.
+GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. After a successful build on `main`, CI publishes a new app version with its IPK, checksum, icon, and Homebrew feed. The version tag (for example, `v1.1.0`) is created automatically at the tested commit.
 
 For each release, update the version in both `package.json` and `appinfo.json`, then merge to `main`. Already-published versions are skipped. To retry a failed run, use **Actions → CI → Run workflow** on `main`.
 

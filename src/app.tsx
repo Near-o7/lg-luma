@@ -6,12 +6,10 @@ import {
   Grid2X2,
   Heart,
   LoaderCircle,
-  Moon,
   MoreHorizontal,
   Search,
   Settings2,
   Sparkles,
-  Tv,
   X,
 } from 'lucide-react';
 import { AppTile } from './components/app-tile';
@@ -19,7 +17,7 @@ import { InputCard } from './components/input-card';
 import { Settings } from './components/settings';
 import { AppOptions } from './components/app-options';
 import { Weather } from './components/weather';
-import { AmbientClock, Clock, Greeting } from './components/clock';
+import { Clock, Greeting } from './components/clock';
 import { Navigation } from './components/navigation';
 import { defaultFavorites, sortApps } from './catalog';
 import { isTV, launchApp, loadInventory, platformBack } from './bridge';
@@ -27,6 +25,7 @@ import { moveFocus, type Direction } from './navigation';
 import { loadPreferences, savePreferences } from './storage';
 import { wallpapers } from './wallpapers';
 import { moveFavorite } from './favorites';
+import { visibleInputs } from './inputs';
 import type { Category, Inventory, Page, Preferences, TVApp, TVInput } from './types';
 import { categoryLabel, LanguageProvider, useTranslation } from './i18n';
 
@@ -67,13 +66,11 @@ function Launcher({
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category | null>(null);
   const [showHidden, setShowHidden] = useState(false);
-  const [ambient, setAmbient] = useState(false);
   const [launching, setLaunching] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const pendingLaunch = useRef(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reloadVersion = useRef(0);
-  const wasAmbient = useRef(false);
   const lastReordering = useRef<string | null>(null);
   const refreshing = useRef(false);
   const reducedMotion = preferences.reducedMotion;
@@ -93,6 +90,10 @@ function Launcher({
         return app && !hiddenIds.has(id) ? [app] : [];
       }),
     [favoriteIds, appMap, hiddenIds],
+  );
+  const homeInputs = useMemo(
+    () => visibleInputs(inventory.inputs, preferences.inputVisibility),
+    [inventory.inputs, preferences.inputVisibility],
   );
   const hiddenCount = useMemo(
     () => inventory.apps.filter((app) => hiddenIds.has(app.id)).length,
@@ -175,11 +176,6 @@ function Launcher({
   }, [loading, page]);
 
   useLayoutEffect(() => {
-    if (wasAmbient.current && !ambient) focusFirstApp();
-    wasAmbient.current = ambient;
-  }, [ambient]);
-
-  useLayoutEffect(() => {
     const id = reordering ?? lastReordering.current;
     if (id) {
       const card = [
@@ -198,6 +194,12 @@ function Launcher({
     setCategory(null);
     setShowHidden(false);
     document.querySelector('main')?.scrollTo({ top: 0 });
+    if (next === 'settings')
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>('[data-focusable="settings-section-interface"]')
+          ?.focus({ preventScroll: true }),
+      );
   }, []);
 
   const onLaunch = useCallback(
@@ -252,27 +254,37 @@ function Launcher({
     options: () => void;
     hold: () => void;
     reorder: (key: string) => boolean;
-    wake: () => boolean;
   }>({
     back: () => {},
     options: () => {},
     hold: () => {},
     reorder: () => false,
-    wake: () => false,
   });
   useLayoutEffect(() => {
     actions.current = {
       back: () => {
-        if (ambient) {
-          setAmbient(false);
-          return;
-        }
         if (reordering) {
           setReordering(null);
           return;
         }
         if (optionsApp) {
           setOptionsApp(null);
+          return;
+        }
+        if (
+          page === 'settings' &&
+          document.activeElement?.getAttribute('data-focusable')?.startsWith('settings-section-')
+        ) {
+          document
+            .querySelector<HTMLElement>('[data-focusable="nav-settings"]')
+            ?.focus({ preventScroll: true });
+          return;
+        }
+        if (page === 'apps' && document.activeElement?.closest('.library-toolbar .search-field')) {
+          setQuery('');
+          document
+            .querySelector<HTMLElement>('[data-focusable="nav-apps"]')
+            ?.focus({ preventScroll: true });
           return;
         }
         if (query) {
@@ -304,11 +316,6 @@ function Launcher({
           shiftFavorite(reordering, key === 'ArrowLeft' ? -1 : 1);
         return true;
       },
-      wake: () => {
-        if (!ambient) return false;
-        setAmbient(false);
-        return true;
-      },
     };
   });
 
@@ -323,10 +330,6 @@ function Launcher({
       ArrowDown: 'down',
     };
     const onDown = (event: KeyboardEvent) => {
-      if (actions.current.wake()) {
-        event.preventDefault();
-        return;
-      }
       const editable = event.target instanceof HTMLInputElement;
       if (
         event.key === 'Escape' ||
@@ -358,7 +361,13 @@ function Launcher({
       const languageOption = (event.target as HTMLElement | null)?.dataset.focusable?.startsWith(
         'language-option-',
       );
-      if (editable && event.key !== 'ArrowDown') return;
+      if (
+        editable &&
+        event.key !== 'ArrowDown' &&
+        event.key !== 'ArrowUp' &&
+        event.key !== 'ArrowLeft'
+      )
+        return;
       if (languageOption && event.key.startsWith('Arrow')) {
         event.preventDefault();
         moveFocus(directions[event.key]);
@@ -426,369 +435,330 @@ function Launcher({
     />
   );
   const wallpaper = wallpapers.find((item) => item.id === preferences.wallpaper) ?? wallpapers[0];
+  const pageEntryFocus: Record<Page, string> = {
+    home: favorites[0]
+      ? `favorite-${favorites[0].id}`
+      : error && !inventory.apps.length
+        ? 'retry'
+        : 'browse-apps',
+    apps: filteredApps[0] ? `library-${filteredApps[0].id}` : 'filter-Streaming',
+    settings: 'settings-section-interface',
+  };
 
   return (
-    <div className={`luma${reducedMotion ? ' reduce-motion' : ''}${ambient ? ' is-ambient' : ''}`}>
+    <div className={`luma${reducedMotion ? ' reduce-motion' : ''}`}>
       <div className="landscape-fallback" />
       <div
         className={`wallpaper wallpaper-${preferences.wallpaper}`}
         style={{ backgroundImage: `url('./wallpapers/${wallpaper.image}')` }}
       />
       <div className="wallpaper-shade" />
-      {ambient ? (
-        <button
-          className="ambient-screen"
-          aria-label={t('returnLuma')}
-          onClick={() => setAmbient(false)}
-          onPointerMove={() => setAmbient(false)}
-        >
-          <AmbientClock clock24={preferences.clock24} language={language} />
-          <span className="ambient-hint">
-            {preferences.showWeather && preferences.weatherLocation ? (
-              <Weather location={preferences.weatherLocation} unit={preferences.temperatureUnit} />
-            ) : (
-              t('pressToReturn')
-            )}
-          </span>
-        </button>
-      ) : (
-        <div className="shell">
-          <header
-            className="header"
-            data-focus-down={
-              page === 'settings'
-                ? document.activeElement
-                    ?.getAttribute('data-focusable')
-                    ?.startsWith('language-option-')
-                  ? undefined
-                  : 'setting-home-app-names'
-                : undefined
-            }
-          >
-            <Clock clock24={preferences.clock24} language={language} />
-            <Navigation page={page} onChange={openPage} />
-            <div className="header-right">
-              <button
-                className="icon-button settings-button"
-                data-focusable="tv-settings"
-                aria-label={t('tvSettings')}
-                title={t('tvSettings')}
-                onClick={() =>
-                  void onLaunch({
-                    id: 'com.palm.app.settings',
-                    title: 'TV settings',
-                    category: 'Utilities',
-                    brand: 'settings',
-                  })
-                }
-              >
-                <Settings2 strokeWidth={1.8} />
-              </button>
-            </div>
-          </header>
-          <main className={`main page-${page}`}>
-            {page === 'home' ? (
-              <>
-                <section className="hero" aria-labelledby="greeting">
-                  <div className="hero-copy">
-                    <Greeting language={language} />
-                    {preferences.showWeather ? (
-                      <Weather
-                        location={preferences.weatherLocation}
-                        unit={preferences.temperatureUnit}
-                        onConfigure={() => {
-                          openPage('settings');
+      <div className="shell">
+        <header className="header" data-focus-down={pageEntryFocus[page]}>
+          <Clock clock24={preferences.clock24} language={language} />
+          <Navigation page={page} onChange={openPage} />
+          <div className="header-right">
+            <button
+              className="icon-button settings-button"
+              data-focusable="tv-settings"
+              aria-label={t('tvSettings')}
+              title={t('tvSettings')}
+              onClick={() =>
+                void onLaunch({
+                  id: 'com.palm.app.settings',
+                  title: 'TV settings',
+                  category: 'Utilities',
+                  brand: 'settings',
+                })
+              }
+            >
+              <Settings2 strokeWidth={1.8} />
+            </button>
+          </div>
+        </header>
+        <main className={`main page-${page}`} data-focus-exit-up={`nav-${page}`}>
+          {page === 'home' ? (
+            <>
+              <section className="hero" aria-labelledby="greeting">
+                <div className="hero-copy">
+                  <Greeting language={language} />
+                  {preferences.showWeather ? (
+                    <Weather
+                      location={preferences.weatherLocation}
+                      unit={preferences.temperatureUnit}
+                      onConfigure={() => {
+                        openPage('settings');
+                        requestAnimationFrame(() => {
+                          const section = document.querySelector<HTMLElement>(
+                            '[data-focusable="settings-section-weather"]',
+                          );
+                          section?.focus({ preventScroll: true });
+                          section?.click();
                           requestAnimationFrame(() => {
-                            const field = document.querySelector<HTMLElement>(
-                              '[data-focusable="weather-location-query"]',
+                            const location = document.querySelector<HTMLElement>(
+                              '[data-focusable="setting-weather-location"]',
                             );
-                            field?.focus({ preventScroll: true });
-                            field?.scrollIntoView({ block: 'nearest' });
+                            location?.focus({ preventScroll: true });
+                            location?.click();
+                            requestAnimationFrame(() => {
+                              const field = document.querySelector<HTMLElement>(
+                                '[data-focusable="weather-location-query"]',
+                              );
+                              field?.focus({ preventScroll: true });
+                              field?.scrollIntoView({ block: 'nearest' });
+                            });
                           });
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                </section>
-                <section className="favorites-section" aria-labelledby="favorites-heading">
-                  <div className="section-heading">
-                    <h2 id="favorites-heading">{t('favorites')}</h2>
-                    {reordering ? (
-                      <span className="reorder-status" role="status">
-                        {t('moveApps')}
-                      </span>
-                    ) : null}
-                  </div>
-                  {loading && !inventory.apps.length ? (
-                    <div className="app-grid skeleton-grid" aria-label={t('findingApps')}>
-                      {Array.from({ length: 6 }, (_, index) => (
-                        <div className="skeleton" key={index} />
-                      ))}
-                    </div>
-                  ) : error && !inventory.apps.length ? (
-                    <div className="empty-state">
-                      <CircleAlert />
-                      <h3>{t('aLittleHelp')}</h3>
-                      <p>{error}</p>
-                      <button
-                        className="primary-button"
-                        data-focusable="retry"
-                        onClick={() => void refresh()}
-                      >
-                        {t('retry')} <ArrowRight size={18} />
-                      </button>
-                    </div>
-                  ) : favorites.length ? (
-                    <div
-                      className={`app-grid favorites-grid${preferences.showHomeAppNames ? '' : ' hide-app-labels'}${reordering ? ' is-reordering' : ''}`}
-                    >
-                      {favorites.map((app) => renderTile(app, 'favorite'))}
-                    </div>
-                  ) : (
-                    <div className="empty-state empty-favorites">
-                      <Heart />
-                      <h3>{t('makeFavorites')}</h3>
-                      <p>{t('pinHint')}</p>
-                      <button
-                        className="primary-button"
-                        data-focusable="browse-apps"
-                        onClick={() => openPage('apps')}
-                      >
-                        {t('exploreApps')} <ArrowRight size={18} />
-                      </button>
-                    </div>
-                  )}
-                </section>
-                {inventory.inputs.length ? (
-                  <section className="home-inputs" aria-labelledby="inputs-heading">
-                    <div className="section-heading">
-                      <h2 id="inputs-heading">{t('inputsHeading')}</h2>
-                    </div>
-                    <div className="input-grid home-input-grid">
-                      {inventory.inputs.slice(0, 3).map((input) => (
-                        <InputCard key={input.id} input={input} onLaunch={onLaunch} />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-              </>
-            ) : null}
-            {page === 'apps' ? (
-              <>
-                <h1 className="sr-only">{t('apps')}</h1>
-                <div className="library-toolbar" data-focus-scroll-top="true">
-                  <div className="filter-tabs" aria-label={t('appCategories')}>
-                    {categories.map((item) => (
-                      <button
-                        key={item}
-                        className={`filter-tab${category === item ? ' selected' : ''}`}
-                        data-focusable={`filter-${item}`}
-                        aria-pressed={category === item}
-                        onClick={() => {
-                          setShowHidden(false);
-                          setCategory((current) => (current === item ? null : item));
-                        }}
-                      >
-                        {categoryLabel(language, item)}
-                      </button>
-                    ))}
-                    {hiddenCount ? (
-                      <button
-                        className={`filter-tab${showHidden ? ' selected' : ''}`}
-                        data-focusable="filter-hidden"
-                        aria-pressed={showHidden}
-                        onClick={() => {
-                          setCategory(null);
-                          setShowHidden((current) => !current);
-                        }}
-                      >
-                        {t('hidden', { count: hiddenCount })}
-                      </button>
-                    ) : null}
-                    {category || showHidden ? (
-                      <button
-                        className="filter-clear icon-button"
-                        data-focusable="filter-clear"
-                        aria-label={t('dismissSearch')}
-                        onClick={() => {
-                          setCategory(null);
-                          setShowHidden(false);
-                        }}
-                      >
-                        <X size={16} />
-                      </button>
-                    ) : null}
-                  </div>
-                  <label className="search-field">
-                    <Search size={21} />
-                    <input
-                      aria-label={t('findApp')}
-                      data-focusable="search"
-                      type="search"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder={t('findApp')}
-                      autoComplete="off"
+                        });
+                      }}
                     />
-                    {query ? (
-                      <button
-                        data-focusable="search-clear"
-                        aria-label={t('clearCategory')}
-                        onClick={() => setQuery('')}
-                      >
-                        <X size={18} />
-                      </button>
-                    ) : null}
-                  </label>
+                  ) : null}
                 </div>
-                {filteredApps.length ? (
-                  <div className="app-grid library-grid">
-                    {filteredApps.map((app) => (
-                      <div
-                        className={preferences.hidden.includes(app.id) ? 'hidden-app' : ''}
-                        key={app.id}
-                      >
-                        {renderTile(app, 'library', favoriteIds.includes(app.id))}
-                      </div>
+              </section>
+              <section className="favorites-section" aria-labelledby="favorites-heading">
+                <div className="section-heading">
+                  <h2 id="favorites-heading">{t('favorites')}</h2>
+                  {reordering ? (
+                    <span className="reorder-status" role="status">
+                      {t('moveApps')}
+                    </span>
+                  ) : null}
+                </div>
+                {loading && !inventory.apps.length ? (
+                  <div className="app-grid skeleton-grid" aria-label={t('findingApps')}>
+                    {Array.from({ length: 6 }, (_, index) => (
+                      <div className="skeleton" key={index} />
                     ))}
                   </div>
-                ) : (
+                ) : error && !inventory.apps.length ? (
                   <div className="empty-state">
-                    <Grid2X2 />
-                    <h3>
-                      {loading
-                        ? t('findingApps')
-                        : query
-                          ? t('noMatches')
-                          : showHidden
-                            ? t('noHidden')
-                            : t('roomForNew')}
-                    </h3>
-                    <p>
-                      {error ||
-                        (query
-                          ? t('noMatchesHint', { query })
-                          : showHidden
-                            ? t('hiddenHint')
-                            : t('noCategoryApps'))}
-                    </p>
-                    {error ? (
-                      <button
-                        className="primary-button"
-                        data-focusable="library-retry"
-                        onClick={() => void refresh()}
-                      >
-                        {t('retry')}
-                      </button>
-                    ) : null}
-                  </div>
-                )}
-              </>
-            ) : null}
-            {page === 'inputs' ? (
-              <>
-                <h1 className="sr-only">{t('inputs')}</h1>
-                {inventory.inputs.length ? (
-                  <div className="input-grid full-input-grid">
-                    {inventory.inputs.map((input) => (
-                      <InputCard key={input.id} input={input} onLaunch={onLaunch} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    <Tv />
-                    <h3>{loading ? t('findingInputs') : t('noInputs')}</h3>
-                    <p>{inventory.warnings[0] || t('physicalInputs')}</p>
+                    <CircleAlert />
+                    <h3>{t('aLittleHelp')}</h3>
+                    <p>{error}</p>
                     <button
                       className="primary-button"
-                      data-focusable="inputs-retry"
+                      data-focusable="retry"
                       onClick={() => void refresh()}
                     >
-                      {t('refreshInputs')}
+                      {t('retry')} <ArrowRight size={18} />
+                    </button>
+                  </div>
+                ) : favorites.length ? (
+                  <div
+                    className={`app-grid favorites-grid${preferences.showHomeAppNames ? '' : ' hide-app-labels'}${reordering ? ' is-reordering' : ''}`}
+                  >
+                    {favorites.map((app) => renderTile(app, 'favorite'))}
+                  </div>
+                ) : (
+                  <div className="empty-state empty-favorites">
+                    <Heart />
+                    <h3>{t('makeFavorites')}</h3>
+                    <p>{t('pinHint')}</p>
+                    <button
+                      className="primary-button"
+                      data-focusable="browse-apps"
+                      onClick={() => openPage('apps')}
+                    >
+                      {t('exploreApps')} <ArrowRight size={18} />
                     </button>
                   </div>
                 )}
-              </>
-            ) : null}
-            {page === 'settings' ? (
-              <Settings
-                preferences={preferences}
-                onUpdate={update}
-                onRefresh={() => {
-                  void refresh();
-                  notify(t('refreshNotice'));
-                }}
-              />
-            ) : null}
-            {error && inventory.apps.length ? (
-              <div className="inventory-warning">
-                <CircleAlert size={18} />
-                <span>{error}</span>
-                <button data-focusable="refresh-error" onClick={() => void refresh()}>
-                  {t('retry')}
-                </button>
+              </section>
+              {homeInputs.length ? (
+                <section className="home-inputs" aria-labelledby="inputs-heading">
+                  <div className="section-heading">
+                    <h2 id="inputs-heading">{t('inputsHeading')}</h2>
+                  </div>
+                  <div className="input-grid home-input-grid">
+                    {homeInputs.map((input) => (
+                      <InputCard key={input.id} input={input} onLaunch={onLaunch} />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
+          ) : null}
+          {page === 'apps' ? (
+            <>
+              <h1 className="sr-only">{t('apps')}</h1>
+              <div className="library-toolbar" data-focus-scroll-top="true">
+                <div className="filter-tabs" aria-label={t('appCategories')}>
+                  {categories.map((item) => (
+                    <button
+                      key={item}
+                      className={`filter-tab${category === item ? ' selected' : ''}`}
+                      data-focusable={`filter-${item}`}
+                      aria-pressed={category === item}
+                      onClick={() => {
+                        setShowHidden(false);
+                        setCategory((current) => (current === item ? null : item));
+                      }}
+                    >
+                      {categoryLabel(language, item)}
+                    </button>
+                  ))}
+                  {hiddenCount ? (
+                    <button
+                      className={`filter-tab${showHidden ? ' selected' : ''}`}
+                      data-focusable="filter-hidden"
+                      aria-pressed={showHidden}
+                      onClick={() => {
+                        setCategory(null);
+                        setShowHidden((current) => !current);
+                      }}
+                    >
+                      {t('hidden', { count: hiddenCount })}
+                    </button>
+                  ) : null}
+                  {category || showHidden ? (
+                    <button
+                      className="filter-clear icon-button"
+                      data-focusable="filter-clear"
+                      aria-label={t('dismissSearch')}
+                      onClick={() => {
+                        setCategory(null);
+                        setShowHidden(false);
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : null}
+                </div>
+                <label className="search-field">
+                  <Search size={21} />
+                  <input
+                    aria-label={t('findApp')}
+                    data-focusable="search"
+                    data-focus-up="nav-apps"
+                    data-focus-left={hiddenCount ? 'filter-hidden' : 'filter-Utilities'}
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={t('findApp')}
+                    autoComplete="off"
+                  />
+                  {query ? (
+                    <button
+                      data-focusable="search-clear"
+                      aria-label={t('clearCategory')}
+                      onClick={() => setQuery('')}
+                    >
+                      <X size={18} />
+                    </button>
+                  ) : null}
+                </label>
               </div>
-            ) : null}
-          </main>
-          <footer className="footer">
-            {reordering || page !== 'home' ? (
-              <div className="remote-hints" id={reordering ? 'reorder-instructions' : undefined}>
-                {reordering ? (
-                  <>
-                    <span>
-                      <span className="keycap">← →</span>
-                      {t('move')}
-                    </span>
-                    <span>
-                      <span className="keycap">Back</span>
-                      {t('done')}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      <span className="keycap keycap-ok">OK</span>
-                      {page === 'settings' ? t('select') : t('open')}
-                    </span>
-                    <span>
-                      {page === 'settings' ? (
-                        <>
-                          <span className="keycap">Back</span>
-                          {t('homeLabel')}
-                        </>
-                      ) : (
-                        <>
-                          <MoreHorizontal size={19} />
-                          {t('options')}
-                        </>
-                      )}
-                    </span>
-                  </>
-                )}
-              </div>
-            ) : null}
-            <div className="footer-right">
-              {page === 'settings' ? (
-                <span className="settings-version" aria-label="Luma version 1.0.3">
-                  v1.0.3
-                </span>
+              {filteredApps.length ? (
+                <div className="app-grid library-grid">
+                  {filteredApps.map((app, index) => (
+                    <div
+                      className={preferences.hidden.includes(app.id) ? 'hidden-app' : ''}
+                      key={app.id}
+                      data-focus-up={index === 0 ? 'filter-Streaming' : undefined}
+                    >
+                      {renderTile(app, 'library', favoriteIds.includes(app.id))}
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <button
-                  className="ambient-button"
-                  data-focusable="ambient"
-                  aria-label={t('ambientMode')}
-                  onClick={() => {
-                    setReordering(null);
-                    setAmbient(true);
-                  }}
-                >
-                  <Moon size={19} />
-                </button>
+                <div className="empty-state">
+                  <Grid2X2 />
+                  <h3>
+                    {loading
+                      ? t('findingApps')
+                      : query
+                        ? t('noMatches')
+                        : showHidden
+                          ? t('noHidden')
+                          : t('roomForNew')}
+                  </h3>
+                  <p>
+                    {error ||
+                      (query
+                        ? t('noMatchesHint', { query })
+                        : showHidden
+                          ? t('hiddenHint')
+                          : t('noCategoryApps'))}
+                  </p>
+                  {error ? (
+                    <button
+                      className="primary-button"
+                      data-focusable="library-retry"
+                      onClick={() => void refresh()}
+                    >
+                      {t('retry')}
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </>
+          ) : null}
+          {page === 'settings' ? (
+            <Settings
+              preferences={preferences}
+              inputs={inventory.inputs}
+              inputsLoading={loading}
+              inputsWarning={inventory.warnings[0]}
+              onUpdate={update}
+              onRefresh={() => {
+                void refresh();
+                notify(t('refreshNotice'));
+              }}
+            />
+          ) : null}
+          {error && inventory.apps.length ? (
+            <div className="inventory-warning">
+              <CircleAlert size={18} />
+              <span>{error}</span>
+              <button data-focusable="refresh-error" onClick={() => void refresh()}>
+                {t('retry')}
+              </button>
+            </div>
+          ) : null}
+        </main>
+        {reordering || page !== 'home' ? (
+          <footer className="footer">
+            <div className="remote-hints" id={reordering ? 'reorder-instructions' : undefined}>
+              {reordering ? (
+                <>
+                  <span>
+                    <span className="keycap">← →</span>
+                    {t('move')}
+                  </span>
+                  <span>
+                    <span className="keycap">Back</span>
+                    {t('done')}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    <span className="keycap keycap-ok">OK</span>
+                    {page === 'settings' ? t('select') : t('open')}
+                  </span>
+                  <span>
+                    {page === 'settings' ? (
+                      <>
+                        <span className="keycap">Back</span>
+                        {t('homeLabel')}
+                      </>
+                    ) : (
+                      <>
+                        <MoreHorizontal size={19} />
+                        {t('options')}
+                      </>
+                    )}
+                  </span>
+                </>
               )}
             </div>
+            {page === 'settings' ? (
+              <span className="settings-version" aria-label="Luma version 1.1.0">
+                v1.1.0
+              </span>
+            ) : null}
           </footer>
-        </div>
-      )}
+        ) : null}
+      </div>
       {optionsApp ? (
         <AppOptions
           key="options"
