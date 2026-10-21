@@ -1,6 +1,6 @@
 import { ConnectionIcon } from './connection-icon';
+import { InputStatus } from './input-status';
 import type { TVInput } from '../types';
-import { useTranslation } from '../i18n';
 
 export function InputCard({
   input,
@@ -9,7 +9,6 @@ export function InputCard({
   input: TVInput;
   onLaunch: (input: TVInput) => void;
 }) {
-  const { t } = useTranslation();
   return (
     <button
       className={`input-card input-${input.kind}`}
@@ -23,18 +22,9 @@ export function InputCard({
         <ConnectionIcon input={input} />
       </span>
       <span className="input-info">
-        <span className="input-title">{input.title}</span>
+        <span className="input-title">{input.port}</span>
         <span className="input-state">
-          {input.connected === true ? (
-            <>
-              <i className="status-dot" />
-              {t('connected')}
-            </>
-          ) : input.connected === false ? (
-            t('noDevice')
-          ) : (
-            t('externalInput')
-          )}
+          <InputStatus input={input} />
         </span>
       </span>
     </button>

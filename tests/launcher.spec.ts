@@ -33,6 +33,22 @@ test('Left and Right on focused navigation tabs switch pages immediately', async
   await expect(apps).toHaveAttribute('aria-current', 'page');
   await expect(apps).toBeFocused();
   await expect(page.locator('main')).toHaveClass(/page-apps/);
+  await page.keyboard.press('ArrowRight');
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  await expect(settings).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('main')).toHaveClass(/page-settings/);
+  await expect(settings).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('button', { name: 'TV settings', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(settings).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(settings).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(apps).toHaveAttribute('aria-current', 'page');
+  await expect(apps).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(home).toHaveAttribute('aria-current', 'page');
   await expect(home).toBeFocused();
@@ -213,14 +229,22 @@ for (const width of [1920, 390]) {
   }
 }
 
-for (const [section, control, selected, first, subpage] of [
-  ['General', 'setting-language', 'language-option-en', 'language-option-en', 'language'],
+for (const [section, control, selected, first, subpage, title] of [
+  [
+    'General',
+    'setting-language',
+    'language-option-en',
+    'language-option-en',
+    'language',
+    'Language',
+  ],
   [
     'General',
     'setting-clock-format',
     'clock-format-option-12',
     'clock-format-option-12',
     'clock-format',
+    'Clock format',
   ],
   [
     'Weather',
@@ -228,6 +252,7 @@ for (const [section, control, selected, first, subpage] of [
     'temperature-option-celsius',
     'temperature-option-celsius',
     'temperature',
+    'Temperature',
   ],
   [
     'Inputs',
@@ -235,6 +260,7 @@ for (const [section, control, selected, first, subpage] of [
     'input-visibility-option-auto',
     'input-visibility-option-on',
     'input-visibility',
+    'HDMI 1',
   ],
 ] as const) {
   test(`${subpage} options return with Left and exit upward to the Settings tab`, async ({
@@ -247,11 +273,16 @@ for (const [section, control, selected, first, subpage] of [
     await expect(page.locator('.settings-pane [data-focusable]').first()).toBeFocused();
     await page.locator(`[data-focusable="${control}"]`).press('ArrowRight');
     await expect(page.locator(`[data-focusable="${selected}"]`)).toBeFocused();
+    const category = page.locator('.settings-sidebar-item.selected');
+    await expect(category).toHaveAccessibleName(`${section}: ${title}`);
+    await expect(category.locator('.settings-sidebar-parent')).toHaveText(section);
+    await expect(category.locator('.settings-sidebar-subpage')).toHaveText(title);
     await expect(page.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
     await page.locator(`[data-focusable="${first}"]`).focus();
     await page.keyboard.press('ArrowLeft');
     await expect(page.locator(`[data-focusable="${control}"]`)).toBeFocused();
     await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
+    await expect(category).toHaveAccessibleName(section);
     await page.keyboard.press('ArrowRight');
     await expect(page.locator(`[data-focusable="${selected}"]`)).toBeFocused();
     await page.locator(`[data-focusable="${first}"]`).focus();
@@ -272,6 +303,8 @@ for (const section of ['General', 'Background', 'Weather', 'Inputs']) {
     await page.goto('/');
     const settings = page.getByRole('button', { name: 'Settings', exact: true });
     await settings.click();
+    await expect(settings).toBeFocused();
+    await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
     const category = page.getByRole('button', { name: section, exact: true });
     await category.focus();
@@ -298,11 +331,15 @@ test('Left returns from the location search action to the Weather setting', asyn
   await location.press('ArrowRight');
   const search = page.getByRole('searchbox', { name: 'City or postcode' });
   await expect(search).toBeFocused();
+  const category = page.locator('[data-focusable="settings-section-weather"]');
+  await expect(category).toHaveAccessibleName('Weather: Location');
+  await expect(category.locator('.settings-sidebar-subpage')).toHaveText('Location');
   await search.fill('Berlin');
   await page.getByRole('button', { name: 'Search locations', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
   await expect(location).toBeFocused();
   await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
+  await expect(category).toHaveAccessibleName('Weather');
 });
 
 for (const width of [1920, 390]) {
@@ -429,6 +466,9 @@ test('Inputs are configured in Settings with persistent On, Off, and Auto Home v
     page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button'),
   ).toHaveText(['Home', 'Apps', 'Settings']);
   await expect(page.locator('.home-input-grid .input-card')).toHaveCount(2);
+  const homeConsole = page.locator('[data-focusable="input-com.webos.app.hdmi1"]');
+  await expect(homeConsole.locator('.input-title')).toHaveText('HDMI 1');
+  await expect(homeConsole.locator('.input-state')).toHaveText('Console · Connected');
   await expect(page.locator('[data-focusable="input-com.webos.app.hdmi3"]')).toHaveCount(0);
   const settings = page.getByRole('button', { name: 'Settings', exact: true });
   const inputs = page.getByRole('button', { name: 'Inputs', exact: true });
@@ -438,6 +478,13 @@ test('Inputs are configured in Settings with persistent On, Off, and Auto Home v
   await inputs.click();
   await expect(page.locator('[data-focusable^="setting-input-com."]')).toHaveCount(4);
   await expect(consoleInput).toBeFocused();
+  await expect(consoleInput.locator('strong')).toHaveText('HDMI 1');
+  await expect(consoleInput.locator('small')).toHaveText('Console · Connected');
+  await expect(streamer.locator('strong')).toHaveText('HDMI 2');
+  await expect(streamer.locator('small')).toHaveText('No device connected');
+  await expect(
+    page.locator('[data-focusable="setting-input-com.webos.app.hdmi3"] small'),
+  ).toHaveText('External input');
   await consoleInput.press('ArrowRight');
   await expect(page.locator('[data-focusable="input-visibility-option-auto"]')).toBeFocused();
   await page.keyboard.press('Escape');
@@ -463,7 +510,9 @@ test('Inputs are configured in Settings with persistent On, Off, and Auto Home v
   await expect(streamer).toBeFocused();
   await expect(streamer.locator('.setting-value')).toHaveText('On');
   await page.keyboard.press('Escape');
-  await expect(page.locator('[data-focusable="input-com.webos.app.hdmi2"]')).toBeVisible();
+  const homeStreamer = page.locator('[data-focusable="input-com.webos.app.hdmi2"]');
+  await expect(homeStreamer.locator('.input-title')).toHaveText('HDMI 2');
+  await expect(homeStreamer.locator('.input-state')).toHaveText('No device connected');
   await page.reload();
   await expect(page.locator('.home-input-grid .input-card')).toHaveCount(2);
   await expect(page.locator('[data-focusable="input-com.webos.app.hdmi1"]')).toHaveCount(0);
@@ -514,22 +563,25 @@ test('Auto reacts to refreshes and input choices survive renamed devices and rea
   const refresh = page.getByRole('button', { name: 'Refresh inputs', exact: true });
   await refresh.click();
   const streamer = page.locator('[data-focusable="setting-input-com.webos.app.hdmi2"]');
-  await expect(streamer).toContainText('Renamed streamer');
+  await expect(streamer.locator('strong')).toHaveText('HDMI 2');
+  await expect(streamer.locator('small')).toHaveText('No device connected');
   await expect(streamer.locator('.setting-value')).toHaveText('On');
   await page.keyboard.press('Escape');
   await expect(page.locator('.home-input-grid .input-card')).toHaveCount(1);
-  await expect(page.locator('[data-focusable="input-com.webos.app.hdmi2"]')).toContainText(
-    'Renamed streamer',
-  );
+  await expect(
+    page.locator('[data-focusable="input-com.webos.app.hdmi2"] .input-state'),
+  ).toHaveText('No device connected');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Inputs', exact: true }).click();
   await page.evaluate(() => {
     (window as any).__devices[0].connected = true;
+    (window as any).__devices[1].connected = true;
   });
   await refresh.click();
   await expect(page.locator('[data-focusable="setting-input-com.webos.app.hdmi1"]')).toContainText(
     'Connected',
   );
+  await expect(streamer.locator('small')).toHaveText('Renamed streamer · Connected');
   await page.evaluate(() => {
     (window as any).__inputFailure = true;
   });
@@ -540,6 +592,9 @@ test('Auto reacts to refreshes and input choices survive renamed devices and rea
   await expect(streamer.locator('.setting-value')).toHaveText('On');
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(page.locator('.home-input-grid .input-card')).toHaveCount(2);
+  await expect(
+    page.locator('[data-focusable="input-com.webos.app.hdmi2"] .input-state'),
+  ).toHaveText('Renamed streamer · Connected');
 });
 
 test('hold OK opens options, favorites persist and hidden apps can be restored', async ({
@@ -585,7 +640,7 @@ test('Settings sidebar and content support remote navigation and persistent pref
   await expect(page.getByRole('region', { name: 'Luma settings', exact: true })).toBeVisible();
   await expect(settings).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.locator('[data-focusable="settings-section-interface"]').focus();
+  await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
   await expect(page.locator('.settings-sidebar')).toContainText('General');
   await page.keyboard.press('ArrowDown');
@@ -607,6 +662,7 @@ test('Settings sidebar and content support remote navigation and persistent pref
   await expect(page.locator('[data-focusable="clock-format-option-12"]')).toBeFocused();
   await page.locator('[data-focusable="clock-format-option-24"]').click();
   await expect(page.locator('[data-focusable="setting-clock-format"]')).toContainText('24-hour');
+  await expect(page.locator('[data-focusable="setting-clock-format"]')).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
@@ -701,6 +757,7 @@ test('Settings sidebar uses plain labels and an Apple TV-style focus highlight',
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.keyboard.press('ArrowDown');
   const interfaceSection = page.getByRole('button', { name: 'General', exact: true });
   await expect(page.locator('.settings-sidebar-index')).toHaveCount(0);
   await expect(interfaceSection).toBeFocused();
@@ -1178,6 +1235,8 @@ test('connection artwork follows the reported device labels without changing the
   await page.goto('/');
   await expect(page.locator('.home-input-grid .input-card')).toHaveCount(4);
   const playstation = page.locator('[data-focusable="input-com.webos.app.hdmi1"]');
+  await expect(playstation.locator('.input-title')).toHaveText('HDMI 1');
+  await expect(playstation.locator('.input-state')).toHaveText('PlayStation 5 · Connected');
   await expect(playstation.locator('[data-connection-icon="playstation"]')).toBeVisible();
   await expect(
     page.locator('[data-focusable="input-com.webos.app.hdmi2"] [data-connection-icon="usb"]'),
@@ -1185,6 +1244,9 @@ test('connection artwork follows the reported device labels without changing the
   await expect(
     page.locator('[data-focusable="input-com.webos.app.hdmi3"] [data-connection-icon="hdmi"]'),
   ).toBeVisible();
+  await expect(
+    page.locator('[data-focusable="input-com.webos.app.hdmi3"] .input-state'),
+  ).toHaveText('Connected');
   const appleTV = page.locator('[data-focusable="input-com.webos.app.hdmi4"]');
   await expect(appleTV.locator('[data-connection-icon="apple-tv"]')).toBeVisible();
   await playstation.click();

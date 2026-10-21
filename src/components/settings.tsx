@@ -66,7 +66,7 @@ export function Settings({
   const selectedInput = inputs.find((input) => input.id === selectedInputId);
   const subpageTitle =
     subpage === 'input-visibility'
-      ? (selectedInput?.title ?? t('inputs'))
+      ? (selectedInput?.port ?? t('inputs'))
       : subpage
         ? t(subpageTitles[subpage])
         : '';
@@ -204,6 +204,9 @@ export function Settings({
               data-focus-down={`settings-section-${sectionNext[id]}`}
               data-focus-right={sectionFirst[id]}
               aria-current={section === id ? 'page' : undefined}
+              aria-label={
+                section === id && subpage ? `${sectionTitle(id)}: ${subpageTitle}` : undefined
+              }
               onFocus={() => {
                 if (section !== id) {
                   setSection(id);
@@ -232,8 +235,16 @@ export function Settings({
                 );
               }}
             >
-              <span>{sectionTitle(id)}</span>
-              {section === id ? <ChevronRight aria-hidden="true" /> : null}
+              {section === id && subpage ? (
+                <span className="settings-sidebar-path">
+                  <span className="settings-sidebar-parent">{sectionTitle(id)}</span>
+                  <ChevronRight className="settings-sidebar-separator" aria-hidden="true" />
+                  <span className="settings-sidebar-subpage">{subpageTitle}</span>
+                </span>
+              ) : (
+                <span>{sectionTitle(id)}</span>
+              )}
+              {section === id && !subpage ? <ChevronRight aria-hidden="true" /> : null}
             </button>
           ))}
         </nav>
@@ -490,7 +501,6 @@ export function Settings({
               role="region"
               aria-label={subpageTitle}
             >
-              <h2 className="settings-subpage-title">{subpageTitle}</h2>
               {subpage === 'language' ? (
                 <div className="settings-subpage-options" role="listbox" aria-label={t('language')}>
                   {(

@@ -80,6 +80,27 @@
 .settings-sidebar-item:focus > svg {
   color: #2c2c2c99;
 }
+.settings-sidebar-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.45rem;
+  line-height: 1.4;
+}
+.settings-sidebar-parent,
+.settings-sidebar-subpage {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.settings-sidebar-parent {
+  opacity: 0.7;
+}
+.settings-sidebar-separator {
+  width: 0.9em;
+  height: 0.9em;
+  opacity: 0.6;
+}
 .settings-content {
   display: grid;
   gap: 1.75rem;
@@ -89,14 +110,6 @@
   color: var(--soft);
   font-size: 1.05rem;
   line-height: 1.5;
-}
-.settings-subpage-title {
-  margin-bottom: 1.5rem;
-  padding-inline: 1.45rem;
-  font-size: 1.5rem;
-  font-weight: 550;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
 }
 .settings-page .settings-group {
   margin: 0;

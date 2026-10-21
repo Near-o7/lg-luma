@@ -194,12 +194,6 @@ function Launcher({
     setCategory(null);
     setShowHidden(false);
     document.querySelector('main')?.scrollTo({ top: 0 });
-    if (next === 'settings')
-      requestAnimationFrame(() =>
-        document
-          .querySelector<HTMLElement>('[data-focusable="settings-section-interface"]')
-          ?.focus({ preventScroll: true }),
-      );
   }, []);
 
   const onLaunch = useCallback(

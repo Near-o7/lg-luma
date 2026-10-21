@@ -14,6 +14,9 @@
   --soft: rgba(245, 245, 245, 0.72);
   --surface: rgba(37, 38, 40, 0.7);
   --ring: rgba(240, 240, 240, 0.95);
+  --nav-surface: rgba(23, 28, 32, 0.72);
+  --nav-highlight: linear-gradient(180deg, #fafafa, #e5e5e5);
+  --nav-highlight-shadow: 0 2px 6px #0000001a, inset 0 1px 1px white;
 }
 * {
   box-sizing: border-box;
@@ -162,7 +165,7 @@ button svg {
   gap: 0.8rem;
   padding: var(--nav-padding);
   isolation: isolate;
-  background: rgba(23, 28, 32, 0.72);
+  background: var(--nav-surface);
   border: 1px solid #ffffff12;
   border-radius: 3rem;
   box-shadow: 0 4px 18px #00000010;
@@ -193,15 +196,13 @@ button svg {
   left: 0;
   width: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, #fafafa, #e5e5e5);
+  background: var(--nav-highlight);
   border-radius: 2rem;
   z-index: 0;
   transition:
     transform 0.2s cubic-bezier(0.22, 0.61, 0.36, 1),
     width 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
-  box-shadow:
-    0 2px 6px #0000001a,
-    inset 0 1px 1px white;
+  box-shadow: var(--nav-highlight-shadow);
 }
 .nav-item:focus-visible {
   outline-offset: 3px;
@@ -240,6 +241,19 @@ button svg {
 .icon-button svg {
   width: 1.45rem;
   height: 1.45rem;
+}
+.settings-button {
+  background: var(--nav-surface);
+  color: #eeeeeeba;
+  box-shadow: 0 4px 18px #00000010;
+}
+.settings-button:hover,
+.settings-button:focus {
+  outline: none;
+  border-color: transparent;
+  background: var(--nav-highlight);
+  color: #2c2c2c;
+  box-shadow: var(--nav-highlight-shadow);
 }
 .main {
   flex: 1;
@@ -694,18 +708,9 @@ button svg {
 }
 .input-state {
   font-size: 0.82rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
   color: #e8e8e87a;
-}
-.status-dot {
-  width: 0.35rem;
-  height: 0.35rem;
-  display: inline-block;
-  border-radius: 100%;
-  background: #9cbfa0;
-  box-shadow: 0 0 8px #a4d4a51a;
 }
 .footer {
   min-height: 3.7rem;
