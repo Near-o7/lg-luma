@@ -14,6 +14,9 @@ const scenarios = [
   { name: 'home', script: 'home,down' },
   { name: 'home-names', names: true, script: 'home,down' },
   { name: 'home-weather', widget: true, location: true, script: 'home,down' },
+  { name: 'home-de', language: 'de', widget: true, location: true, script: 'home,down' },
+  { name: 'home-zh', language: 'zh', widget: true, location: true, script: 'home,down' },
+  { name: 'language-zh', language: 'zh', script: 'settings,down,enter,down,down,down,enter', web: async (p) => { await click(p, 'nav-settings'); await click(p, 'setting-language'); } },
   { name: 'empty-home', empty: true, script: 'home,down' },
   {
     name: 'apps',
@@ -143,7 +146,7 @@ if (!process.argv.includes('--native-only')) {
       await page.route('https://api.open-meteo.com/**', (route) => route.fulfill({ json: { current: { temperature_2m: 14.2, weather_code: 2, is_day: 1 } } }));
       await page.route('https://geocoding-api.open-meteo.com/**', (route) => route.fulfill({ json: { results: [] } }));
       await page.addInitScript(
-        ({ names, hidden, empty, widget, location }) => {
+        ({ names, hidden, empty, widget, location, language }) => {
           localStorage.setItem(
             'luma.preferences.v1',
             JSON.stringify({
@@ -154,14 +157,14 @@ if (!process.argv.includes('--native-only')) {
               weatherLocation: location,
               clock24: false,
               showHomeAppNames: names,
-              language: 'en',
+              language,
               hidden: hidden ? ['netflix'] : [],
               favorites: empty ? [] : null,
             }),
           );
           if (location) localStorage.setItem('luma.weather.v1', JSON.stringify({ key: '48.2085,16.3721', updatedAt: Date.now(), reading: { temperature: 14.2, code: 2, isDay: true } }));
         },
-        { names: !!scenario.names, hidden: !!scenario.hidden, empty: !!scenario.empty, widget: !!scenario.widget, location: scenario.location ? weatherLocation : null },
+        { names: !!scenario.names, hidden: !!scenario.hidden, empty: !!scenario.empty, widget: !!scenario.widget, location: scenario.location ? weatherLocation : null, language: scenario.language ?? 'en' },
       );
       await page.goto(pathToFileURL(path.join(root, 'dist/app/index.html')).href);
       await page
@@ -172,10 +175,6 @@ if (!process.argv.includes('--native-only')) {
         .waitFor();
       await page.evaluate(() => document.fonts.ready);
       if (scenario.location) await page.locator('.weather-temperature').waitFor();
-      // Compare only the features requested for native parity.
-      await page.addStyleTag({
-        content: '[data-focusable="setting-language"] { display: none !important; }',
-      });
       await scenario.web?.(page);
       await page.mouse.move(1, 1);
       await page.waitForTimeout(150);
@@ -254,6 +253,7 @@ if (!process.argv.includes('--web-only')) {
         reduced_motion: true,
         hour_24: false,
         show_names: !!scenario.names,
+        language: scenario.language ?? 'en',
         show_weather: !!scenario.widget,
         weather_location: scenario.location ? weatherLocation : null,
         hidden: scenario.hidden ? ['netflix'] : [],
