@@ -1,3 +1,4 @@
+use crate::i18n::Language;
 use crate::weather::{Location, Unit};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
@@ -82,16 +83,6 @@ pub enum InputMode {
     Off,
 }
 
-impl InputMode {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Auto => "Auto",
-            Self::On => "On",
-            Self::Off => "Off",
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Preferences {
@@ -108,6 +99,8 @@ pub struct Preferences {
     pub weather_location: Option<Location>,
     #[serde(deserialize_with = "crate::weather::deserialize_unit")]
     pub temperature_unit: Unit,
+    #[serde(deserialize_with = "crate::i18n::deserialize_language")]
+    pub language: Language,
 }
 
 impl Default for Preferences {
@@ -123,6 +116,7 @@ impl Default for Preferences {
             show_weather: true,
             weather_location: None,
             temperature_unit: Unit::Celsius,
+            language: Language::En,
         }
     }
 }

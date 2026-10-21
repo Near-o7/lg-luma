@@ -14,17 +14,19 @@ fn ready() -> State {
 }
 
 fn controls(state: &State) -> Vec<crate::state::Control> {
+    let assets = view::Assets {
+        root: PathBuf::new(),
+        icons: BTreeMap::new(),
+        colors: BTreeMap::new(),
+        version: "test".into(),
+        metrics: BTreeMap::new(),
+    };
+    let navigation = view::navigation(&assets, state.preferences.language);
     view::scene_with_pill(
         state,
-        &view::Assets {
-            root: PathBuf::new(),
-            icons: BTreeMap::new(),
-            colors: BTreeMap::new(),
-            version: "test".into(),
-            metrics: BTreeMap::new(),
-        },
-        view::pill_target(state.page_index()),
-        view::pill_width(state.page_index()),
+        &assets,
+        navigation.items[state.page_index()].x,
+        navigation.items[state.page_index()].w,
         time::OffsetDateTime::UNIX_EPOCH,
     )
     .controls

@@ -1,5 +1,6 @@
 //! Open-Meteo data and request scheduling. API/cache temperatures remain Celsius;
 //! presentation units never change the request or invalidate a cached reading.
+use crate::i18n::Language;
 use crate::model::Preferences;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -184,30 +185,37 @@ impl Cache {
 }
 
 pub struct Condition {
-    pub label: &'static str,
+    pub key: &'static str,
     pub icon: &'static str,
 }
 pub fn condition(reading: Reading) -> Condition {
-    let (label, icon) = match reading.code {
-        0 if reading.is_day => ("Clear skies", "sun"),
-        0 => ("Clear night", "moon"),
-        1 => ("Mostly clear", "partly-cloudy"),
-        2 => ("Partly cloudy", "partly-cloudy"),
-        3 => ("Overcast", "cloud"),
-        45 | 48 => ("Fog", "fog"),
-        51 | 53 | 55 | 56 | 57 => ("Drizzle", "drizzle"),
-        61 | 63 | 65 | 66 | 67 | 80 | 81 | 82 => ("Rain", "rain"),
-        71 | 73 | 75 | 77 | 85 | 86 => ("Snow", "snow"),
-        95 | 96 | 99 => ("Thunderstorms", "storm"),
-        _ => ("Current weather", "cloud"),
+    let (key, icon) = match reading.code {
+        0 if reading.is_day => ("clearSkies", "sun"),
+        0 => ("clearNight", "moon"),
+        1 => ("mostlyClear", "partly-cloudy"),
+        2 => ("partlyCloudy", "partly-cloudy"),
+        3 => ("overcast", "cloud"),
+        45 | 48 => ("fog", "fog"),
+        51 | 53 | 55 | 56 | 57 => ("drizzle", "drizzle"),
+        61 | 63 | 65 | 66 | 67 | 80 | 81 | 82 => ("rain", "rain"),
+        71 | 73 | 75 | 77 | 85 | 86 => ("snow", "snow"),
+        95 | 96 | 99 => ("thunderstorms", "storm"),
+        _ => ("currentWeather", "cloud"),
     };
-    Condition { label, icon }
+    Condition { key, icon }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
-    Search { id: u64, query: String },
-    Forecast { id: u64, location: Location },
+    Search {
+        id: u64,
+        query: String,
+        language: Language,
+    },
+    Forecast {
+        id: u64,
+        location: Location,
+    },
     Persist(Cache),
     ClearCache,
 }
@@ -255,20 +263,21 @@ impl Weather {
         self.searching = false;
         self.message = None;
     }
-    pub fn search(&mut self) -> Option<Command> {
+    pub fn search(&mut self, language: Language) -> Option<Command> {
         if self.searching {
             return None;
         }
         self.cancel_search();
         let query = self.query.trim().to_owned();
         if query.chars().count() < 2 {
-            self.message = Some("Enter at least two characters.".into());
+            self.message = Some("enterCity".into());
             return None;
         }
         self.searching = true;
         Some(Command::Search {
             id: self.search_id,
             query,
+            language,
         })
     }
     pub fn accept_search(&mut self, id: u64, result: Result<Vec<Location>, String>) -> bool {
@@ -280,10 +289,10 @@ impl Weather {
             Ok(places) => {
                 self.results = places;
                 if self.results.is_empty() {
-                    self.message = Some("No places found. Try another city or postcode.".into());
+                    self.message = Some("noLocations".into());
                 }
             }
-            Err(_) => self.message = Some("Location search is unavailable. Try again.".into()),
+            Err(_) => self.message = Some("searchUnavailable".into()),
         }
         true
     }

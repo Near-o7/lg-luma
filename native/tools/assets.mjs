@@ -33,9 +33,19 @@ if (decoded.error || decoded.status !== 0) {
   );
 }
 await fs.rm(font);
-const weights = spawnSync('python3', [path.join(import.meta.dirname, 'font-weights.py'), out], {
-  encoding: 'utf8',
-});
+const cjk = path.join(root, 'native/assets/fonts/noto-sans-sc.ttf');
+try {
+  await fs.access(cjk);
+} catch {
+  throw new Error('Prepare the bundled Chinese font with pnpm native:font-assets first.');
+}
+const weights = spawnSync(
+  'python3',
+  [path.join(import.meta.dirname, 'font-weights.py'), out, cjk],
+  {
+    encoding: 'utf8',
+  },
+);
 if (weights.error || weights.status !== 0) {
   throw new Error(
     'Font weights need Python/fontTools. Run pnpm native:assets inside nix develop.',
@@ -43,6 +53,10 @@ if (weights.error || weights.status !== 0) {
   );
 }
 await fs.copyFile(path.join(source, 'fonts/ofl.txt'), path.join(out, 'font-license.txt'));
+await fs.copyFile(
+  path.join(root, 'native/assets/fonts/noto-ofl.txt'),
+  path.join(out, 'font-cjk-license.txt'),
+);
 
 for (const file of await fs.readdir(path.join(source, 'wallpapers'))) {
   if (!/\.(jpg|svg)$/.test(file)) continue;
@@ -173,6 +187,7 @@ const uiIcons = {
   moonlight: 'MonitorPlay',
   gaming: 'Gamepad2',
   generic: 'AppWindow',
+  language: 'Languages',
   location: 'MapPin',
   thermometer: 'Thermometer',
   'weather-sun': 'Sun',

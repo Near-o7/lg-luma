@@ -1,3 +1,4 @@
+use crate::i18n::Language;
 use crate::model::{App, BACKGROUNDS, CATEGORIES, InputMode, Inventory, Preferences};
 use crate::weather::{self, Unit};
 use serde::Serialize;
@@ -86,6 +87,7 @@ pub enum Subpage {
     Input(String),
     WeatherLocation,
     Temperature,
+    Language,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -437,6 +439,7 @@ impl State {
             Some(Subpage::Input(id)) => Target::InputMode(id),
             Some(Subpage::WeatherLocation) => Target::WeatherLocation,
             Some(Subpage::Temperature) => Target::WeatherTemperature,
+            Some(Subpage::Language) => Target::Setting(4),
             None => Target::Sidebar(self.section),
         };
         self.scroll = 0.;
@@ -517,7 +520,7 @@ impl State {
             }
             if matches!(
                 self.focus,
-                Target::Setting(1)
+                Target::Setting(1 | 4)
                     | Target::InputMode(_)
                     | Target::WeatherLocation
                     | Target::WeatherTemperature
@@ -897,7 +900,7 @@ impl State {
             Target::WeatherSearch => {
                 return self
                     .weather
-                    .search()
+                    .search(self.preferences.language)
                     .map(|command| vec![Effect::Weather(command)])
                     .unwrap_or_default();
             }
@@ -934,6 +937,14 @@ impl State {
                         return vec![];
                     }
                     2 => self.preferences.reduced_motion = !self.preferences.reduced_motion,
+                    4 => {
+                        self.subpage = Some(Subpage::Language);
+                        self.focus = Target::Choice(self.preferences.language.index());
+                        if !self.preferences.reduced_motion {
+                            self.panel_started = Some(Instant::now());
+                        }
+                        return vec![];
+                    }
                     _ => return vec![Effect::Refresh],
                 }
                 return vec![Effect::Save];
@@ -981,6 +992,10 @@ impl State {
                             Unit::Celsius
                         }
                     }
+                    Some(Subpage::Language) => {
+                        self.preferences.language = Language::ALL[index.min(2)];
+                        self.weather.cancel_search();
+                    }
                     Some(Subpage::WeatherLocation) => return vec![],
                     None => return vec![],
                 }
@@ -1004,20 +1019,36 @@ impl State {
                 if index == 0 {
                     if favorites.contains(&id) {
                         favorites.retain(|item| item != &id);
-                        self.notify(format!("{title} removed from favorites."));
+                        self.notify(
+                            self.preferences
+                                .language
+                                .format("favoriteRemoved", &[("app", &title)]),
+                        );
                     } else {
                         favorites.push(id.clone());
-                        self.notify(format!("{title} added to favorites."));
+                        self.notify(
+                            self.preferences
+                                .language
+                                .format("favoriteAdded", &[("app", &title)]),
+                        );
                     }
                     self.preferences.hidden.retain(|item| item != &id);
                     self.preferences.favorites = Some(favorites);
                 } else if index == 1 {
                     if self.preferences.hidden.contains(&id) {
                         self.preferences.hidden.retain(|item| item != &id);
-                        self.notify(format!("{title} restored."));
+                        self.notify(
+                            self.preferences
+                                .language
+                                .format("appRestored", &[("app", &title)]),
+                        );
                     } else {
                         self.preferences.hidden.push(id.clone());
-                        self.notify(format!("{title} hidden."));
+                        self.notify(
+                            self.preferences
+                                .language
+                                .format("appHidden", &[("app", &title)]),
+                        );
                     }
                 }
                 if self.filter == 5 && self.hidden_count() == 0 {

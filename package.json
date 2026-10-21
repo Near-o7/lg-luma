@@ -27,6 +27,7 @@
     "benchmark": "pnpm build && node tools/benchmark.mjs",
     "assets": "node tools/assets.mjs",
     "native:assets": "node native/tools/assets.mjs",
+    "native:font-assets": "node native/tools/font-assets.mjs",
     "native:dev": "cargo run --manifest-path native/Cargo.toml --",
     "native:check": "cargo fmt --manifest-path native/Cargo.toml -- --check && cargo clippy --locked --manifest-path native/Cargo.toml --all-targets --all-features -- -D warnings && cargo test --locked --manifest-path native/Cargo.toml",
     "native:smoke": "node native/tools/smoke.mjs && node native/tools/weather-smoke.mjs",

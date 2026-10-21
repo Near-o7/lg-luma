@@ -1,4 +1,5 @@
 mod diagnostics;
+mod i18n;
 mod model;
 mod platform;
 mod raster;
@@ -138,7 +139,8 @@ fn effects(
         match effect {
             Effect::Save => {
                 if let Err(error) = storage::save(preferences, &state.preferences) {
-                    state.notify(error);
+                    eprintln!("{error}");
+                    state.notify(state.preferences.language.t("savedError"));
                 }
             }
             Effect::Refresh => {
@@ -152,7 +154,7 @@ fn effects(
                 if !state.launching {
                     if platform.webos {
                         state.launching = true;
-                        state.notify("Opening…");
+                        state.notify(state.preferences.language.t("opening"));
                         platform.send(Request::Launch(id));
                     } else {
                         let title = state
@@ -161,7 +163,12 @@ fn effects(
                             .iter()
                             .find(|a| a.id == id)
                             .map_or(id.as_str(), |app| app.title.as_str());
-                        state.notify(format!("Desktop preview: open {title}"));
+                        state.notify(
+                            state
+                                .preferences
+                                .language
+                                .format("desktopPreview", &[("app", title)]),
+                        );
                     }
                 }
             }
@@ -338,6 +345,10 @@ fn run() -> Result<(), String> {
         .map(Ok)
         .unwrap_or_else(|| storage::default_path(webos))?;
     let mut state = State::new(storage::load(&preferences_path)?);
+    // Discover the local offset before any HTTP/platform workers start.
+    let local_offset = OffsetDateTime::now_local()
+        .map(|now| now.offset())
+        .unwrap_or(time::UtcOffset::UTC);
     if webos && options.weather_test_server.is_some() {
         return Err("Weather test servers are only available in desktop builds".into());
     }
@@ -347,10 +358,6 @@ fn run() -> Result<(), String> {
         weather_service::Client::new(options.weather_test_server.as_deref())?,
         weather_cache,
     );
-    // Some libc/time combinations cannot discover the offset after threads start.
-    let local_offset = OffsetDateTime::now_local()
-        .map(|now| now.offset())
-        .unwrap_or(time::UtcOffset::UTC);
     let platform = Platform::new(webos);
     effects(
         vec![Effect::Refresh],
@@ -402,8 +409,9 @@ fn run() -> Result<(), String> {
     let mut last_drawable = None;
     let mut events = sdl.event_pump()?;
     let mut press: Option<Press> = None;
-    let mut pill = view::pill_target(0);
-    let mut pill_width = view::pill_width(0);
+    let initial_nav = view::navigation(&assets, state.preferences.language);
+    let mut pill = initial_nav.items[0].x;
+    let mut pill_width = initial_nav.items[0].w;
     let mut last_frame = Instant::now();
     let mut last_minute = None;
     let mut frame = 0u64;
@@ -453,7 +461,10 @@ fn run() -> Result<(), String> {
                 Response::Launched(result) => {
                     state.launching = false;
                     match result {
-                        Err(error) => state.notify(error),
+                        Err(error) => {
+                            eprintln!("{error}");
+                            state.notify(state.preferences.language.t("appOpenError"));
+                        }
                         Ok(()) => {
                             state.notice = None;
                             state.dirty = true;
@@ -700,8 +711,9 @@ fn run() -> Result<(), String> {
         }
         let dt = last_frame.elapsed().as_secs_f32().min(0.1);
         last_frame = Instant::now();
-        let target = view::pill_target(state.page_index());
-        let target_width = view::pill_width(state.page_index());
+        let navigation = view::navigation(&assets, state.preferences.language);
+        let target = navigation.items[state.page_index()].x;
+        let target_width = navigation.items[state.page_index()].w;
         if state.preferences.reduced_motion
             || ((pill - target).abs() < 0.2 && (pill_width - target_width).abs() < 0.2)
         {
@@ -781,7 +793,8 @@ fn run() -> Result<(), String> {
     if let Some(path) = options.dump {
         let state = serde_json::json!({ "page": state.page, "focus": state.focus, "query": state.query,
             "filter": state.filter, "preferences": state.preferences, "apps": state.apps().iter().map(|a| &a.id).collect::<Vec<_>>(),
-            "error": state.error, "scroll": state.scroll, "subpage": state.subpage, "modal": state.overlay.is_some(), "weather": state.weather });
+            "error": state.error, "scroll": state.scroll, "subpage": state.subpage, "modal": state.overlay.is_some(), "weather": state.weather,
+            "ui_text": scene.draw.iter().filter_map(|draw| match draw { renderer::Draw::Text(value, ..) => Some(value), _ => None }).collect::<Vec<_>>() });
         std::fs::write(
             path,
             serde_json::to_vec_pretty(&state).map_err(|e| e.to_string())?,

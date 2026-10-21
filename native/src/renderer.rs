@@ -115,6 +115,7 @@ pub struct RenderStats {
     pub cached_glyphs: usize,
     pub glyph_rasterizations: usize,
     pub glyph_failures: usize,
+    pub missing_glyphs: usize,
     pub glyph_atlas_pages: usize,
     pub glyph_atlas_bytes: usize,
     pub artwork_bytes: usize,
@@ -133,6 +134,7 @@ impl RenderStats {
             cached_glyphs: 0,
             glyph_rasterizations: 0,
             glyph_failures: 0,
+            missing_glyphs: 0,
             glyph_atlas_pages: 0,
             glyph_atlas_bytes: 0,
             artwork_bytes: 0,
@@ -187,6 +189,20 @@ impl Renderer {
                         .map_err(str::to_string)?,
                 );
             }
+        }
+        for weight in [400, 500] {
+            let path = directory.join(format!("font-cjk-{weight}.ttf"));
+            let bytes = std::fs::read(&path).map_err(|e| {
+                format!(
+                    "Chinese font {}: {e}. Regenerate native assets.",
+                    path.display()
+                )
+            })?;
+            fonts.insert(
+                weight + 2000,
+                Font::from_bytes(bytes, fontdue::FontSettings::default())
+                    .map_err(str::to_string)?,
+            );
         }
         let mut max_texture_size = 0;
         let mut max_viewport = [0; 2];
@@ -462,7 +478,16 @@ impl Renderer {
             .max_physical_font_px
             .max(f32::from(physical_size) / 4.);
         let font_id = style.weight + if style.size >= 32. { 1000 } else { 0 };
-        let font = &self.fonts[&font_id];
+        let fallback_id = if style.weight >= 500 { 2500 } else { 2400 };
+        let fonts = &self.fonts;
+        let choose_font = |c| {
+            if fonts[&font_id].lookup_glyph_index(c) == 0 {
+                fallback_id
+            } else {
+                font_id
+            }
+        };
+        let font = &fonts[&font_id];
         let line_height = size_f * style.line_height;
         let baseline = font.horizontal_line_metrics(size_f).map_or(size_f, |m| {
             (line_height - m.ascent + m.descent) / 2. + m.ascent
@@ -472,7 +497,7 @@ impl Renderer {
             if c == '\n' {
                 0.
             } else {
-                font.metrics(c, size_f).advance_width + tracking
+                fonts[&choose_font(c)].metrics(c, size_f).advance_width + tracking
             }
         };
         let mut lines: Vec<String> = Vec::new();
@@ -536,13 +561,26 @@ impl Renderer {
                 if let Some(previous) = previous {
                     x += font.horizontal_kern(previous, c, size_f).unwrap_or(0.);
                 }
-                placed.push((c, x, top + baseline));
+                let selected = choose_font(c);
+                let baseline = if selected == font_id {
+                    baseline
+                } else {
+                    fonts[&selected]
+                        .horizontal_line_metrics(size_f)
+                        .map_or(baseline, |m| {
+                            (line_height - m.ascent + m.descent) / 2. + m.ascent
+                        })
+                };
+                placed.push((c, x, top + baseline, selected));
                 x += advance(c);
                 previous = Some(c);
             }
         }
-        for (c, x, baseline) in placed {
-            if let Some(glyph) = self.glyph(c, physical_size, font_id)
+        for (c, x, baseline, selected) in placed {
+            if self.fonts[&selected].lookup_glyph_index(c) == 0 && !c.is_whitespace() {
+                self.stats.missing_glyphs += 1;
+            }
+            if let Some(glyph) = self.glyph(c, physical_size, selected)
                 && let Some(page) = glyph.page
             {
                 let m = glyph.metrics;

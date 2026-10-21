@@ -1,5 +1,6 @@
 //! Screen geometry and styling mirror the web UI's 1920×1080 / 16px-rem layout.
 use crate::{
+    i18n::Language,
     model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode},
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
@@ -16,8 +17,6 @@ use time::OffsetDateTime;
 const MAIN_TOP: f32 = 108.8;
 const FACE_HEIGHT: f32 = 154.4;
 const GRID_PITCH: f32 = 296.4;
-const NAV_X: [f32; 3] = [783.1, 899.6, 1011.6];
-const NAV_WIDTH: [f32; 3] = [103.7, 99.2, 125.3];
 
 pub struct Assets {
     pub root: PathBuf,
@@ -56,11 +55,17 @@ impl Assets {
             style.weight
         );
         let advances = self.metrics.get(&key);
+        let fallback = self.metrics.get(if style.weight >= 500 {
+            "fallback-500"
+        } else {
+            "fallback-400"
+        });
         value
             .chars()
             .map(|c| {
                 (advances
                     .and_then(|a| a.get(&c))
+                    .or_else(|| fallback.and_then(|a| a.get(&c)))
                     .copied()
                     .unwrap_or(if c == ' ' { 0.28 } else { 0.53 })
                     + style.tracking)
@@ -76,9 +81,15 @@ impl Assets {
             style.weight
         );
         let advances = self.metrics.get(&key);
+        let fallback = self.metrics.get(if style.weight >= 500 {
+            "fallback-500"
+        } else {
+            "fallback-400"
+        });
         let advance = |c: char| {
             (advances
                 .and_then(|a| a.get(&c))
+                .or_else(|| fallback.and_then(|a| a.get(&c)))
                 .copied()
                 .unwrap_or(if c == ' ' { 0.28 } else { 0.53 })
                 + style.tracking)
@@ -237,11 +248,24 @@ fn text(size: f32, weight: u16, tracking: f32) -> TextStyle {
     TextStyle::new(size).weight(weight).tracking(tracking)
 }
 
-pub fn pill_target(page: usize) -> f32 {
-    NAV_X[page]
+pub struct Navigation {
+    pub surface: Rect,
+    pub items: [Rect; 3],
 }
-pub fn pill_width(page: usize) -> f32 {
-    NAV_WIDTH[page]
+pub fn navigation(assets: &Assets, language: Language) -> Navigation {
+    let widths = ["home", "apps", "settings"]
+        .map(|key| (assets.width(language.t(key), text(20.8, 550, -0.02)) + 46.4).max(99.2));
+    let width = widths.iter().sum::<f32>() + 25.6 + 19.6;
+    let mut x = (1920. - width) / 2. + 9.8;
+    let items = widths.map(|width| {
+        let rect = Rect::new(x, 52.3, width, 49.);
+        x += width + 12.8;
+        rect
+    });
+    Navigation {
+        surface: Rect::new((1920. - width) / 2., 42.5, width, 68.6),
+        items,
+    }
 }
 
 pub fn scene_with_pill(
@@ -316,7 +340,7 @@ pub fn scene_with_pill(
         );
         let retry = Rect::new(1720., rect.y + 8., 96., 38.);
         out.text(
-            "Try again",
+            state.preferences.language.t("retry"),
             Rect::new(retry.x, retry.y + 10., retry.w, 20.),
             text(14.4, 500, 0.),
             c(0xf3ddbd, 1.),
@@ -356,23 +380,8 @@ fn header(
     pill_x: f32,
     pill_width: f32,
 ) {
-    let hour = if state.preferences.hour_24 {
-        now.hour()
-    } else {
-        match now.hour() % 12 {
-            0 => 12,
-            hour => hour,
-        }
-    };
-    let clock = if state.preferences.hour_24 {
-        format!("{hour:02}:{:02}", now.minute())
-    } else {
-        format!(
-            "{hour}:{:02} {}",
-            now.minute(),
-            if now.hour() >= 12 { "PM" } else { "AM" }
-        )
-    };
+    let language = state.preferences.language;
+    let clock = language.clock(now, state.preferences.hour_24);
     out.text(
         clock,
         Rect::new(84., 64.8, 300., 24.),
@@ -380,7 +389,8 @@ fn header(
         WHITE,
         false,
     );
-    let nav = Rect::new(773.3, 42.5, 373.4, 68.6);
+    let layout = navigation(assets, language);
+    let nav = layout.surface;
     out.shadow(nav, 48., 18., 4., 0.06);
     out.shape(nav, 48., c(0x171c20, 0.72));
     out.border(nav, 48., 1., c(0xffffff, 0.07));
@@ -390,13 +400,13 @@ fn header(
         c(0xfafafa, 1.),
         c(0xe5e5e5, 1.),
     ));
-    for (index, label) in ["Home", "Apps", "Settings"].into_iter().enumerate() {
-        let rect = Rect::new(NAV_X[index], 52.3, NAV_WIDTH[index], 49.);
+    for (index, key) in ["home", "apps", "settings"].into_iter().enumerate() {
+        let rect = layout.items[index];
         if state.focus == Target::Nav(index) && !state.pointer {
             out.border(rect.inset(-5.), 37., 2., c(0xf0f0f0, 0.95));
         }
         out.text(
-            label,
+            language.t(key),
             Rect::new(rect.x, 64.3, rect.w, 25.),
             text(20.8, 550, -0.02),
             if state.page_index() == index {
@@ -534,7 +544,7 @@ fn tile(
             true,
         );
     } else {
-        brand_mark(out, assets, app, rect);
+        brand_mark(out, assets, app, rect, state.preferences.language);
     }
     if pinned {
         out.icon(
@@ -579,7 +589,11 @@ fn tile(
             format!(
                 "{}{}",
                 app.title,
-                if state.filter == 5 { " · Hidden" } else { "" }
+                if state.filter == 5 {
+                    format!(" · {}", state.preferences.language.t("hiddenLabel"))
+                } else {
+                    String::new()
+                }
             ),
             Rect::new(
                 rect.x + 4.,
@@ -605,7 +619,11 @@ fn caption_height(state: &State, assets: &Assets, app: &App, width: f32) -> f32 
     let title = format!(
         "{}{}",
         app.title,
-        if state.filter == 5 { " · Hidden" } else { "" }
+        if state.filter == 5 {
+            format!(" · {}", state.preferences.language.t("hiddenLabel"))
+        } else {
+            String::new()
+        }
     );
     let style = text(
         17.6,
@@ -620,7 +638,7 @@ fn caption_height(state: &State, assets: &Assets, app: &App, width: f32) -> f32 
     (assets.lines(&title, style, width - 8.) as f32 * style.size * style.line_height).max(49.28)
 }
 
-fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect) {
+fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect, language: Language) {
     let (cx, cy) = rect.center();
     match app.brand.as_str() {
         "plex" => {
@@ -671,9 +689,9 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect) {
         }
         brand => {
             let (icon, label) = match brand {
-                "live-tv" => ("tv", "Live TV"),
-                "homebrew" => ("coffee", "Homebrew"),
-                "browser" => ("globe", "Browser"),
+                "live-tv" => ("tv", language.t("liveTV")),
+                "homebrew" => ("coffee", language.t("homebrew")),
+                "browser" => ("globe", language.t("browser")),
                 "moonlight" => ("moonlight", "Moonlight"),
                 "gaming" => ("gaming", app.title.as_str()),
                 _ => ("generic", app.title.as_str()),
@@ -706,6 +724,7 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect) {
 }
 
 fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
+    let language = state.preferences.language;
     let s = state.scroll;
     let summary = state
         .preferences
@@ -714,7 +733,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let shift = summary
         .as_ref()
         .map_or(0., |summary| (summary.height + 18.4) / 2.);
-    let date = format!("{:?}, {:?} {}", now.weekday(), now.month(), now.day()).to_uppercase();
+    let date = language.date(now);
     out.text(
         date,
         Rect::new(84., 227.2 - shift - s, 1200., 17.),
@@ -722,11 +741,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         c(0xf5f5f5, 0.72),
         false,
     );
-    let greeting = match now.hour() {
-        5..=11 => "Good morning.",
-        12..=17 => "Good afternoon.",
-        _ => "Good evening.",
-    };
+    let greeting = language.greeting(now.hour());
     out.text(
         greeting,
         Rect::new(84., 265. - shift - s, 1500., 95.),
@@ -738,7 +753,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         weather_summary(out, state, assets, summary, 265. - shift + 94.92 + 18.4 - s);
     }
     out.text(
-        "Favorites",
+        language.t("favorites"),
         Rect::new(84., 478.5 - s, 1000., 31.),
         text(23.2, 550, -0.035).leading(1.3),
         WHITE,
@@ -746,7 +761,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     );
     if state.moving.is_some() {
         out.text(
-            "Move apps",
+            language.t("moveApps"),
             Rect::new(1686., 485. - s, 150., 24.),
             text(14.4, 400, 0.),
             c(0xdedede, 1.),
@@ -779,14 +794,14 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
                 rect: Rect::new(84., 533.6 - s, 1752., 258.7),
                 icon: if error { "alert" } else { "heart" },
                 title: if error {
-                    "A little help?"
+                    language.t("aLittleHelp")
                 } else {
-                    "Make room for your favorites."
+                    language.t("makeFavorites")
                 },
                 hint: if error {
                     state.error.as_deref().unwrap_or("")
                 } else {
-                    "Find an app you love. Hold OK to pin it here."
+                    language.t("pinHint")
                 },
                 action: Some(if error { Target::Retry } else { Target::Browse }),
             },
@@ -827,7 +842,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         .collect();
     if !inputs.is_empty() {
         out.text(
-            "Inputs",
+            language.t("inputsHeading"),
             Rect::new(84., input_y + 3.3, 1000., 31.),
             text(23.2, 550, -0.035).leading(1.3),
             WHITE,
@@ -897,7 +912,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             false,
         );
         out.text(
-            input_status(input),
+            input_status(input, language),
             Rect::new(rect.x + 93., rect.y + 58.7, 450., 20.),
             text(13.12, 400, 0.).leading(1.5),
             c(0xe8e8e8, 0.48),
@@ -918,6 +933,7 @@ struct WeatherSummary {
 }
 type WeatherPart = (String, TextStyle, Color, f32, f32);
 fn weather_summary_layout(state: &State, assets: &Assets) -> WeatherSummary {
+    let language = state.preferences.language;
     let base = text(23.2, 400, -0.025).leading(1.5);
     let mut parts = Vec::new();
     let mut icon = "location".to_owned();
@@ -935,10 +951,10 @@ fn weather_summary_layout(state: &State, assets: &Assets) -> WeatherSummary {
                 base.weight(550),
                 c(0xf5f5f5, 0.91),
             ));
-            parts.push((condition.label.into(), base, c(0xf5f5f5, 0.58)));
+            parts.push((language.t(condition.key).into(), base, c(0xf5f5f5, 0.58)));
             if state.weather.failed {
                 parts.push((
-                    "Saved reading".into(),
+                    language.t("lastReading").into(),
                     text(15.08, 400, 0.).leading(1.5),
                     c(0xf2d5a5, 0.65),
                 ));
@@ -946,9 +962,9 @@ fn weather_summary_layout(state: &State, assets: &Assets) -> WeatherSummary {
         } else {
             parts.push((
                 if state.weather.loading {
-                    "Loading weather…"
+                    language.t("loadingWeather")
                 } else {
-                    "Weather unavailable"
+                    language.t("weatherUnavailable")
                 }
                 .into(),
                 base,
@@ -956,7 +972,11 @@ fn weather_summary_layout(state: &State, assets: &Assets) -> WeatherSummary {
             ));
         }
     } else {
-        parts.push(("Set weather location".into(), base, c(0xf5f5f5, 0.72)));
+        parts.push((
+            language.t("setWeatherLocation").into(),
+            base,
+            c(0xf5f5f5, 0.72),
+        ));
     }
     let mut rows: Vec<Vec<WeatherPart>> = vec![Vec::new()];
     let mut used = 0.;
@@ -1035,11 +1055,13 @@ fn weather_summary(
 }
 
 fn library(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
     let s = state.scroll;
     let mut x = 84.;
-    let widths = [112.5, 81., 93.7, 91.3];
     for (index, label) in CATEGORIES.into_iter().enumerate() {
-        let rect = Rect::new(x, 171.4 - s, widths[index], 42.8);
+        let label = language.category(label);
+        let width = assets.width(label, text(16., 400, 0.)) + 35.6;
+        let rect = Rect::new(x, 171.4 - s, width, 42.8);
         filter(
             out,
             state,
@@ -1048,13 +1070,14 @@ fn library(out: &mut Scene, state: &State, assets: &Assets) {
             label,
             state.filter == index + 1,
         );
-        x += widths[index] + 7.2;
+        x += width + 7.2;
     }
     if state.hidden_count() > 0 {
+        let label = language.format("hidden", &[("count", &state.hidden_count().to_string())]);
         let rect = Rect::new(
             x,
             171.4 - s,
-            122. + (state.hidden_count().to_string().len() - 1) as f32 * 10.,
+            assets.width(&label, text(16., 400, 0.)) + 35.6,
             42.8,
         );
         filter(
@@ -1062,7 +1085,7 @@ fn library(out: &mut Scene, state: &State, assets: &Assets) {
             state,
             Target::Filter(5),
             rect,
-            &format!("Hidden ({})", state.hidden_count()),
+            &label,
             state.filter == 5,
         );
         x += rect.w + 7.2;
@@ -1104,7 +1127,7 @@ fn library(out: &mut Scene, state: &State, assets: &Assets) {
     );
     out.text(
         if state.query.is_empty() {
-            "Find an app"
+            language.t("findApp")
         } else {
             &state.query
         },
@@ -1132,21 +1155,21 @@ fn library(out: &mut Scene, state: &State, assets: &Assets) {
     let apps = state.apps();
     if apps.is_empty() {
         let title = if state.loading {
-            "Finding your apps…"
+            language.t("findingApps")
         } else if !state.query.is_empty() {
-            "Nothing here. Yet."
+            language.t("noMatches")
         } else if state.filter == 5 {
-            "No hidden apps."
+            language.t("noHidden")
         } else {
-            "Room for something new."
+            language.t("roomForNew")
         };
         let hint = state.error.clone().unwrap_or_else(|| {
             if !state.query.is_empty() {
-                format!("No apps match “{}”. Try another name.", state.query)
+                language.format("noMatchesHint", &[("query", &state.query)])
             } else if state.filter == 5 {
-                "Apps you hide will appear here.".into()
+                language.t("hiddenHint").into()
             } else {
-                "Apps in this category will appear here.".into()
+                language.t("noCategoryApps").into()
             }
         });
         empty(
@@ -1326,6 +1349,7 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
 }
 
 fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
     let s = state.scroll;
     row(
         out,
@@ -1334,12 +1358,12 @@ fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
         Row {
             target: Target::WeatherToggle,
             rect: Rect::new(640., 164.8 - s, 1120., 72.),
-            title: "Show widget",
+            title: language.t("showWidget"),
             icon: Some("eye"),
             value: Some(if state.preferences.show_weather {
-                "On"
+                language.t("stateOn")
             } else {
-                "Off"
+                language.t("stateOff")
             }),
             description: None,
             selected: false,
@@ -1362,7 +1386,7 @@ fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
         Row {
             target: Target::WeatherLocation,
             rect,
-            title: "Location",
+            title: language.t("location"),
             icon: Some("location"),
             value: None,
             description: None,
@@ -1396,7 +1420,7 @@ fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
         Row {
             target: Target::WeatherTemperature,
             rect: Rect::new(640., y, 1120., 72.),
-            title: "Temperature",
+            title: language.t("temperature"),
             icon: Some("thermometer"),
             value: Some(state.preferences.temperature_unit.symbol()),
             description: None,
@@ -1404,16 +1428,10 @@ fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
             chevron: true,
         },
     );
-    out.text(
-        "Weather data: Open-Meteo · CC BY 4.0",
-        Rect::new(664.2, y + 100., 1000., 24.),
-        text(12.48, 400, 0.),
-        c(0xf5f5f5, 0.56),
-        false,
-    );
 }
 
 fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
     let mut y = 164.8 - state.scroll;
     if let Some(place) = &state.preferences.weather_location {
         let rect = Rect::new(640., y, 1120., 76.2);
@@ -1477,7 +1495,7 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
     );
     out.text(
         if state.weather.query.is_empty() {
-            "City or postcode"
+            language.t("cityPostcode")
         } else {
             &state.weather.query
         },
@@ -1508,9 +1526,9 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
     if state.weather.searching || state.weather.message.is_some() {
         out.text(
             if state.weather.searching {
-                "Searching…"
+                language.t("searching")
             } else {
-                state.weather.message.as_deref().unwrap_or("")
+                language.t(state.weather.message.as_deref().unwrap_or(""))
             },
             Rect::new(664.2, y, 1071.6, 58.),
             text(16., 400, 0.).leading(1.5),
@@ -1563,11 +1581,13 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
 }
 
 fn settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
     let s = state.scroll;
-    for (index, label) in ["General", "Background", "Weather", "Inputs"]
+    for (index, key) in ["interface", "background", "weather", "inputs"]
         .into_iter()
         .enumerate()
     {
+        let label = language.t(key);
         let rect = Rect::new(160., 164.8 + index as f32 * 84. - s, 403.2, 72.);
         let focused = state.focus == Target::Sidebar(index);
         out.pill(rect, focused, state.section == index);
@@ -1580,15 +1600,16 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         };
         if state.section == index && state.subpage.is_some() {
             let sub = match &state.subpage {
-                Some(Subpage::Clock) => "Clock format",
+                Some(Subpage::Clock) => language.t("clockFormat"),
                 Some(Subpage::Input(id)) => state
                     .inventory
                     .inputs
                     .iter()
                     .find(|input| &input.id == id)
-                    .map_or("Inputs", |input| input.port.as_str()),
-                Some(Subpage::WeatherLocation) => "Location",
-                Some(Subpage::Temperature) => "Temperature",
+                    .map_or(language.t("inputs"), |input| input.port.as_str()),
+                Some(Subpage::WeatherLocation) => language.t("location"),
+                Some(Subpage::Temperature) => language.t("temperature"),
+                Some(Subpage::Language) => language.t("language"),
                 None => "",
             };
             let parent_width = assets.width(label, text(20.8, 550, -0.02)) + 2.;
@@ -1646,8 +1667,8 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         }
         let options: Vec<(&str, Option<&str>, bool)> = match subpage {
             Subpage::Clock => vec![
-                ("12-hour", None, !state.preferences.hour_24),
-                ("24-hour", None, state.preferences.hour_24),
+                (language.t("hour12"), None, !state.preferences.hour_24),
+                (language.t("hour24"), None, state.preferences.hour_24),
             ],
             Subpage::Input(id) => {
                 let current = state
@@ -1657,28 +1678,40 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     .copied()
                     .unwrap_or_default();
                 vec![
-                    ("On", Some("Always show"), current == InputMode::On),
-                    ("Off", Some("Never show"), current == InputMode::Off),
                     (
-                        "Auto",
-                        Some("Only show when connected"),
+                        language.t("stateOn"),
+                        Some(language.t("inputAlways")),
+                        current == InputMode::On,
+                    ),
+                    (
+                        language.t("stateOff"),
+                        Some(language.t("inputNever")),
+                        current == InputMode::Off,
+                    ),
+                    (
+                        language.t("stateAuto"),
+                        Some(language.t("inputWhenConnected")),
                         current == InputMode::Auto,
                     ),
                 ]
             }
             Subpage::Temperature => vec![
                 (
-                    "Celsius",
+                    language.t("celsius"),
                     None,
                     state.preferences.temperature_unit == Unit::Celsius,
                 ),
                 (
-                    "Fahrenheit",
+                    language.t("fahrenheit"),
                     None,
                     state.preferences.temperature_unit == Unit::Fahrenheit,
                 ),
             ],
             Subpage::WeatherLocation => unreachable!(),
+            Subpage::Language => Language::ALL
+                .into_iter()
+                .map(|option| (option.name(), None, option == language))
+                .collect(),
         };
         for (index, (title, description, selected)) in options.into_iter().enumerate() {
             let h = if description.is_some() { 90.7 } else { 72. };
@@ -1705,49 +1738,53 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
     }
     match state.section {
         0 => {
-            for (index, title, icon, value, chevron) in [
+            for (position, (index, key, icon, value, chevron)) in [
                 (
                     0,
-                    "Show app names",
+                    "showAppNames",
                     "type",
                     if state.preferences.show_names {
-                        "On"
+                        language.t("stateOn")
                     } else {
-                        "Off"
+                        language.t("stateOff")
                     },
                     false,
                 ),
                 (
                     1,
-                    "Clock format",
+                    "clockFormat",
                     "clock",
                     if state.preferences.hour_24 {
-                        "24-hour"
+                        language.t("hour24")
                     } else {
-                        "12-hour"
+                        language.t("hour12")
                     },
                     true,
                 ),
                 (
                     2,
-                    "Reduced motion",
+                    "reducedMotion",
                     "motion",
                     if state.preferences.reduced_motion {
-                        "On"
+                        language.t("stateOn")
                     } else {
-                        "Off"
+                        language.t("stateOff")
                     },
                     false,
                 ),
-            ] {
+                (4, "language", "language", language.name(), true),
+            ]
+            .into_iter()
+            .enumerate()
+            {
                 row(
                     out,
                     state,
                     assets,
                     Row {
                         target: Target::Setting(index),
-                        rect: Rect::new(640., 164.8 + index as f32 * 84. - s, 1120., 72.),
-                        title,
+                        rect: Rect::new(640., 164.8 + position as f32 * 84. - s, 1120., 72.),
+                        title: language.t(key),
                         icon: Some(icon),
                         value: Some(value),
                         description: None,
@@ -1762,11 +1799,11 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 assets,
                 Row {
                     target: Target::Setting(3),
-                    rect: Rect::new(640., 432.8 - s, 1120., 72.),
+                    rect: Rect::new(640., 516.8 - s, 1120., 72.),
                     title: if state.loading {
-                        "Refreshing…"
+                        language.t("refreshNotice")
                     } else {
-                        "Refresh apps & inputs"
+                        language.t("refreshApps")
                     },
                     icon: Some("refresh"),
                     value: None,
@@ -1777,7 +1814,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             );
         }
         1 => {
-            for (index, (id, title)) in BACKGROUNDS.iter().enumerate() {
+            for (index, (id, _title)) in BACKGROUNDS.iter().enumerate() {
                 let rect = Rect::new(
                     640. + (index % 3) as f32 * 380.,
                     164.8 + (index / 3) as f32 * 264.3 - s,
@@ -1803,7 +1840,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     out.ring(rect, 16.);
                 }
                 out.text(
-                    *title,
+                    language.wallpaper(id),
                     Rect::new(rect.x + 4., rect.y + rect.h + 12., 352., 26.),
                     text(18.4, 500, -0.02).leading(1.4),
                     c(0xf0f0f0, 0.87),
@@ -1834,8 +1871,12 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                         rect: Rect::new(640., 164.8 + index as f32 * 102.7 - s, 1120., 90.7),
                         title: &input.port,
                         icon: Some(&format!("input-{}", input_icon(input))),
-                        value: Some(mode.label()),
-                        description: Some(&input_status(input)),
+                        value: Some(language.t(match mode {
+                            InputMode::On => "stateOn",
+                            InputMode::Off => "stateOff",
+                            InputMode::Auto => "stateAuto",
+                        })),
+                        description: Some(&input_status(input, language)),
                         selected: false,
                         chevron: true,
                     },
@@ -1844,7 +1885,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             let mut y = 164.8 + state.inventory.inputs.len() as f32 * 102.7 + 16. - s;
             if state.inventory.inputs.is_empty() {
                 out.text(
-                    "No inputs found.",
+                    language.t("noInputs"),
                     Rect::new(664., 165. - s, 1000., 26.),
                     text(16.8, 400, 0.).leading(1.5),
                     c(0xf5f5f5, 0.72),
@@ -1860,9 +1901,9 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     target: Target::Setting(3),
                     rect: Rect::new(640., y, 1120., 72.),
                     title: if state.loading {
-                        "Refreshing…"
+                        language.t("refreshNotice")
                     } else {
-                        "Refresh inputs"
+                        language.t("refreshInputs")
                     },
                     icon: Some("refresh"),
                     value: None,
@@ -1903,12 +1944,12 @@ fn input_icon(input: &Input) -> &'static str {
         "hdmi"
     }
 }
-fn input_status(input: &Input) -> String {
+fn input_status(input: &Input, language: Language) -> String {
     match input.connected {
-        Some(false) => "No device connected".into(),
-        None => "External input".into(),
-        Some(true) if input.title == input.port => "Connected".into(),
-        Some(true) => format!("{} · Connected", input.title),
+        Some(false) => language.t("noDevice").into(),
+        None => language.t("externalInput").into(),
+        Some(true) if input.title == input.port => language.t("connected").into(),
+        Some(true) => format!("{} · {}", input.title, language.t("connected")),
     }
 }
 
@@ -1930,6 +1971,8 @@ fn keycap(out: &mut Scene, label: &str, x: f32, y: f32, w: f32, small: bool) {
 }
 
 fn footer(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
+    let style = text(14.4, 400, 0.005);
     if state.page == Page::Home && state.moving.is_none() {
         return;
     }
@@ -1937,38 +1980,41 @@ fn footer(out: &mut Scene, state: &State, assets: &Assets) {
     if state.moving.is_some() {
         keycap(out, "← →", 84., 1030.4, 42., false);
         out.text(
-            "Move",
+            language.t("move"),
             Rect::new(134., 1033., 100., 20.),
             text(14.4, 400, 0.005),
             color,
             false,
         );
-        keycap(out, "Back", 220., 1030.4, 39., false);
+        let second_x = 134. + assets.width(language.t("move"), style) + 25.6;
+        keycap(out, "Back", second_x, 1030.4, 39., false);
         out.text(
-            "Done",
-            Rect::new(267., 1033., 100., 20.),
+            language.t("done"),
+            Rect::new(second_x + 47., 1033., 150., 20.),
             text(14.4, 400, 0.005),
             color,
             false,
         );
     } else {
+        let label = language.t(if state.page == Page::Settings {
+            "select"
+        } else {
+            "open"
+        });
+        let second_x = 119. + assets.width(label, style) + 25.6;
         keycap(out, "OK", 84., 1030.4, 27., false);
         out.text(
-            if state.page == Page::Settings {
-                "Select"
-            } else {
-                "Open"
-            },
+            label,
             Rect::new(119., 1033., 100., 20.),
             text(14.4, 400, 0.005),
             color,
             false,
         );
         if state.page == Page::Settings {
-            keycap(out, "Back", 189., 1030.4, 39., false);
+            keycap(out, "Back", second_x, 1030.4, 39., false);
             out.text(
-                "Home",
-                Rect::new(236., 1033., 100., 20.),
+                language.t("homeLabel"),
+                Rect::new(second_x + 47., 1033., 180., 20.),
                 text(14.4, 400, 0.005),
                 color,
                 false,
@@ -1984,12 +2030,12 @@ fn footer(out: &mut Scene, state: &State, assets: &Assets) {
             out.icon(
                 assets,
                 "more",
-                Rect::new(185., 1032., 19.2, 19.2),
+                Rect::new(second_x, 1032., 19.2, 19.2),
                 c(0xeeeeee, 0.26),
             );
             out.text(
-                "Hold OK for options",
-                Rect::new(212., 1033., 300., 20.),
+                language.t("options"),
+                Rect::new(second_x + 27.2, 1033., 400., 20.),
                 text(14.4, 400, 0.005),
                 color,
                 false,
@@ -2043,17 +2089,19 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
         true,
     );
     if let Some(target) = action {
-        let button = Rect::new(center - 104.8, top + 144.8, 209.6, 46.8);
+        let label = state.preferences.language.t(if target == Target::Retry {
+            "retry"
+        } else {
+            "exploreApps"
+        });
+        let width = assets.width(label, text(15.2, 600, 0.)) + 72.;
+        let button = Rect::new(center - width / 2., top + 144.8, width, 46.8);
         out.shape(button, 11.2, c(0xededed, 1.));
         if state.focus == target {
             out.border(button.inset(-7.), 18.2, 2., WHITE);
         }
         out.text(
-            if target == Target::Retry {
-                "Try again"
-            } else {
-                "Explore your apps"
-            },
+            label,
             Rect::new(button.x + 20.8, button.y + 14.4, button.w - 72., 18.4),
             text(15.2, 600, 0.),
             c(0x242424, 1.),
@@ -2070,6 +2118,7 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
 }
 
 fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str) {
+    let language = state.preferences.language;
     let app = state.inventory.apps.iter().find(|app| app.id == id);
     let title = app.map_or(id, |app| app.title.as_str());
     let extra = assets
@@ -2094,7 +2143,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str) {
         false,
     );
     out.text(
-        app.map_or("Utilities", |app| app.category.as_str()),
+        language.category(app.map_or("Utilities", |app| app.category.as_str())),
         Rect::new(717.8, panel.y + 87.9 + extra, 440., 23.),
         text(15.2, 400, 0.).leading(1.5),
         c(0xf5f5f5, 0.56),
@@ -2116,11 +2165,11 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str) {
     let hidden = state.preferences.hidden.iter().any(|item| item == id);
     for (index, label) in [
         if favorite {
-            "Remove from favorites"
+            language.t("removeFavorite")
         } else {
-            "Add to favorites"
+            language.t("addFavorite")
         },
-        if hidden { "Show app" } else { "Hide app" },
+        language.t(if hidden { "showApp" } else { "hideApp" }),
     ]
     .into_iter()
     .enumerate()
@@ -2165,18 +2214,23 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str) {
     }
     let line_y = panel.y + panel.h - 53.2;
     out.shape(Rect::new(717.8, line_y, 484.4, 1.), 0., c(0xffffff, 0.04));
-    keycap(out, "OK", 894., line_y + 15., 23., true);
+    let shortcut = text(10.4, 400, 0.);
+    let select_width = assets.width(language.t("selectClose"), shortcut);
+    let close_width = assets.width(language.t("close"), shortcut);
+    let start = 960. - (23. + 6.4 + select_width + 15. + 29. + 6.4 + close_width) / 2.;
+    let back = start + 29.4 + select_width + 15.;
+    keycap(out, "OK", start, line_y + 15., 23., true);
     out.text(
-        "Select",
-        Rect::new(923., line_y + 18., 50., 13.),
+        language.t("selectClose"),
+        Rect::new(start + 29.4, line_y + 18., select_width + 1., 13.),
         text(10.4, 400, 0.),
         c(0xe0e0e0, 0.35),
         false,
     );
-    keycap(out, "Back", 969., line_y + 15., 29., true);
+    keycap(out, "Back", back, line_y + 15., 29., true);
     out.text(
-        "Close",
-        Rect::new(1005., line_y + 18., 50., 13.),
+        language.t("close"),
+        Rect::new(back + 35.4, line_y + 18., close_width + 1., 13.),
         text(10.4, 400, 0.),
         c(0xe0e0e0, 0.35),
         false,
@@ -2184,6 +2238,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str) {
 }
 
 fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
     let panel = Rect::new(350., 290., 1220., 530.);
     out.modal = Some(panel);
     out.shadow(panel, 27.2, 90., 20., 0.45);
@@ -2196,9 +2251,9 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
     out.border(panel, 27.2, 1., c(0xffffff, 0.12));
     out.text(
         if state.keyboard_field == TextField::Location {
-            "City or postcode"
+            language.t("cityPostcode")
         } else {
-            "Find an app"
+            language.t("findApp")
         },
         Rect::new(389., 324., 1000., 44.),
         text(37.6, 500, -0.055).leading(1.1),
@@ -2226,6 +2281,13 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
         false,
     );
     for (index, key) in KEYS.iter().enumerate() {
+        let label = match *key {
+            "Space" => language.t("space"),
+            "Delete" => language.t("delete"),
+            "Clear" => language.t("clear"),
+            "Done" => language.t("done"),
+            _ => key,
+        };
         let rect = Rect::new(
             389. + (index % 10) as f32 * 115.6,
             474. + (index / 10) as f32 * 74.,
@@ -2234,10 +2296,15 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
         );
         let focused = state.focus == Target::Key(index);
         out.pill(rect, focused, false);
+        let mut style = text(18.4, 550, -0.02);
+        let width = assets.width(label, style);
+        if width > rect.w - 12. {
+            style.size *= (rect.w - 12.) / width;
+        }
         out.text(
-            *key,
+            label,
             Rect::new(rect.x, rect.y + 18., rect.w, 25.),
-            text(18.4, 550, -0.02),
+            style,
             if focused { c(0x2c2c2c, 1.) } else { WHITE },
             true,
         );
@@ -2247,25 +2314,27 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
 
 fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
     let start = out.draw.len();
-    let width = (assets.width(notice, text(16., 400, 0.)) + 118.).clamp(240., 1200.);
-    let rect = Rect::new(960. - width / 2., 970., width, 58.);
+    let style = text(16., 400, 0.).leading(1.5);
+    let width = (assets.width(notice, style) + 118.).clamp(240., 1856.);
+    let height = 34. + assets.lines(notice, style, width - 100.) as f32 * 24.;
+    let rect = Rect::new(960. - width / 2., 1080. - 51.2 - height, width, height);
     out.shadow(rect, 16., 40., 8., 0.33);
     out.shape(rect, 16., c(0xededed, 0.96));
     out.border(rect, 16., 1., c(0xffffff, 0.5));
     out.icon(
         assets,
         "sparkles",
-        Rect::new(rect.x + 20., rect.y + 18.6, 20.8, 20.8),
+        Rect::new(rect.x + 20., rect.y + (height - 20.8) / 2., 20.8, 20.8),
         c(0x727272, 1.),
     );
     out.text(
         notice,
-        Rect::new(rect.x + 53.6, rect.y + 17., width - 100., 28.),
+        Rect::new(rect.x + 53.6, rect.y + 17., width - 100., height - 34.),
         text(16., 400, 0.).leading(1.5),
         c(0x303030, 1.),
         false,
     );
-    let close = Rect::new(rect.x + width - 33., rect.y + 19., 20., 20.);
+    let close = Rect::new(rect.x + width - 33., rect.y + (height - 20.) / 2., 20., 20.);
     out.icon(assets, "close", close.inset(1.2), c(0x6b6b6b, 1.));
     if state.focus == Target::DismissNotice {
         out.border(close.inset(-2.), 5., 2., c(0x303030, 1.));

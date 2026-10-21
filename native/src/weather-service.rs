@@ -1,5 +1,6 @@
 //! Dedicated latest-job HTTP workers and an ordered cache writer. No request,
 //! DNS/TLS work or cache write blocks the SDL thread.
+use crate::i18n::Language;
 use crate::weather::{Cache, Command, Location, Reading, parse_locations, parse_reading};
 use serde_json::Value;
 use std::{
@@ -94,7 +95,7 @@ impl Client {
         serde_json::from_slice(&bytes)
             .map_err(|_| "The weather service returned unreadable data".into())
     }
-    pub fn search(&self, query: &str) -> Result<Vec<Location>, String> {
+    pub fn search(&self, query: &str, language: Language) -> Result<Vec<Location>, String> {
         let query = query.trim();
         if query.chars().count() < 2 {
             return Err("Enter at least two characters.".into());
@@ -104,7 +105,7 @@ impl Client {
             &[
                 ("name", query),
                 ("count", "6"),
-                ("language", "en"),
+                ("language", language.code()),
                 ("format", "json"),
             ],
         )?)
@@ -194,9 +195,13 @@ impl Service {
                         continue;
                     }
                     let response = match job {
-                        Command::Search { id, query } => Response::Search {
+                        Command::Search {
                             id,
-                            result: client.search(&query),
+                            query,
+                            language,
+                        } => Response::Search {
+                            id,
+                            result: client.search(&query, language),
                         },
                         Command::Forecast { id, location } => Response::Forecast {
                             id,
