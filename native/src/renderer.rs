@@ -7,16 +7,54 @@ use std::{collections::HashMap, ffi::CString, path::Path};
 
 pub type Color = [f32; 4];
 pub const WHITE: Color = [0.96, 0.96, 0.96, 1.];
-pub const MUTED: Color = [0.72, 0.73, 0.75, 1.];
 const ATLAS: usize = 2048;
 const TEXTURE_BUDGET: usize = 48 * 1024 * 1024;
+
+#[derive(Clone, Copy, Debug)]
+pub struct TextStyle {
+    pub size: f32,
+    pub weight: u16,
+    /// CSS letter-spacing in em, not pixels.
+    pub tracking: f32,
+    pub line_height: f32,
+    pub align_right: bool,
+}
+impl TextStyle {
+    pub const fn new(size: f32) -> Self {
+        Self {
+            size,
+            weight: 400,
+            tracking: 0.,
+            line_height: 1.2,
+            align_right: false,
+        }
+    }
+    pub const fn weight(mut self, weight: u16) -> Self {
+        self.weight = weight;
+        self
+    }
+    pub const fn tracking(mut self, tracking: f32) -> Self {
+        self.tracking = tracking;
+        self
+    }
+    pub const fn leading(mut self, height: f32) -> Self {
+        self.line_height = height;
+        self
+    }
+    pub const fn right(mut self) -> Self {
+        self.align_right = true;
+        self
+    }
+}
 
 #[derive(Clone)]
 pub enum Draw {
     Shape(Rect, f32, f32, Color),
-    Gradient(Rect, Color, Color),
-    Text(String, Rect, f32, Color, bool),
+    RoundedGradient(Rect, f32, Color, Color),
+    Shadow(Rect, f32, f32, Color),
+    Text(String, Rect, TextStyle, Color, bool),
     Image(String, Rect, f32, bool),
+    TintedImage(String, Rect, f32, bool, Color),
     Clip(Option<Rect>),
 }
 
@@ -53,8 +91,8 @@ pub struct Renderer {
     vao: GLuint,
     white: Texture,
     atlas: Texture,
-    font: Font,
-    glyphs: HashMap<(char, u16), Glyph>,
+    fonts: HashMap<u16, Font>,
+    glyphs: HashMap<(char, u16, u16), Glyph>,
     atlas_cursor: (usize, usize, usize),
     textures: HashMap<String, Option<Texture>>,
     vertices: Vec<f32>,
@@ -65,16 +103,24 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(font: &Path, gles: bool) -> Result<Self, String> {
-        let font = Font::from_bytes(
-            std::fs::read(font).map_err(|e| {
-                format!(
-                    "Font {}: {e}. Run node native/tools/assets.mjs first.",
-                    font.display()
-                )
-            })?,
-            fontdue::FontSettings::default(),
-        )
-        .map_err(str::to_string)?;
+        let directory = font.parent().ok_or("Invalid font path")?;
+        let mut fonts = HashMap::new();
+        for weight in [350, 400, 450, 500, 550, 600, 650, 800] {
+            for display in [false, true] {
+                let path = directory.join(format!(
+                    "font-{}{weight}.ttf",
+                    if display { "display-" } else { "" }
+                ));
+                let bytes = std::fs::read(&path).map_err(|e| {
+                    format!("Font {}: {e}. Regenerate native assets.", path.display())
+                })?;
+                fonts.insert(
+                    weight + if display { 1000 } else { 0 },
+                    Font::from_bytes(bytes, fontdue::FontSettings::default())
+                        .map_err(str::to_string)?,
+                );
+            }
+        }
         let vertex = if gles {
             "#version 100\n"
         } else {
@@ -93,7 +139,14 @@ impl Renderer {
             }
             gl::GenBuffers(1, &mut buffer);
             gl::Enable(gl::BLEND);
-            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+            // Preserve an opaque destination alpha. Using BlendFunc for both
+            // channels makes translucent UI darken again in PNG/window compositing.
+            gl::BlendFuncSeparate(
+                gl::SRC_ALPHA,
+                gl::ONE_MINUS_SRC_ALPHA,
+                gl::ONE,
+                gl::ONE_MINUS_SRC_ALPHA,
+            );
             gl::Disable(gl::DEPTH_TEST);
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         }
@@ -105,7 +158,7 @@ impl Renderer {
             vao,
             white,
             atlas,
-            font,
+            fonts,
             glyphs: HashMap::new(),
             atlas_cursor: (1, 1, 0),
             textures: HashMap::new(),
@@ -116,11 +169,11 @@ impl Renderer {
         })
     }
 
-    fn glyph(&mut self, c: char, size: u16) -> Option<Glyph> {
-        if let Some(glyph) = self.glyphs.get(&(c, size)) {
+    fn glyph(&mut self, c: char, size: u16, font: u16) -> Option<Glyph> {
+        if let Some(glyph) = self.glyphs.get(&(c, size, font)) {
             return Some(*glyph);
         }
-        let (metrics, bitmap) = self.font.rasterize(c, f32::from(size));
+        let (metrics, bitmap) = self.fonts[&font].rasterize(c, f32::from(size) / 4.);
         let (mut x, mut y, mut row) = self.atlas_cursor;
         if x + metrics.width + 1 >= ATLAS {
             x = 1;
@@ -160,7 +213,7 @@ impl Renderer {
             ],
         };
         self.atlas_cursor = (x + metrics.width + 2, y, row.max(metrics.height));
-        self.glyphs.insert((c, size), glyph);
+        self.glyphs.insert((c, size, font), glyph);
         Some(glyph)
     }
 
@@ -227,18 +280,21 @@ impl Renderer {
         });
     }
 
-    fn text(&mut self, text: &str, rect: Rect, size: f32, color: Color, centered: bool) {
-        let size = size.round() as u16;
-        let size_f = f32::from(size);
-        let ascent = self
-            .font
-            .horizontal_line_metrics(size_f)
-            .map_or(size_f, |m| m.ascent);
+    fn text(&mut self, text: &str, rect: Rect, style: TextStyle, color: Color, centered: bool) {
+        let size = (style.size * 4.).round() as u16;
+        let size_f = f32::from(size) / 4.;
+        let font_id = style.weight + if style.size >= 32. { 1000 } else { 0 };
+        let font = &self.fonts[&font_id];
+        let line_height = size_f * style.line_height;
+        let baseline = font.horizontal_line_metrics(size_f).map_or(size_f, |m| {
+            (line_height - m.ascent + m.descent) / 2. + m.ascent
+        });
+        let tracking = style.tracking * size_f;
         let advance = |c| {
             if c == '\n' {
                 0.
             } else {
-                self.font.metrics(c, size_f).advance_width
+                font.metrics(c, size_f).advance_width + tracking
             }
         };
         let mut lines: Vec<String> = Vec::new();
@@ -272,39 +328,62 @@ impl Renderer {
         if !line.is_empty() {
             lines.push(line.trim_end().into());
         }
+        let mut placed = Vec::new();
         for (index, line) in lines.iter().enumerate() {
-            let top = rect.y + index as f32 * size_f * 1.25;
-            if top + size_f > rect.y + rect.h + 1. {
+            let top = rect.y + index as f32 * line_height;
+            if index > 0 && top + line_height > rect.y + rect.h + 1. {
                 break;
             }
+            let mut previous = None;
             let width: f32 = line
                 .chars()
-                .map(|c| self.font.metrics(c, size_f).advance_width)
+                .map(|c| {
+                    let kern = previous
+                        .and_then(|p| font.horizontal_kern(p, c, size_f))
+                        .unwrap_or(0.);
+                    previous = Some(c);
+                    advance(c) + kern
+                })
                 .sum();
-            let mut x = rect.x + if centered { (rect.w - width) / 2. } else { 0. };
+            let mut x = rect.x
+                + if style.align_right {
+                    rect.w - width
+                } else if centered {
+                    (rect.w - width) / 2.
+                } else {
+                    0.
+                };
+            let mut previous = None;
             for c in line.chars() {
-                if let Some(glyph) = self.glyph(c, size) {
-                    let m = glyph.metrics;
-                    self.quad(
-                        Rect::new(
-                            x + m.xmin as f32,
-                            top + ascent - (m.height as f32 + m.ymin as f32),
-                            m.width as f32,
-                            m.height as f32,
-                        ),
-                        glyph.uv,
-                        0.,
-                        0.,
-                        color,
-                        self.atlas.id,
-                    );
-                    x += m.advance_width;
+                if let Some(previous) = previous {
+                    x += font.horizontal_kern(previous, c, size_f).unwrap_or(0.);
                 }
+                placed.push((c, x, top + baseline));
+                x += advance(c);
+                previous = Some(c);
+            }
+        }
+        for (c, x, baseline) in placed {
+            if let Some(glyph) = self.glyph(c, size, font_id) {
+                let m = glyph.metrics;
+                self.quad(
+                    Rect::new(
+                        x + m.xmin as f32,
+                        baseline - (m.height as f32 + m.ymin as f32),
+                        m.width as f32,
+                        m.height as f32,
+                    ),
+                    glyph.uv,
+                    0.,
+                    0.,
+                    color,
+                    self.atlas.id,
+                );
             }
         }
     }
 
-    fn image(&mut self, path: &str, mut rect: Rect, radius: f32, contain: bool) {
+    fn image(&mut self, path: &str, mut rect: Rect, radius: f32, contain: bool, tint: Color) {
         let frame = self.frame;
         let entry = self
             .textures
@@ -330,7 +409,7 @@ impl Renderer {
             let h = texture.height as f32 * scale;
             rect = Rect::new(rect.x + (rect.w - w) / 2., rect.y + (rect.h - h) / 2., w, h);
         }
-        self.quad(rect, [0., 0., 1., 1.], radius, 0., WHITE, id);
+        self.quad(rect, [0., 0., 1., 1.], radius, 0., tint, id);
     }
 
     pub fn render(&mut self, commands: &[Draw], width: u32, height: u32) {
@@ -348,19 +427,30 @@ impl Renderer {
                     *color,
                     self.white.id,
                 ),
-                Draw::Gradient(rect, top, bottom) => self.gradient_quad(
+                Draw::RoundedGradient(rect, radius, top, bottom) => self.gradient_quad(
                     *rect,
                     [0., 0., 1., 1.],
-                    0.,
+                    *radius,
                     0.,
                     [*top, *bottom],
+                    self.white.id,
+                ),
+                Draw::Shadow(rect, radius, blur, color) => self.quad(
+                    rect.inset(-*blur),
+                    [0., 0., 1., 1.],
+                    *radius,
+                    -*blur,
+                    *color,
                     self.white.id,
                 ),
                 Draw::Text(text, rect, size, color, centered) => {
                     self.text(text, *rect, *size, *color, *centered)
                 }
                 Draw::Image(path, rect, radius, contain) => {
-                    self.image(path, *rect, *radius, *contain)
+                    self.image(path, *rect, *radius, *contain, [1.; 4])
+                }
+                Draw::TintedImage(path, rect, radius, contain, tint) => {
+                    self.image(path, *rect, *radius, *contain, *tint)
                 }
                 Draw::Clip(clip) => self.clip = *clip,
             }
@@ -472,6 +562,35 @@ impl Renderer {
             .ok_or("Invalid framebuffer dimensions")?;
         image::imageops::flip_vertical_in_place(&mut image);
         image.save(path).map_err(|e| e.to_string())
+    }
+
+    /// Capture the authored TV surface, independent of desktop HiDPI/window limits.
+    pub fn capture(&mut self, commands: &[Draw], path: &Path) -> Result<(), String> {
+        let image = texture(1920, 1080, &vec![0; 1920 * 1080 * 4]);
+        let mut framebuffer = 0;
+        unsafe {
+            gl::GenFramebuffers(1, &mut framebuffer);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, framebuffer);
+            gl::FramebufferTexture2D(
+                gl::FRAMEBUFFER,
+                gl::COLOR_ATTACHMENT0,
+                gl::TEXTURE_2D,
+                image.id,
+                0,
+            );
+            if gl::CheckFramebufferStatus(gl::FRAMEBUFFER) != gl::FRAMEBUFFER_COMPLETE {
+                gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+                gl::DeleteFramebuffers(1, &framebuffer);
+                return Err("Screenshot framebuffer is incomplete".into());
+            }
+        }
+        self.render(commands, 1920, 1080);
+        let result = self.screenshot(path, 1920, 1080);
+        unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            gl::DeleteFramebuffers(1, &framebuffer);
+        }
+        result
     }
 }
 

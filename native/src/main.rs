@@ -32,6 +32,7 @@ struct Options {
     frames: Option<u64>,
     script: VecDeque<String>,
     fullscreen: bool,
+    time: Option<OffsetDateTime>,
 }
 
 impl Options {
@@ -57,6 +58,15 @@ impl Options {
                 "--preferences" => result.preferences = Some(value.into()),
                 "--screenshot" => result.screenshot = Some(value.into()),
                 "--dump-state" => result.dump = Some(value.into()),
+                "--time" => {
+                    result.time = Some(
+                        OffsetDateTime::parse(
+                            &value,
+                            &time::format_description::well_known::Rfc3339,
+                        )
+                        .map_err(|e| e.to_string())?,
+                    )
+                }
                 "--frames" => {
                     result.frames = Some(
                         value
@@ -162,6 +172,7 @@ fn script(
         "wait" => vec![],
         action if action.starts_with("type:") => {
             state.overlay = Some(Overlay::Keyboard);
+            state.focus = Target::Key(0);
             state.text(&action[5..]);
             vec![]
         }
@@ -174,6 +185,37 @@ fn main() {
         eprintln!("Luma native: {error}");
         std::process::exit(1);
     }
+}
+
+fn compose(
+    state: &mut State,
+    assets: &view::Assets,
+    pill: f32,
+    width: f32,
+    now: OffsetDateTime,
+) -> view::Scene {
+    let scene = view::scene_with_pill(state, assets, pill, width, now);
+    if !state.pointer && state.overlay.is_none() && state.reveal_focus(&scene.controls) {
+        view::scene_with_pill(state, assets, pill, width, now)
+    } else {
+        scene
+    }
+}
+
+fn scripted_click(sdl: &sdl2::Sdl, window: &sdl2::video::Window, position: &str) -> Result<(), String> {
+    let coordinates: Vec<f32> = position.split(':').map(|value| value.parse::<f32>().map_err(|e| e.to_string())).collect::<Result<_, _>>()?;
+    let [x, y] = coordinates.as_slice() else { return Err("click: expects logical x:y coordinates".into()); };
+    if !x.is_finite() || !y.is_finite() { return Err("Pointer coordinates must be finite".into()); }
+    let (w, h) = window.size();
+    let scale = (w as f32 / 1920.).min(h as f32 / 1080.);
+    let x = (x * scale + (w as f32 - 1920. * scale) / 2.).round() as i32;
+    let y = (y * scale + (h as f32 - 1080. * scale) / 2.).round() as i32;
+    let events = sdl.event()?;
+    for event in [
+        Event::MouseButtonDown { timestamp: 0, window_id: window.id(), which: 0, mouse_btn: MouseButton::Left, clicks: 1, x, y },
+        Event::MouseButtonUp { timestamp: 0, window_id: window.id(), which: 0, mouse_btn: MouseButton::Left, clicks: 1, x, y },
+    ] { events.push_event(event)?; }
+    Ok(())
 }
 
 fn run() -> Result<(), String> {
@@ -244,6 +286,7 @@ fn run() -> Result<(), String> {
     let mut events = sdl.event_pump()?;
     let mut press: Option<Press> = None;
     let mut pill = view::pill_target(0);
+    let mut pill_width = view::pill_width(0);
     let mut last_frame = Instant::now();
     let mut last_minute = None;
     let mut frame = 0u64;
@@ -251,9 +294,18 @@ fn run() -> Result<(), String> {
     let mut running = true;
     let mut queued_event = None;
     let mut text_active = false;
-    let mut scene = view::scene(&state, &assets, pill, OffsetDateTime::now_utc(), !webos);
+    let mut initial_focus = options.script.is_empty();
+    let mut scene = compose(
+        &mut state,
+        &assets,
+        pill,
+        pill_width,
+        options.time.unwrap_or_else(OffsetDateTime::now_utc),
+    );
     while running {
-        let now = OffsetDateTime::now_utc().to_offset(local_offset);
+        let now = options
+            .time
+            .unwrap_or_else(|| OffsetDateTime::now_utc().to_offset(local_offset));
         if last_minute != Some(now.unix_timestamp() / 60) {
             last_minute = Some(now.unix_timestamp() / 60);
             state.dirty = true;
@@ -262,12 +314,23 @@ fn run() -> Result<(), String> {
         while let Ok(response) = platform.receiver.try_recv() {
             match response {
                 Response::Inventory(Ok((inventory, warning))) => {
-                    state.set_inventory(inventory, warning)
+                    state.set_inventory(inventory, warning);
+                    if initial_focus
+                        && state.focus == Target::Nav(0)
+                        && state.page == state::Page::Home
+                    {
+                        state.focus = state.first_content();
+                    }
+                    initial_focus = false;
                 }
                 Response::Inventory(Err(error)) => {
                     state.loading = false;
                     state.error = Some(error);
                     state.dirty = true;
+                    if initial_focus {
+                        state.focus = state.first_content();
+                        initial_focus = false;
+                    }
                 }
                 Response::Launched(result) => {
                     state.launching = false;
@@ -283,7 +346,7 @@ fn run() -> Result<(), String> {
         }
         // Rebuild hit regions before input whenever inventory/layout changed.
         if state.dirty {
-            scene = view::scene(&state, &assets, pill, now, !webos);
+            scene = compose(&mut state, &assets, pill, pill_width, now);
         }
         for event in queued_event.take().into_iter().chain(events.poll_iter()) {
             let mut pending = vec![];
@@ -386,6 +449,8 @@ fn run() -> Result<(), String> {
                                 pointer: true,
                             });
                         }
+                    } else if mouse_btn == MouseButton::Left {
+                        press = None;
                     }
                 }
                 Event::MouseButtonUp {
@@ -393,24 +458,39 @@ fn run() -> Result<(), String> {
                     x,
                     y,
                     ..
-                } => {
-                    if let Some(held) = press.take()
-                        && held.pointer
-                        && !held.held
-                        && hit(&scene.controls, &window, x, y, &state).as_ref()
-                            == Some(&held.target)
+                } => match press.take() {
+                    Some(held)
+                        if held.pointer
+                            && !held.held
+                            && hit(&scene.controls, &window, x, y, &state).as_ref()
+                                == Some(&held.target) =>
                     {
-                        pending = state.activate();
+                        pending = state.activate()
                     }
-                }
+                    None if scene.modal.is_some_and(|rect| {
+                        pointer_position(&window, x, y).is_some_and(|(x, y)| !rect.contains(x, y))
+                    }) =>
+                    {
+                        pending = state.back()
+                    }
+                    _ => {}
+                },
                 Event::MouseWheel { y, .. } if state.overlay.is_none() => {
                     let max = scene
                         .controls
                         .iter()
                         .filter(|c| c.scrollable)
-                        .map(|c| c.rect.y + c.rect.h + state.scroll - 965.)
+                        .map(|c| {
+                            c.rect.y + c.rect.h + state.scroll
+                                - if state.page == state::Page::Home {
+                                    1041.6
+                                } else {
+                                    982.4
+                                }
+                        })
                         .fold(0., f32::max);
                     state.scroll = (state.scroll - y as f32 * 90.).clamp(0., max.max(0.));
+                    state.pointer = true;
                     state.dirty = true;
                 }
                 _ => {}
@@ -422,9 +502,14 @@ fn run() -> Result<(), String> {
             {
                 press = None;
             }
+            let pressed = press.as_ref().filter(|p| !p.held).map(|p| p.target.clone());
+            if state.pressed != pressed {
+                state.pressed = pressed;
+                state.dirty = true;
+            }
             // SDL may deliver several navigation events in a single poll.
             if state.dirty {
-                scene = view::scene(&state, &assets, pill, now, !webos);
+                scene = compose(&mut state, &assets, pill, pill_width, now);
             }
         }
         if let Some(held) = &mut press
@@ -432,14 +517,18 @@ fn run() -> Result<(), String> {
             && held.start.elapsed() >= Duration::from_millis(600)
         {
             held.held = true;
+            state.pressed = None;
             state.hold();
         }
         if !state.loading
             && frame.is_multiple_of(3)
             && let Some(action) = options.script.pop_front()
         {
-            let pending = script(&action, &mut state, &scene.controls)?;
-            running &= effects(pending, &mut state, &platform, &preferences_path);
+            if let Some(position) = action.strip_prefix("click:") { scripted_click(&sdl, &window, position)?; }
+            else {
+                let pending = script(&action, &mut state, &scene.controls)?;
+                running &= effects(pending, &mut state, &platform, &preferences_path);
+            }
         }
         let keyboard = matches!(state.overlay, Some(Overlay::Keyboard));
         if keyboard != text_active {
@@ -453,21 +542,26 @@ fn run() -> Result<(), String> {
         let dt = last_frame.elapsed().as_secs_f32().min(0.1);
         last_frame = Instant::now();
         let target = view::pill_target(state.page_index());
-        if state.preferences.reduced_motion || (pill - target).abs() < 0.2 {
+        let target_width = view::pill_width(state.page_index());
+        if state.preferences.reduced_motion
+            || ((pill - target).abs() < 0.2 && (pill_width - target_width).abs() < 0.2)
+        {
             pill = target;
+            pill_width = target_width;
         } else {
             pill += (target - pill) * (1. - (-20. * dt).exp());
+            pill_width += (target_width - pill_width) * (1. - (-20. * dt).exp());
             state.dirty = true;
         }
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit);
         if (state.dirty && visible) || final_frame {
-            scene = view::scene(&state, &assets, pill, now, !webos);
+            scene = compose(&mut state, &assets, pill, pill_width, now);
             let (width, height) = window.drawable_size();
             if width > 0 && height > 0 {
-                renderer.render(&scene.draw, width, height);
                 if final_frame && let Some(path) = &options.screenshot {
-                    renderer.screenshot(path, width, height)?;
+                    renderer.capture(&scene.draw, path)?;
                 }
+                renderer.render(&scene.draw, width, height);
                 window.gl_swap_window();
             }
             state.dirty = false;
@@ -480,7 +574,10 @@ fn run() -> Result<(), String> {
         // VSync paces animation; holds and scripted checks need short timed wakes.
         let timeout = if !visible {
             250
-        } else if pill != target {
+        } else if pill != target
+            || pill_width != target_width
+            || state.previous_background.is_some()
+        {
             0
         } else if press.is_some() || options.frames.is_some() {
             8
@@ -495,7 +592,7 @@ fn run() -> Result<(), String> {
     if let Some(path) = options.dump {
         let state = serde_json::json!({ "page": state.page, "focus": state.focus, "query": state.query,
             "filter": state.filter, "preferences": state.preferences, "apps": state.apps().iter().map(|a| &a.id).collect::<Vec<_>>(),
-            "error": state.error, "scroll": state.scroll });
+            "error": state.error, "scroll": state.scroll, "subpage": state.subpage, "modal": state.overlay.is_some() });
         std::fs::write(
             path,
             serde_json::to_vec_pretty(&state).map_err(|e| e.to_string())?,
@@ -505,6 +602,18 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
+fn pointer_position(window: &sdl2::video::Window, x: i32, y: i32) -> Option<(f32, f32)> {
+    let (width, height) = window.size();
+    let scale = (width as f32 / 1920.).min(height as f32 / 1080.);
+    if scale <= 0. {
+        return None;
+    }
+    Some((
+        (x as f32 - (width as f32 - 1920. * scale) / 2.) / scale,
+        (y as f32 - (height as f32 - 1080. * scale) / 2.) / scale,
+    ))
+}
+
 fn hit(
     controls: &[state::Control],
     window: &sdl2::video::Window,
@@ -512,26 +621,19 @@ fn hit(
     y: i32,
     state: &State,
 ) -> Option<Target> {
-    let (width, height) = window.size();
-    let scale = (width as f32 / 1920.).min(height as f32 / 1080.);
-    if scale <= 0. {
-        return None;
-    }
-    let x = (x as f32 - (width as f32 - 1920. * scale) / 2.) / scale;
-    let y = (y as f32 - (height as f32 - 1080. * scale) / 2.) / scale;
+    let (x, y) = pointer_position(window, x, y)?;
     controls
         .iter()
         .rev()
         .find(|control| {
             control.rect.contains(x, y)
                 && (!control.scrollable
-                    || (y
-                        >= match state.page {
-                            state::Page::Apps => 352.,
-                            state::Page::Settings => 275.,
-                            state::Page::Home => 190.,
-                        }
-                        && y < 986.))
+                    || (y >= 108.8
+                        && y < if state.page == state::Page::Home && state.moving.is_none() {
+                            1053.6
+                        } else {
+                            994.4
+                        }))
         })
         .map(|control| control.target.clone())
 }

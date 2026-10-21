@@ -14,15 +14,17 @@ fn ready() -> State {
 }
 
 fn controls(state: &State) -> Vec<crate::state::Control> {
-    view::scene(
+    view::scene_with_pill(
         state,
         &view::Assets {
             root: PathBuf::new(),
             icons: BTreeMap::new(),
+            colors: BTreeMap::new(),
+            version: "test".into(),
         },
         view::pill_target(state.page_index()),
+        view::pill_width(state.page_index()),
         time::OffsetDateTime::UNIX_EPOCH,
-        true,
     )
     .controls
 }
@@ -65,7 +67,8 @@ fn hiding_restores_nearest_app_and_hidden_filter_can_restore_it() {
     state.focus = Target::Option(1);
     state.activate();
     assert!(state.preferences.hidden.is_empty());
-    assert_eq!(state.focus, Target::Filter(0));
+    assert_eq!(state.focus, Target::App("netflix".into()));
+    assert_eq!(state.filter, 0);
 }
 
 #[test]
@@ -95,7 +98,7 @@ fn keyboard_is_modal_and_back_preserves_then_clears_search() {
     assert!(
         controls(&state)
             .iter()
-            .all(|c| matches!(c.target, Target::Key(_)))
+            .all(|c| matches!(c.target, Target::Key(_) | Target::CloseDialog))
     );
     state.text("netflix");
     state.delete();
@@ -205,9 +208,19 @@ fn gallery_and_grid_navigation_scroll_to_keep_focus_visible() {
     assert_eq!(state.focus, Target::Background(3));
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Background(6));
-    assert!(state.scroll > 0.);
+    assert_eq!(
+        state.scroll, 0.,
+        "the web-sized gallery fits all three rows"
+    );
     state.direction(Direction::Left, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(1));
+    state.open(1);
+    let last = state.apps().last().unwrap().id.clone();
+    state.focus(Target::App(last), &controls(&state));
+    assert!(
+        state.scroll > 0.,
+        "library focus includes its wrapped caption"
+    );
 }
 
 #[test]
@@ -216,7 +229,7 @@ fn cancelling_options_preserves_identity_and_does_not_save() {
     state.focus = Target::App("netflix".into());
     state.options();
     assert!(matches!(state.overlay, Some(Overlay::Options { .. })));
-    state.focus = Target::Option(2);
+    state.focus = Target::CloseDialog;
     assert!(state.activate().is_empty());
     assert_eq!(state.focus, Target::App("netflix".into()));
     assert!(state.overlay.is_none());
@@ -272,4 +285,120 @@ fn focused_navigation_tabs_switch_pages_immediately() {
     state.direction(Direction::Right, &controls(&state));
     assert_eq!(state.page, Page::Settings);
     assert_eq!(state.focus, Target::Nav(2));
+}
+
+#[test]
+fn clock_format_subpage_saves_and_restores_its_parent_row() {
+    let mut state = ready();
+    state.open(2);
+    state.focus = Target::Setting(1);
+    assert!(
+        state
+            .direction(Direction::Right, &controls(&state))
+            .is_empty()
+    );
+    assert_eq!(state.subpage, Some(crate::state::Subpage::Clock));
+    assert_eq!(state.focus, Target::Choice(0));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(state.preferences.hour_24);
+    assert!(state.subpage.is_none());
+    assert_eq!(state.focus, Target::Setting(1));
+    state.activate();
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::Setting(1));
+    assert!(state.subpage.is_none());
+}
+
+#[test]
+fn input_visibility_has_explicit_choices_and_returns_to_the_same_input() {
+    let mut state = ready();
+    state.open(2);
+    state.section = 2;
+    let id = "com.webos.app.hdmi1".to_string();
+    state.focus = Target::InputMode(id.clone());
+    state.activate();
+    assert_eq!(state.focus, Target::Choice(2));
+    state.direction(Direction::Up, &controls(&state));
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(state.preferences.input_modes[&id], InputMode::Off);
+    assert_eq!(state.focus, Target::InputMode(id.clone()));
+    assert!(!state.preferences.input_visible(&state.inventory.inputs[0]));
+    state.activate();
+    state.back();
+    assert_eq!(state.focus, Target::InputMode(id));
+    assert!(state.subpage.is_none());
+}
+
+#[test]
+fn background_entry_restores_the_applied_background() {
+    let mut state = ready();
+    state.open(2);
+    state.preferences.background = "forest".into();
+    state.focus = Target::Sidebar(1);
+    state.section = 1;
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::Background(6));
+    state.back();
+    state.activate();
+    assert_eq!(state.focus, Target::Background(6));
+}
+
+#[test]
+fn categories_and_search_have_clear_actions_and_conditional_hidden_control() {
+    let mut state = ready();
+    state.open(1);
+    assert!(
+        !controls(&state)
+            .iter()
+            .any(|c| c.target == Target::Filter(5))
+    );
+    state.focus = Target::Search;
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::Filter(4));
+    state.preferences.hidden.push("netflix".into());
+    state.focus = Target::Search;
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::Filter(5));
+    state.activate();
+    assert_eq!(state.apps().len(), 1);
+    state.focus = Target::ClearFilter;
+    state.activate();
+    assert_eq!(state.filter, 0);
+    assert_eq!(state.focus, Target::Filter(1));
+    state.query = "YouTube".into();
+    state.focus = Target::ClearSearch;
+    state.activate();
+    assert!(state.query.is_empty());
+    assert_eq!(state.focus, Target::Search);
+}
+
+#[test]
+fn a_notice_does_not_escape_modal_focus_and_closing_restores_the_app() {
+    let mut state = ready();
+    state.open(1);
+    state.notify("Saved");
+    state.focus = Target::App("netflix".into());
+    state.options();
+    assert!(
+        controls(&state)
+            .iter()
+            .all(|c| matches!(c.target, Target::Option(_) | Target::CloseDialog))
+    );
+    state.focus = Target::Option(1);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::Option(1));
+    state.back();
+    assert_eq!(state.focus, Target::App("netflix".into()));
+}
+
+#[test]
+fn remote_toolbar_focus_normalizes_scroll_but_hover_does_not() {
+    let mut state = ready();
+    state.open(1);
+    state.scroll = 100.;
+    state.pointer_focus(Target::Filter(1));
+    assert_eq!(state.scroll, 100.);
+    state.focus(Target::Filter(2), &controls(&state));
+    assert_eq!(state.scroll, 0.);
 }

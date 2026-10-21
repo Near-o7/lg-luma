@@ -82,13 +82,6 @@ pub enum InputMode {
 }
 
 impl InputMode {
-    pub fn next(self) -> Self {
-        match self {
-            Self::Auto => Self::On,
-            Self::On => Self::Off,
-            Self::Off => Self::Auto,
-        }
-    }
     pub fn label(self) -> &'static str {
         match self {
             Self::Auto => "Auto",
@@ -115,9 +108,9 @@ impl Default for Preferences {
         Self {
             favorites: None,
             hidden: vec![],
-            background: "slate".into(),
+            background: "dunes".into(),
             show_names: false,
-            hour_24: true,
+            hour_24: false,
             reduced_motion: false,
             input_modes: BTreeMap::new(),
         }
@@ -162,7 +155,7 @@ impl Preferences {
 
     pub fn sanitize(&mut self) {
         if !BACKGROUNDS.iter().any(|(id, _)| *id == self.background) {
-            self.background = "slate".into();
+            self.background = "dunes".into();
         }
         fn clean(ids: &mut Vec<String>) {
             let mut seen = HashSet::new();

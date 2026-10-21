@@ -1,4 +1,4 @@
-use crate::model::{App, BACKGROUNDS, CATEGORIES, Inventory, Preferences};
+use crate::model::{App, BACKGROUNDS, CATEGORIES, InputMode, Inventory, Preferences};
 use serde::Serialize;
 use std::time::{Duration, Instant};
 
@@ -17,11 +17,17 @@ pub enum Target {
     Input(String),
     Browse,
     Filter(usize),
+    ClearFilter,
     Search,
+    ClearSearch,
     Sidebar(usize),
     Setting(usize),
     Background(usize),
     InputMode(String),
+    Choice(usize),
+    CloseDialog,
+    Retry,
+    DismissNotice,
     Option(usize),
     Key(usize),
 }
@@ -61,6 +67,12 @@ pub enum Overlay {
     Keyboard,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub enum Subpage {
+    Clock,
+    Input(String),
+}
+
 #[derive(Clone, Copy)]
 pub enum Direction {
     Up,
@@ -91,6 +103,7 @@ pub struct State {
     pub query: String,
     pub filter: usize,
     pub section: usize,
+    pub subpage: Option<Subpage>,
     pub scroll: f32,
     pub overlay: Option<Overlay>,
     pub moving: Option<String>,
@@ -99,6 +112,9 @@ pub struct State {
     pub notice: Option<(String, Instant)>,
     pub error: Option<String>,
     pub dirty: bool,
+    pub pointer: bool,
+    pub pressed: Option<Target>,
+    pub previous_background: Option<(String, Instant)>,
 }
 
 impl State {
@@ -111,6 +127,7 @@ impl State {
             query: String::new(),
             filter: 0,
             section: 0,
+            subpage: None,
             scroll: 0.,
             overlay: None,
             moving: None,
@@ -119,6 +136,9 @@ impl State {
             notice: None,
             error: None,
             dirty: true,
+            pointer: false,
+            pressed: None,
+            previous_background: None,
         }
     }
 
@@ -128,6 +148,12 @@ impl State {
     }
 
     pub fn tick(&mut self) {
+        if let Some((_, start)) = &self.previous_background {
+            self.dirty = true;
+            if self.preferences.reduced_motion || start.elapsed() >= Duration::from_millis(400) {
+                self.previous_background = None;
+            }
+        }
         if self
             .notice
             .as_ref()
@@ -158,6 +184,7 @@ impl State {
         self.filter = 0;
         self.overlay = None;
         self.moving = None;
+        self.subpage = None;
         self.dirty = true;
     }
 
@@ -232,60 +259,124 @@ impl State {
                 .apps()
                 .first()
                 .map(|app| Target::App(app.id.clone()))
-                .unwrap_or(Target::Browse),
+                .unwrap_or(if self.error.is_some() {
+                    Target::Retry
+                } else {
+                    Target::Browse
+                }),
             Page::Apps => self
                 .apps()
                 .first()
                 .map(|app| Target::App(app.id.clone()))
-                .unwrap_or(Target::Filter(0)),
+                .unwrap_or(Target::Filter(1)),
             Page::Settings => Target::Sidebar(0),
         }
     }
 
     pub fn focus(&mut self, target: Target, controls: &[Control]) {
-        if self.focus == target {
-            return;
-        }
+        self.pointer = false;
         self.focus = target;
-        if let Some(control) = controls.iter().find(|c| c.target == self.focus) {
-            if control.scrollable {
-                let top = match self.page {
-                    Page::Apps => 362.,
-                    Page::Settings => 292.,
-                    Page::Home => 190.,
-                };
-                if control.rect.y < top {
-                    self.scroll = (self.scroll + control.rect.y - top).max(0.);
-                }
-                if control.rect.y + control.rect.h > 965. {
-                    self.scroll += control.rect.y + control.rect.h - 965.;
-                }
-            } else if matches!(
-                self.focus,
-                Target::Nav(_) | Target::Filter(_) | Target::Search | Target::Sidebar(_)
-            ) {
-                self.scroll = 0.;
-            }
-        }
+        self.reveal_focus(controls);
         if let Target::Sidebar(section) = self.focus {
             self.section = section;
+            self.subpage = None;
         }
         self.dirty = true;
     }
 
+    /// Remote focus is revealed after layout changes, including hide/reorder.
+    /// Pointer paths deliberately do not call this method.
+    pub fn reveal_focus(&mut self, controls: &[Control]) -> bool {
+        let previous = self.scroll;
+        if let Some(control) = controls.iter().find(|c| c.target == self.focus) {
+            if matches!(
+                self.focus,
+                Target::Nav(_)
+                    | Target::Filter(_)
+                    | Target::ClearFilter
+                    | Target::Search
+                    | Target::ClearSearch
+                    | Target::Sidebar(_)
+            ) {
+                self.scroll = 0.;
+            } else if control.scrollable {
+                let top = 120.8;
+                if control.rect.y < top {
+                    self.scroll = (self.scroll + control.rect.y - top).max(0.);
+                }
+                let bottom = if self.page == Page::Home && self.moving.is_none() {
+                    1041.6
+                } else {
+                    982.4
+                };
+                if control.rect.y + control.rect.h > bottom {
+                    self.scroll += control.rect.y + control.rect.h - bottom;
+                }
+            }
+        }
+        if self.scroll != previous {
+            self.dirty = true;
+        }
+        self.scroll != previous
+    }
+
     /// Hover and pointer-down must not move the control before pointer-up.
     pub fn pointer_focus(&mut self, target: Target) {
+        if !self.pointer {
+            self.dirty = true;
+        }
+        self.pointer = true;
         if self.focus == target {
             return;
         }
         if let Target::Sidebar(section) = target {
             self.section = section;
+            self.subpage = None;
         }
         self.focus = target;
         self.dirty = true;
     }
 
+    pub fn hidden_count(&self) -> usize {
+        self.inventory
+            .apps
+            .iter()
+            .filter(|app| self.preferences.hidden.contains(&app.id))
+            .count()
+    }
+
+    fn section_entry(&self) -> Target {
+        match self.section {
+            1 => Target::Background(
+                BACKGROUNDS
+                    .iter()
+                    .position(|(id, _)| *id == self.preferences.background)
+                    .unwrap_or(3),
+            ),
+            2 => self
+                .inventory
+                .inputs
+                .first()
+                .map(|input| Target::InputMode(input.id.clone()))
+                .unwrap_or(Target::Setting(3)),
+            _ => Target::Setting(0),
+        }
+    }
+
+    fn close_subpage(&mut self) {
+        self.pointer = false;
+        self.focus = match self.subpage.take() {
+            Some(Subpage::Clock) => Target::Setting(1),
+            Some(Subpage::Input(id)) => Target::InputMode(id),
+            None => Target::Sidebar(self.section),
+        };
+        self.scroll = 0.;
+        self.dirty = true;
+    }
+
     pub fn direction(&mut self, direction: Direction, controls: &[Control]) -> Vec<Effect> {
+        self.pointer = false;
+        self.dirty = true;
         if let Some(id) = self.moving.clone() {
             let mut ids = self.preferences.favorites(&self.inventory.apps);
             let slots: Vec<_> = ids
@@ -313,6 +404,85 @@ impl State {
             return vec![];
         }
         if self.overlay.is_none() {
+            if let Target::Choice(index) = self.focus {
+                let count = if matches!(self.subpage, Some(Subpage::Clock)) {
+                    2
+                } else {
+                    3
+                };
+                match direction {
+                    Direction::Left => self.close_subpage(),
+                    Direction::Up => self.focus(
+                        if index == 0 {
+                            Target::Nav(2)
+                        } else {
+                            Target::Choice(index - 1)
+                        },
+                        controls,
+                    ),
+                    Direction::Down => self.focus(Target::Choice((index + 1) % count), controls),
+                    Direction::Right => {}
+                }
+                return vec![];
+            }
+            if let Target::Sidebar(index) = self.focus {
+                match direction {
+                    Direction::Right => {
+                        let entry = self.section_entry();
+                        self.focus(entry, controls);
+                    }
+                    Direction::Up => self.focus(
+                        if index == 0 {
+                            Target::Nav(2)
+                        } else {
+                            Target::Sidebar(index - 1)
+                        },
+                        controls,
+                    ),
+                    Direction::Down => self.focus(Target::Sidebar((index + 1) % 3), controls),
+                    Direction::Left => {}
+                }
+                return vec![];
+            }
+            if matches!(self.focus, Target::Setting(1) | Target::InputMode(_))
+                && matches!(direction, Direction::Right)
+            {
+                return self.activate();
+            }
+            if matches!(self.focus, Target::Setting(_)) && matches!(direction, Direction::Right) {
+                return vec![];
+            }
+            if let Target::InputMode(id) = &self.focus
+                && matches!(direction, Direction::Up)
+                && self
+                    .inventory
+                    .inputs
+                    .first()
+                    .is_some_and(|input| &input.id == id)
+            {
+                self.focus(Target::Sidebar(2), controls);
+                return vec![];
+            }
+            if self.focus == Target::Setting(0) && matches!(direction, Direction::Up) {
+                self.focus(Target::Nav(2), controls);
+                return vec![];
+            }
+            if self.focus == Target::Search {
+                match direction {
+                    Direction::Left => {
+                        self.focus(
+                            Target::Filter(if self.hidden_count() > 0 { 5 } else { 4 }),
+                            controls,
+                        );
+                        return vec![];
+                    }
+                    Direction::Up => {
+                        self.focus(Target::Nav(1), controls);
+                        return vec![];
+                    }
+                    _ => {}
+                }
+            }
             if let Target::Nav(index) = self.focus {
                 let next = match direction {
                     Direction::Left if index > 0 => Some(index - 1),
@@ -330,7 +500,7 @@ impl State {
             {
                 self.focus(
                     if self.page == Page::Apps {
-                        Target::Filter(0)
+                        Target::Filter(1)
                     } else {
                         Target::Nav(0)
                     },
@@ -352,6 +522,10 @@ impl State {
                 }
             }
             if matches!(self.focus, Target::Nav(_)) && matches!(direction, Direction::Down) {
+                if self.page == Page::Settings {
+                    self.subpage = None;
+                    self.section = 0;
+                }
                 self.focus(self.first_content(), controls);
                 return vec![];
             }
@@ -445,7 +619,8 @@ impl State {
         if self.page == Page::Home && self.overlay.is_none() {
             if let Target::App(id) = &self.focus {
                 self.moving = Some(id.clone());
-                self.notify("Move with Left / Right. Back to finish.");
+                self.notice = None;
+                self.dirty = true;
             }
         } else {
             self.options();
@@ -481,12 +656,25 @@ impl State {
         match self.focus.clone() {
             Target::Nav(index) => self.open(index),
             Target::Browse => self.open(1),
+            Target::Retry => return vec![Effect::Refresh],
+            Target::DismissNotice => self.notice = None,
+            Target::CloseDialog => return self.back(),
             Target::TvSettings => return vec![Effect::Launch("com.palm.app.settings".into())],
             Target::App(id) | Target::Input(id) if !self.launching => {
                 return vec![Effect::Launch(id)];
             }
             Target::Filter(index) => {
                 self.filter = if self.filter == index { 0 } else { index };
+                self.scroll = 0.;
+            }
+            Target::ClearFilter => {
+                self.filter = 0;
+                self.focus = Target::Filter(1);
+                self.scroll = 0.;
+            }
+            Target::ClearSearch => {
+                self.query.clear();
+                self.focus = Target::Search;
                 self.scroll = 0.;
             }
             Target::Search => {
@@ -496,33 +684,58 @@ impl State {
             Target::Sidebar(index) => {
                 self.section = index;
                 self.scroll = 0.;
-                self.focus = match index {
-                    1 => Target::Background(0),
-                    2 => self
-                        .inventory
-                        .inputs
-                        .first()
-                        .map(|input| Target::InputMode(input.id.clone()))
-                        .unwrap_or(Target::Setting(3)),
-                    _ => Target::Setting(0),
-                };
+                self.subpage = None;
+                self.focus = self.section_entry();
             }
             Target::Setting(index) => {
                 match index {
                     0 => self.preferences.show_names = !self.preferences.show_names,
-                    1 => self.preferences.hour_24 = !self.preferences.hour_24,
+                    1 => {
+                        self.subpage = Some(Subpage::Clock);
+                        self.focus = Target::Choice(usize::from(self.preferences.hour_24));
+                        return vec![];
+                    }
                     2 => self.preferences.reduced_motion = !self.preferences.reduced_motion,
                     _ => return vec![Effect::Refresh],
                 }
                 return vec![Effect::Save];
             }
             Target::Background(index) => {
+                if !self.preferences.reduced_motion
+                    && self.preferences.background != BACKGROUNDS[index].0
+                {
+                    self.previous_background =
+                        Some((self.preferences.background.clone(), Instant::now()));
+                }
                 self.preferences.background = BACKGROUNDS[index].0.into();
                 return vec![Effect::Save];
             }
             Target::InputMode(id) => {
-                let mode = self.preferences.input_modes.entry(id).or_default();
-                *mode = mode.next();
+                let mode = self
+                    .preferences
+                    .input_modes
+                    .get(&id)
+                    .copied()
+                    .unwrap_or_default();
+                self.subpage = Some(Subpage::Input(id));
+                self.focus = Target::Choice(match mode {
+                    InputMode::On => 0,
+                    InputMode::Off => 1,
+                    InputMode::Auto => 2,
+                });
+            }
+            Target::Choice(index) => {
+                match self.subpage.clone() {
+                    Some(Subpage::Clock) => self.preferences.hour_24 = index == 1,
+                    Some(Subpage::Input(id)) => {
+                        self.preferences.input_modes.insert(
+                            id,
+                            [InputMode::On, InputMode::Off, InputMode::Auto][index.min(2)],
+                        );
+                    }
+                    None => return vec![],
+                }
+                self.close_subpage();
                 return vec![Effect::Save];
             }
             Target::Option(index) => {
@@ -532,21 +745,36 @@ impl State {
                 let old_ids: Vec<_> = self.apps().iter().map(|a| a.id.clone()).collect();
                 let old_index = old_ids.iter().position(|item| item == &id).unwrap_or(0);
                 let mut favorites = self.preferences.favorites(&self.inventory.apps);
+                let title = self
+                    .inventory
+                    .apps
+                    .iter()
+                    .find(|app| app.id == id)
+                    .map_or(id.clone(), |app| app.title.clone());
                 if index == 0 {
                     if favorites.contains(&id) {
                         favorites.retain(|item| item != &id);
+                        self.notify(format!("{title} removed from favorites."));
                     } else {
-                        favorites.push(id);
+                        favorites.push(id.clone());
+                        self.notify(format!("{title} added to favorites."));
                     }
+                    self.preferences.hidden.retain(|item| item != &id);
                     self.preferences.favorites = Some(favorites);
                 } else if index == 1 {
                     if self.preferences.hidden.contains(&id) {
                         self.preferences.hidden.retain(|item| item != &id);
+                        self.notify(format!("{title} restored."));
                     } else {
-                        self.preferences.hidden.push(id);
+                        self.preferences.hidden.push(id.clone());
+                        self.notify(format!("{title} hidden."));
                     }
                 }
+                if self.filter == 5 && self.hidden_count() == 0 {
+                    self.filter = 0;
+                }
                 self.focus = restore;
+                self.pointer = false;
                 if let Target::App(id) = &self.focus {
                     let apps = self.apps();
                     if !apps.iter().any(|app| &app.id == id) {
@@ -578,6 +806,7 @@ impl State {
     }
 
     pub fn back(&mut self) -> Vec<Effect> {
+        self.pointer = false;
         self.dirty = true;
         if self.moving.take().is_some() {
             return vec![];
@@ -589,6 +818,10 @@ impl State {
             };
             return vec![];
         }
+        if self.subpage.is_some() && !matches!(self.focus, Target::Nav(_)) {
+            self.close_subpage();
+            return vec![];
+        }
         if self.page == Page::Settings && !matches!(self.focus, Target::Nav(_)) {
             if matches!(self.focus, Target::Sidebar(_)) {
                 self.focus = Target::Nav(2);
@@ -598,9 +831,7 @@ impl State {
             self.scroll = 0.;
             return vec![];
         }
-        if self.page == Page::Apps
-            && (matches!(self.focus, Target::Search) || !self.query.is_empty())
-        {
+        if self.page == Page::Apps && matches!(self.focus, Target::Search | Target::ClearSearch) {
             self.query.clear();
             self.focus = Target::Nav(1);
             self.scroll = 0.;
