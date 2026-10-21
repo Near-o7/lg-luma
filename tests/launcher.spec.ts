@@ -33,6 +33,22 @@ test('Left and Right on focused navigation tabs switch pages immediately', async
   await expect(apps).toHaveAttribute('aria-current', 'page');
   await expect(apps).toBeFocused();
   await expect(page.locator('main')).toHaveClass(/page-apps/);
+  await page.keyboard.press('ArrowRight');
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  await expect(settings).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('main')).toHaveClass(/page-settings/);
+  await expect(settings).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('button', { name: 'TV settings', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(settings).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(settings).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(apps).toHaveAttribute('aria-current', 'page');
+  await expect(apps).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(home).toHaveAttribute('aria-current', 'page');
   await expect(home).toBeFocused();
@@ -272,6 +288,8 @@ for (const section of ['General', 'Background', 'Weather', 'Inputs']) {
     await page.goto('/');
     const settings = page.getByRole('button', { name: 'Settings', exact: true });
     await settings.click();
+    await expect(settings).toBeFocused();
+    await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
     const category = page.getByRole('button', { name: section, exact: true });
     await category.focus();
@@ -585,7 +603,7 @@ test('Settings sidebar and content support remote navigation and persistent pref
   await expect(page.getByRole('region', { name: 'Luma settings', exact: true })).toBeVisible();
   await expect(settings).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.locator('[data-focusable="settings-section-interface"]').focus();
+  await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
   await expect(page.locator('.settings-sidebar')).toContainText('General');
   await page.keyboard.press('ArrowDown');
@@ -607,6 +625,7 @@ test('Settings sidebar and content support remote navigation and persistent pref
   await expect(page.locator('[data-focusable="clock-format-option-12"]')).toBeFocused();
   await page.locator('[data-focusable="clock-format-option-24"]').click();
   await expect(page.locator('[data-focusable="setting-clock-format"]')).toContainText('24-hour');
+  await expect(page.locator('[data-focusable="setting-clock-format"]')).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
@@ -701,6 +720,7 @@ test('Settings sidebar uses plain labels and an Apple TV-style focus highlight',
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.keyboard.press('ArrowDown');
   const interfaceSection = page.getByRole('button', { name: 'General', exact: true });
   await expect(page.locator('.settings-sidebar-index')).toHaveCount(0);
   await expect(interfaceSection).toBeFocused();
