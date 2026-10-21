@@ -711,9 +711,12 @@ fn run() -> Result<(), String> {
     if let Some(path) = options.diagnostics {
         let (width, height) = window.size();
         let (dw, dh) = window.drawable_size();
+        let display_mode = window.display_index().ok().and_then(|index| video.current_display_mode(index).ok())
+            .map(|mode| serde_json::json!({ "width": mode.w, "height": mode.h, "refresh_hz": mode.refresh_rate }));
         let report = serde_json::json!({
             "logical_layout": Size::HD, "requested_window": requested,
             "window": Size::new(width, height), "drawable": Size::new(dw, dh),
+            "display_mode": display_mode,
             "drawable_is_4k": Size::new(dw, dh).is_4k(), "presented_frames": presented,
             "graphics": renderer.info, "last_presented": renderer.stats(), "capture": captured,
             "profile": options.profile_frames.map(|_| profile.summary()),

@@ -28,7 +28,7 @@ await fs.copyFile(path.join(source, 'fonts/inter-latin.woff2'), font);
 const decoded = spawnSync('woff2_decompress', [font], { encoding: 'utf8' });
 if (decoded.error || decoded.status !== 0) {
   throw new Error(
-    'Font conversion needs woff2_decompress. Run: nix-shell -p woff2 --run "node native/tools/assets.mjs"',
+    'Font conversion needs woff2_decompress. Run pnpm native:assets inside nix develop.',
     { cause: decoded.error ?? new Error(decoded.stderr) },
   );
 }
@@ -38,7 +38,7 @@ const weights = spawnSync('python3', [path.join(import.meta.dirname, 'font-weigh
 });
 if (weights.error || weights.status !== 0) {
   throw new Error(
-    'Font weights need Python/fontTools. Use nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools.',
+    'Font weights need Python/fontTools. Run pnpm native:assets inside nix develop.',
     { cause: weights.error ?? new Error(weights.stderr) },
   );
 }

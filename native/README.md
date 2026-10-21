@@ -149,6 +149,8 @@ transitions as the interactive UI.
 
 `--time 2026-10-21T20:41:00+02:00` fixes the clock/date for reproducible previews. Scripted
 `click:X:Y` uses authored 1920×1080 coordinates and injects actual SDL button-down/up events.
+Bounded scripted runs ignore physical pointer/keyboard events so window-entry hover cannot change
+the scene during a slow first upload. Unbounded scripts return to normal input after their actions.
 
 ### Compare with the web interface
 

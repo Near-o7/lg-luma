@@ -101,6 +101,7 @@ pub struct GraphicsInfo {
     pub renderer: String,
     pub version: String,
     pub max_texture_size: u32,
+    pub max_viewport: [i32; 2],
     pub fragment_highp: bool,
 }
 
@@ -188,9 +189,11 @@ impl Renderer {
             }
         }
         let mut max_texture_size = 0;
+        let mut max_viewport = [0; 2];
         let mut precision = 0;
         unsafe {
             gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut max_texture_size);
+            gl::GetIntegerv(gl::MAX_VIEWPORT_DIMS, max_viewport.as_mut_ptr());
             if gles && gl::GetShaderPrecisionFormat::is_loaded() {
                 let mut range = [0; 2];
                 gl::GetShaderPrecisionFormat(
@@ -258,6 +261,7 @@ impl Renderer {
                 renderer: gl_string(gl::RENDERER),
                 version: gl_string(gl::VERSION),
                 max_texture_size: max_texture_size.max(0) as u32,
+                max_viewport,
                 fragment_highp,
             },
         })
@@ -447,8 +451,9 @@ impl Renderer {
     }
 
     fn text(&mut self, text: &str, rect: Rect, style: TextStyle, color: Color, centered: bool) {
-        let size = (style.size * 4.).round() as u16;
-        let size_f = f32::from(size) / 4.;
+        // Layout/kerning retain the exact logical CSS size. Only the physical
+        // bitmap size is quantized for the glyph cache.
+        let size_f = style.size;
         let viewport = self.stats.viewport;
         let physical_size = glyph_size(size_f, viewport.text_scale());
         self.stats.max_logical_font_px = self.stats.max_logical_font_px.max(size_f);
@@ -788,10 +793,11 @@ impl Renderer {
         path: &Path,
         size: Size,
     ) -> Result<RenderStats, String> {
-        if size.width > self.info.max_texture_size || size.height > self.info.max_texture_size {
+        if size.width > self.info.max_texture_size || size.height > self.info.max_texture_size
+            || size.width > self.info.max_viewport[0] as u32 || size.height > self.info.max_viewport[1] as u32 {
             return Err(format!(
-                "Capture {}x{} exceeds the GPU's {}px texture limit",
-                size.width, size.height, self.info.max_texture_size
+                "Capture {}x{} exceeds GPU limits: {}px texture, {:?} viewport",
+                size.width, size.height, self.info.max_texture_size, self.info.max_viewport
             ));
         }
         let image = texture(size.width, size.height, &[]);
