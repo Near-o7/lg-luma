@@ -190,24 +190,46 @@ and relocated according to its instructions. The target is ARMv7 **soft-float AB
 The `nix develop` shell includes that Rust target. With another Rust toolchain, install the target
 before building.
 
+On Apple Silicon macOS, the following SDK release has been cross-linked successfully. From the
+repository root, enter `nix develop`, run `pnpm install --frozen-lockfile`, then set up the SDK once:
+
 ```sh
-export WEBOS_NDK=/absolute/path/to/arm-webos-linux-gnueabi_sdk-buildroot
+mkdir -p .build/native/toolchain
+curl --fail --location \
+  --output .build/native/toolchain/webos-sdk-darwin-arm64.tar.bz2 \
+  https://github.com/webosbrew/native-toolchain/releases/download/webos-d7ed7ee.6/arm-webos-linux-gnueabi_sdk-buildroot_darwin-arm64.tar.bz2
+tar -xjf .build/native/toolchain/webos-sdk-darwin-arm64.tar.bz2 -C .build/native/toolchain
+export WEBOS_NDK="$PWD/.build/native/toolchain/arm-webos-linux-gnueabi_sdk-buildroot"
+sh "$WEBOS_NDK/relocate-sdk.sh"
+```
+
+Keep the SDK path free of spaces. Other hosts should use the matching download from upstream.
+For each new shell, set `WEBOS_NDK` again. Build and package with:
+
+```sh
 pnpm native:assets
 pnpm native:build
 pnpm native:package
 ```
 
 The NDK must expose a webOS-compatible SDL2 and its `sdl2.pc` in the sysroot. The build script
-uses the NDK compiler, sysroot and pkg-config metadata together. Do not use rust-sdl2's generic
-`bundled` feature for this target: the SDL backend must support the TV's compositor. rust-sdl2 0.38
-recommends SDL 2.0.26+; older system SDL builds need a compatible webOS SDL build and on-device
-link testing. If shipping SDL/shared libraries, set `WEBOS_NATIVE_LIBS` to their directory before
-packaging; the executable searches `$ORIGIN/lib`. Package only the needed webOS libraries.
+uses the NDK compiler, explicit sysroot and isolated pkg-config metadata together, keeping desktop
+Nix SDL libraries out of the ARM build. The macOS SDK above includes SDL2 2.24.1. Do not use
+rust-sdl2's generic `bundled` feature for this target: the SDL backend must support the TV's compositor.
+TV builds provide `getauxval` compatibility for the SDK's older libc by reading `/proc/self/auxv`;
+Rust startup and TLS CPU detection receive real kernel values.
+
+Packaging bundles `libSDL2-2.0.so.0` from the SDK automatically, along with its license. To override
+SDL or include other selected ARM webOS shared libraries, set `WEBOS_NATIVE_LIBS` to their directory
+before packaging. Include SDL under its runtime name, `libSDL2-2.0.so.0`. The executable searches
+`$ORIGIN/lib`; avoid copying the entire SDK library directory or replacing the TV's libc/graphics drivers.
 
 The package is created under `.build/native/dist` as **Luma Native**,
 `com.luma.launcher.native`, with the version taken from the root `appinfo.json`.
-The packager validates that the executable is a 32-bit ARM ELF. Install the resulting IPK through
-Dev Manager or the same root-shell app installation workflow used for Luma.
+The packager validates that the executable and bundled libraries are little-endian ARM soft-float
+ELFs. For version 1.1.1, the result is `.build/native/dist/com.luma.launcher.native_1.1.1_arm.ipk`.
+Install it through webOS Dev Manager connected to the TV on port 22 as `root`, then open
+**Luma Native**. It has a separate app ID and preferences from the web launcher.
 
 ### TV services
 
@@ -226,8 +248,9 @@ TV preferences are saved beside the installed executable. The SDL window uses th
 Wayland class. Hidden/minimized windows pause drawing, and focus restoration refreshes inventory.
 Back on Home exits the native app and returns control to the platform.
 
-**Hardware status:** desktop rendering and state behavior are testable locally. Cross-linking,
-native caller permissions, the TV SDL/Wayland backend, Magic Remote key mapping, app switching
+**Hardware status:** desktop rendering/state checks and ARM cross-linking/IPK creation have passed
+on Apple Silicon macOS with the SDK above. Native caller permissions, the TV SDL/Wayland backend,
+Magic Remote key mapping, app switching
 and relaunch behavior still require verification on the actual TV. The CLI adapter can later be
 replaced behind `platform.rs` with direct LS2 integration if the native sandbox requires it.
 

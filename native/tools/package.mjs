@@ -7,12 +7,14 @@ const version = JSON.parse(await fs.readFile(path.join(root, 'appinfo.json'), 'u
 const binary = path.join(root, 'native/target/armv7-unknown-linux-gnueabi/release/luma-native');
 const bytes = await fs.readFile(binary);
 if (
+  bytes.length < 52 ||
   bytes.subarray(0, 4).toString('hex') !== '7f454c46' ||
   bytes[4] !== 1 ||
   bytes[5] !== 1 ||
-  bytes.readUInt16LE(18) !== 40
+  bytes.readUInt16LE(18) !== 40 ||
+  (bytes.readUInt32LE(36) & 0x400) !== 0
 ) {
-  throw new Error('Packaging requires a 32-bit little-endian ARM ELF from build-webos.sh.');
+  throw new Error('Packaging requires a 32-bit little-endian ARM soft-float ELF from build-webos.sh.');
 }
 const out = path.join(root, '.build/native');
 const stage = path.join(out, 'package');
@@ -21,7 +23,10 @@ await fs.mkdir(stage, { recursive: true });
 await fs.mkdir(path.join(out, 'dist'), { recursive: true });
 await fs.copyFile(binary, path.join(stage, 'luma-native'));
 await fs.chmod(path.join(stage, 'luma-native'), 0o755);
-await fs.cp(path.join(out, 'assets'), path.join(stage, 'assets'), { recursive: true });
+await fs.cp(path.join(out, 'assets'), path.join(stage, 'assets'), {
+  recursive: true,
+  filter: (source) => path.basename(source) !== '.DS_Store',
+});
 await fs.copyFile(path.join(out, 'assets/app-icon.png'), path.join(stage, 'app-icon.png'));
 await fs.copyFile(path.join(root, 'license'), path.join(stage, 'LICENSE'));
 await fs.copyFile(path.join(root, 'assets.md'), path.join(stage, 'ASSETS.md'));
