@@ -7,18 +7,24 @@ independent MIT implementation; no PlxNative source is included.
 
 ## Desktop preview
 
-From the repository root, with the existing pnpm dependencies installed, Rust 1.88+,
-`pkg-config`, SDL2 development libraries, `woff2_decompress`, and Python/fontTools available:
+From the repository root, enter the pinned development shell and install the project dependencies:
 
 ```sh
+nix develop
+pnpm install --frozen-lockfile
 pnpm native:assets
 pnpm native:dev
 ```
 
-On this project's Nix setup, use one development shell:
+The flake supplies Rust 1.93, Cargo, rustfmt, Clippy, Node.js, the pinned pnpm version, SDL2,
+pkg-config, CMake, woff2 and Python/fontTools. Without Nix, provide those tools manually
+(Rust 1.88+ is supported). The shell also includes the ARMv7 soft-float Rust standard library for
+TV cross-builds; the webOS native SDK is configured separately.
+
+To run the preview directly from your current shell:
 
 ```sh
-nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run 'pnpm native:assets && pnpm native:dev'
+nix develop --command sh -c 'pnpm native:assets && pnpm native:dev'
 ```
 
 The preview opens a resizable 1280×720 window, letterboxing the same 1920×1080 layout used on TV.
@@ -62,7 +68,7 @@ being silently replaced. Writes use a temporary file and atomic rename; run one 
 ## Checks and screenshots
 
 ```sh
-nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run 'pnpm native:check && pnpm native:smoke'
+nix develop --command sh -c 'pnpm native:check && pnpm native:smoke'
 ```
 
 `native:check` runs rustfmt, Clippy (including the webOS feature) and behavior tests.
@@ -93,8 +99,12 @@ transitions as the interactive UI.
 
 ```sh
 pnpm exec playwright install chromium
-nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run 'pnpm native:compare'
+pnpm native:compare
 ```
+
+Run these inside `nix develop`. Linux already has matching Playwright browsers in the shell;
+the browser-install command is needed on macOS. For headless native rendering on Linux, run
+`xvfb-run -a pnpm native:smoke`.
 
 The comparison command builds the web app and captures both renderers with the same inventory,
 preferences, time and canvas size. Weather and translation controls are omitted from the web
@@ -112,7 +122,8 @@ reuses existing web references.
 Use the [unofficial webOS native toolchain](https://github.com/webosbrew/native-toolchain), extracted
 and relocated according to its instructions. The target is ARMv7 **soft-float ABI**
 (`armv7-unknown-linux-gnueabi`), not `gnueabihf` or an ordinary desktop Linux target.
-Install that Rust target with your Rust toolchain before building.
+The `nix develop` shell includes that Rust target. With another Rust toolchain, install the target
+before building.
 
 ```sh
 export WEBOS_NDK=/absolute/path/to/arm-webos-linux-gnueabi_sdk-buildroot

@@ -3,6 +3,8 @@
 ## Checks
 
 Use pnpm, Oxlint, and Oxfmt. Node.js 22+ and pnpm 10 are required; `package.json` pins the pnpm version.
+`nix develop` provides the pinned web/native toolchain. Use `nix develop --command <command>` for
+one-off checks. `flake.lock` pins Nixpkgs and the Rust overlay; `nix fmt` formats `flake.nix`.
 
 ```sh
 pnpm check
@@ -29,7 +31,8 @@ Project filenames use lowercase kebab-case, including React components (for exam
 layers. See `native/README.md`. Run `pnpm native:check` for Rust changes and `pnpm native:smoke`
 after generating native assets to exercise desktop OpenGL screenshots and interaction/persistence.
 These commands need Rust, pkg-config and SDL2; asset generation also needs woff2_decompress and
-Python/fontTools. When missing, use `nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run '<command>'`.
+Python/fontTools. Prefer `nix develop` to provide these, along with Node/pnpm and Rust 1.93 with
+the ARMv7 soft-float target. The external webOS NDK is still required for TV cross-builds.
 `pnpm native:compare` produces fixed-time web/native side-by-side screenshots under
 `.build/native/comparison` (Playwright Chromium required); use it when matching the web design.
 Native preferences and app ID

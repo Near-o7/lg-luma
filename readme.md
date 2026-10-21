@@ -125,6 +125,23 @@ The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunab
 
 ## Development
 
+With Nix (flakes enabled), enter the pinned web/native development environment:
+
+```sh
+nix develop
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+The shell includes Node.js 24, the project's pinned pnpm 10, Rust 1.93 with Cargo/rustfmt/Clippy,
+SDL2, pkg-config, CMake, woff2 and Python/fontTools. It supports Apple Silicon/Intel macOS and
+ARM64/x86-64 Linux. Linux also includes Playwright's matching browser binaries and Xvfb; on macOS,
+run `pnpm exec playwright install chromium` before browser tests or screenshot comparisons.
+`nix develop --command pnpm native:check` runs a command without opening an interactive shell.
+The optional webOS cross-build still needs the external native SDK configured as `WEBOS_NDK`.
+
+### Without Nix
+
 Use Node.js 22+ and pnpm 10 (the project pins pnpm 10.34.5):
 
 ```sh
