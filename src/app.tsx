@@ -271,6 +271,15 @@ function Launcher({
           setOptionsApp(null);
           return;
         }
+        if (
+          page === 'settings' &&
+          document.activeElement?.getAttribute('data-focusable')?.startsWith('settings-section-')
+        ) {
+          document
+            .querySelector<HTMLElement>('[data-focusable="nav-settings"]')
+            ?.focus({ preventScroll: true });
+          return;
+        }
         if (page === 'apps' && document.activeElement?.closest('.library-toolbar .search-field')) {
           setQuery('');
           document

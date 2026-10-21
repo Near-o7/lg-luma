@@ -265,6 +265,25 @@ for (const [section, control, selected, first, subpage] of [
   });
 }
 
+for (const section of ['General', 'Background', 'Weather', 'Inputs']) {
+  test(`Back from the ${section} category returns to the Settings tab before Home`, async ({ page }) => {
+    await page.goto('/');
+    const settings = page.getByRole('button', { name: 'Settings', exact: true });
+    await settings.click();
+    await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
+    const category = page.getByRole('button', { name: section, exact: true });
+    await category.focus();
+    await pressBack(page, 'Escape');
+    await expect(settings).toBeFocused();
+    await expect(page.locator('main')).toHaveClass(/page-settings/);
+    await category.focus();
+    await pressBack(page, 'TV Back');
+    await expect(settings).toBeFocused();
+    await pressBack(page, 'Escape');
+    await expect(page.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute('aria-current', 'page');
+  });
+}
+
 test('Left returns from the location search action to the Weather setting', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -763,6 +782,9 @@ for (const width of [1920, 390]) {
     await pressBack(page, 'TV Back');
     await expect(background).toBeFocused();
     await expect(page.locator('.wallpaper')).toHaveClass(/wallpaper-dunes/);
+    await pressBack(page, 'Escape');
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeFocused();
+    await expect(page.locator('main')).toHaveClass(/page-settings/);
     await pressBack(page, 'Escape');
     await expect(page.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute(
       'aria-current',

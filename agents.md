@@ -75,6 +75,8 @@ From the top navigation, Down enters Home at the first visible favorite, Apps at
 
 Repeated Up returns to the active top navigation tab before other header controls. Settings subpages use Left or Back to return to the parent setting and restore its focus, without a visible Back button. Up from the first option goes to the Settings tab. The app search and city/postcode fields let Up/Left move focus out of the field; Left from app search enters Hidden when available, otherwise Utilities, and Left from the location query returns to its parent setting. Up from the first app enters the first category.
 
+Back from a Settings sidebar category focuses the Settings navigation tab while keeping Settings open. Back again from that tab returns Home.
+
 Back from the Apps search field or its clear button clears the query and focuses the Apps tab while keeping the library open. Back again from that tab returns Home.
 
 On Home, hold OK on a favorite to enter move mode, press Left/Right to change its position, then press Back to finish. The new order is saved immediately and the selected app stays focused. Apps → select an app → hold OK to add/remove favorites or hide apps. The action menu shows the app name and category, and closes after either action. Favorites have a filled-heart badge and sort first in the saved Home order; other apps sort alphabetically. Hidden apps remain installed and can be restored from the **Hidden (count)** category pill, which shows only hidden apps. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
