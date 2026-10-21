@@ -173,6 +173,17 @@ const uiIcons = {
   moonlight: 'MonitorPlay',
   gaming: 'Gamepad2',
   generic: 'AppWindow',
+  location: 'MapPin',
+  thermometer: 'Thermometer',
+  'weather-sun': 'Sun',
+  'weather-moon': 'Moon',
+  'weather-partly-cloudy': 'CloudSun',
+  'weather-cloud': 'Cloud',
+  'weather-fog': 'CloudFog',
+  'weather-drizzle': 'CloudDrizzle',
+  'weather-rain': 'CloudRain',
+  'weather-snow': 'CloudSnow',
+  'weather-storm': 'CloudLightning',
 };
 async function rasterIcon(name, element) {
   let svg = renderToStaticMarkup(element);

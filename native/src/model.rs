@@ -1,3 +1,4 @@
+use crate::weather::{Location, Unit};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
@@ -101,6 +102,12 @@ pub struct Preferences {
     pub hour_24: bool,
     pub reduced_motion: bool,
     pub input_modes: BTreeMap<String, InputMode>,
+    #[serde(deserialize_with = "crate::weather::deserialize_enabled")]
+    pub show_weather: bool,
+    #[serde(deserialize_with = "crate::weather::deserialize_location")]
+    pub weather_location: Option<Location>,
+    #[serde(deserialize_with = "crate::weather::deserialize_unit")]
+    pub temperature_unit: Unit,
 }
 
 impl Default for Preferences {
@@ -113,6 +120,9 @@ impl Default for Preferences {
             hour_24: false,
             reduced_motion: false,
             input_modes: BTreeMap::new(),
+            show_weather: true,
+            weather_location: None,
+            temperature_unit: Unit::Celsius,
         }
     }
 }

@@ -1,6 +1,11 @@
 use crate::model::{App, BACKGROUNDS, CATEGORIES, InputMode, Inventory, Preferences};
+use crate::weather::{self, Unit};
 use serde::Serialize;
 use std::time::{Duration, Instant};
+
+pub const WEATHER_SECTION: usize = 2;
+pub const INPUTS_SECTION: usize = 3;
+pub const SECTION_COUNT: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum Page {
@@ -30,6 +35,14 @@ pub enum Target {
     DismissNotice,
     Option(usize),
     Key(usize),
+    WeatherConfigure,
+    WeatherToggle,
+    WeatherLocation,
+    WeatherTemperature,
+    WeatherQuery,
+    WeatherSearch,
+    WeatherClear,
+    WeatherResult(usize),
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -71,6 +84,14 @@ pub enum Overlay {
 pub enum Subpage {
     Clock,
     Input(String),
+    WeatherLocation,
+    Temperature,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub enum TextField {
+    Apps,
+    Location,
 }
 
 #[derive(Clone, Copy)]
@@ -87,6 +108,7 @@ pub enum Effect {
     Refresh,
     Launch(String),
     Quit,
+    Weather(weather::Command),
 }
 
 pub const KEYS: [&str; 40] = [
@@ -116,6 +138,8 @@ pub struct State {
     pub pressed: Option<Target>,
     pub previous_background: Option<(String, Instant)>,
     pub panel_started: Option<Instant>,
+    pub weather: weather::Weather,
+    pub keyboard_field: TextField,
 }
 
 impl State {
@@ -141,6 +165,8 @@ impl State {
             pressed: None,
             previous_background: None,
             panel_started: None,
+            weather: weather::Weather::default(),
+            keyboard_field: TextField::Apps,
         }
     }
 
@@ -201,6 +227,7 @@ impl State {
     }
 
     pub fn open(&mut self, index: usize) {
+        self.weather.cancel_search();
         self.page = match index {
             1 => Page::Apps,
             2 => Page::Settings,
@@ -307,6 +334,9 @@ impl State {
         self.focus = target;
         self.reveal_focus(controls);
         if let Target::Sidebar(section) = self.focus {
+            if self.subpage == Some(Subpage::WeatherLocation) {
+                self.weather.cancel_search();
+            }
             self.section = section;
             self.subpage = None;
         }
@@ -359,6 +389,9 @@ impl State {
             return;
         }
         if let Target::Sidebar(section) = target {
+            if self.subpage == Some(Subpage::WeatherLocation) {
+                self.weather.cancel_search();
+            }
             self.section = section;
             self.subpage = None;
         }
@@ -382,7 +415,8 @@ impl State {
                     .position(|(id, _)| *id == self.preferences.background)
                     .unwrap_or(3),
             ),
-            2 => self
+            WEATHER_SECTION => Target::WeatherToggle,
+            INPUTS_SECTION => self
                 .inventory
                 .inputs
                 .first()
@@ -393,11 +427,16 @@ impl State {
     }
 
     fn close_subpage(&mut self) {
+        if self.subpage == Some(Subpage::WeatherLocation) {
+            self.weather.cancel_search();
+        }
         self.panel_started = None;
         self.pointer = false;
         self.focus = match self.subpage.take() {
             Some(Subpage::Clock) => Target::Setting(1),
             Some(Subpage::Input(id)) => Target::InputMode(id),
+            Some(Subpage::WeatherLocation) => Target::WeatherLocation,
+            Some(Subpage::Temperature) => Target::WeatherTemperature,
             None => Target::Sidebar(self.section),
         };
         self.scroll = 0.;
@@ -435,7 +474,7 @@ impl State {
         }
         if self.overlay.is_none() {
             if let Target::Choice(index) = self.focus {
-                let count = if matches!(self.subpage, Some(Subpage::Clock)) {
+                let count = if matches!(self.subpage, Some(Subpage::Clock | Subpage::Temperature)) {
                     2
                 } else {
                     3
@@ -469,17 +508,26 @@ impl State {
                         },
                         controls,
                     ),
-                    Direction::Down => self.focus(Target::Sidebar((index + 1) % 3), controls),
+                    Direction::Down => {
+                        self.focus(Target::Sidebar((index + 1) % SECTION_COUNT), controls)
+                    }
                     Direction::Left => {}
                 }
                 return vec![];
             }
-            if matches!(self.focus, Target::Setting(1) | Target::InputMode(_))
-                && matches!(direction, Direction::Right)
+            if matches!(
+                self.focus,
+                Target::Setting(1)
+                    | Target::InputMode(_)
+                    | Target::WeatherLocation
+                    | Target::WeatherTemperature
+            ) && matches!(direction, Direction::Right)
             {
                 return self.activate();
             }
-            if matches!(self.focus, Target::Setting(_)) && matches!(direction, Direction::Right) {
+            if matches!(self.focus, Target::Setting(_) | Target::WeatherToggle)
+                && matches!(direction, Direction::Right)
+            {
                 return vec![];
             }
             if let Target::InputMode(id) = &self.focus
@@ -490,11 +538,73 @@ impl State {
                     .first()
                     .is_some_and(|input| &input.id == id)
             {
-                self.focus(Target::Sidebar(2), controls);
+                self.focus(Target::Sidebar(INPUTS_SECTION), controls);
                 return vec![];
             }
             if self.focus == Target::Setting(0) && matches!(direction, Direction::Up) {
                 self.focus(Target::Nav(2), controls);
+                return vec![];
+            }
+            if self.focus == Target::WeatherToggle && matches!(direction, Direction::Up) {
+                self.focus(Target::Nav(2), controls);
+                return vec![];
+            }
+            if matches!(
+                self.focus,
+                Target::WeatherQuery | Target::WeatherSearch | Target::WeatherClear
+            ) {
+                match direction {
+                    Direction::Left => {
+                        self.close_subpage();
+                        return vec![];
+                    }
+                    Direction::Up => {
+                        self.focus(
+                            if self.preferences.weather_location.is_some()
+                                && self.focus != Target::WeatherClear
+                            {
+                                Target::WeatherClear
+                            } else {
+                                Target::Nav(2)
+                            },
+                            controls,
+                        );
+                        return vec![];
+                    }
+                    Direction::Down => {
+                        let target = if self.focus == Target::WeatherClear {
+                            Some(Target::WeatherQuery)
+                        } else if !self.weather.results.is_empty() {
+                            Some(Target::WeatherResult(0))
+                        } else if self.focus == Target::WeatherQuery {
+                            Some(Target::WeatherSearch)
+                        } else {
+                            None
+                        };
+                        if let Some(target) = target {
+                            self.focus(target, controls);
+                        }
+                        return vec![];
+                    }
+                    _ => {}
+                }
+            }
+            if let Target::WeatherResult(index) = self.focus {
+                match direction {
+                    Direction::Left => self.close_subpage(),
+                    Direction::Up => self.focus(
+                        if index == 0 {
+                            Target::WeatherQuery
+                        } else {
+                            Target::WeatherResult(index - 1)
+                        },
+                        controls,
+                    ),
+                    Direction::Down if index + 1 < self.weather.results.len() => {
+                        self.focus(Target::WeatherResult(index + 1), controls)
+                    }
+                    _ => {}
+                }
                 return vec![];
             }
             if self.focus == Target::Search {
@@ -662,6 +772,17 @@ impl State {
 
     pub fn text(&mut self, text: &str) {
         if matches!(self.overlay, Some(Overlay::Keyboard)) {
+            if self.keyboard_field == TextField::Location {
+                let mut query = self.weather.query.clone();
+                query.extend(
+                    text.chars()
+                        .filter(|c| !c.is_control())
+                        .take(120usize.saturating_sub(query.chars().count())),
+                );
+                self.weather.edit(query);
+                self.dirty = true;
+                return;
+            }
             self.query.extend(
                 text.chars()
                     .filter(|c| !c.is_control())
@@ -674,8 +795,48 @@ impl State {
 
     pub fn delete(&mut self) {
         if matches!(self.overlay, Some(Overlay::Keyboard)) {
-            self.query.pop();
+            if self.keyboard_field == TextField::Location {
+                let mut query = self.weather.query.clone();
+                query.pop();
+                self.weather.edit(query);
+            } else {
+                self.query.pop();
+            }
             self.dirty = true;
+        }
+    }
+
+    pub fn editing_text(&self) -> &str {
+        if self.keyboard_field == TextField::Location {
+            &self.weather.query
+        } else {
+            &self.query
+        }
+    }
+    pub fn open_keyboard(&mut self, field: TextField) {
+        self.keyboard_field = field;
+        self.overlay = Some(Overlay::Keyboard);
+        self.focus = Target::Key(0);
+        if !self.preferences.reduced_motion {
+            self.panel_started = Some(Instant::now());
+        }
+        self.dirty = true;
+    }
+    fn open_location(&mut self) {
+        self.weather.edit(String::new());
+        self.subpage = Some(Subpage::WeatherLocation);
+        self.focus = Target::WeatherQuery;
+        self.scroll = 0.;
+        if !self.preferences.reduced_motion {
+            self.panel_started = Some(Instant::now());
+        }
+        self.dirty = true;
+    }
+    fn keyboard_return(&self) -> Target {
+        if self.keyboard_field == TextField::Location {
+            Target::WeatherSearch
+        } else {
+            Target::Search
         }
     }
 
@@ -709,10 +870,50 @@ impl State {
                 self.scroll = 0.;
             }
             Target::Search => {
-                self.overlay = Some(Overlay::Keyboard);
-                self.focus = Target::Key(0);
+                self.open_keyboard(TextField::Apps);
+            }
+            Target::WeatherConfigure => {
+                self.open(2);
+                self.section = WEATHER_SECTION;
+                self.open_location();
+                self.open_keyboard(TextField::Location);
+            }
+            Target::WeatherToggle => {
+                self.preferences.show_weather = !self.preferences.show_weather;
+                self.weather.invalidate_forecast();
+                return vec![Effect::Save];
+            }
+            Target::WeatherLocation => self.open_location(),
+            Target::WeatherTemperature => {
+                self.subpage = Some(Subpage::Temperature);
+                self.focus = Target::Choice(usize::from(
+                    self.preferences.temperature_unit == Unit::Fahrenheit,
+                ));
                 if !self.preferences.reduced_motion {
                     self.panel_started = Some(Instant::now());
+                }
+            }
+            Target::WeatherQuery => self.open_keyboard(TextField::Location),
+            Target::WeatherSearch => {
+                return self
+                    .weather
+                    .search()
+                    .map(|command| vec![Effect::Weather(command)])
+                    .unwrap_or_default();
+            }
+            Target::WeatherClear => {
+                self.preferences.weather_location = None;
+                self.weather.remove_location();
+                self.focus = Target::WeatherSearch;
+                return vec![Effect::Save, Effect::Weather(weather::Command::ClearCache)];
+            }
+            Target::WeatherResult(index) => {
+                if let Some(place) = self.weather.results.get(index).cloned() {
+                    self.preferences.weather_location = Some(place);
+                    self.weather.invalidate_forecast();
+                    self.weather.cancel_search();
+                    self.focus = Target::WeatherSearch;
+                    return vec![Effect::Save];
                 }
             }
             Target::Sidebar(index) => {
@@ -773,6 +974,14 @@ impl State {
                             [InputMode::On, InputMode::Off, InputMode::Auto][index.min(2)],
                         );
                     }
+                    Some(Subpage::Temperature) => {
+                        self.preferences.temperature_unit = if index == 1 {
+                            Unit::Fahrenheit
+                        } else {
+                            Unit::Celsius
+                        }
+                    }
+                    Some(Subpage::WeatherLocation) => return vec![],
                     None => return vec![],
                 }
                 self.close_subpage();
@@ -834,10 +1043,17 @@ impl State {
             Target::Key(index) => match KEYS[index] {
                 "Space" => self.text(" "),
                 "Delete" => self.delete(),
-                "Clear" => self.query.clear(),
+                "Clear" => {
+                    if self.keyboard_field == TextField::Location {
+                        self.weather.edit(String::new());
+                    } else {
+                        self.query.clear();
+                    }
+                }
                 "Done" => {
                     self.overlay = None;
-                    self.focus = Target::Search;
+                    self.panel_started = None;
+                    self.focus = self.keyboard_return();
                 }
                 key => self.text(key),
             },
@@ -856,7 +1072,7 @@ impl State {
             self.panel_started = None;
             self.focus = match overlay {
                 Overlay::Options { restore, .. } => restore,
-                Overlay::Keyboard => Target::Search,
+                Overlay::Keyboard => self.keyboard_return(),
             };
             return vec![];
         }

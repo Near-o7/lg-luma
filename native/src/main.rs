@@ -6,6 +6,9 @@ mod renderer;
 mod state;
 mod storage;
 mod view;
+mod weather;
+#[path = "weather-service.rs"]
+mod weather_service;
 
 #[cfg(test)]
 mod tests;
@@ -40,6 +43,7 @@ struct Options {
     capture_size: Option<Size>,
     diagnostics: Option<PathBuf>,
     profile_frames: Option<usize>,
+    weather_test_server: Option<String>,
 }
 
 impl Options {
@@ -74,6 +78,7 @@ impl Options {
                     })
                 }
                 "--diagnostics" => result.diagnostics = Some(value.into()),
+                "--weather-test-server" => result.weather_test_server = Some(value),
                 "--profile-frames" => {
                     result.profile_frames = Some(
                         value
@@ -127,6 +132,7 @@ fn effects(
     state: &mut State,
     platform: &Platform,
     preferences: &std::path::Path,
+    weather: &weather_service::Service,
 ) -> bool {
     for effect in effects {
         match effect {
@@ -160,6 +166,7 @@ fn effects(
                 }
             }
             Effect::Quit => return false,
+            Effect::Weather(command) => weather.send(command),
         }
     }
     true
@@ -199,11 +206,17 @@ fn script(
         }
         "wait" => vec![],
         action if action.starts_with("type:") => {
-            state.overlay = Some(Overlay::Keyboard);
-            state.focus = Target::Key(0);
+            let field = if state.subpage == Some(state::Subpage::WeatherLocation) {
+                state::TextField::Location
+            } else {
+                state::TextField::Apps
+            };
+            state.open_keyboard(field);
             state.text(&action[5..]);
             vec![]
         }
+        "await-search" => vec![],
+        "await-weather" => vec![],
         _ => return Err(format!("Unknown scripted action: {action}")),
     })
 }
@@ -227,6 +240,34 @@ fn compose(
         view::scene_with_pill(state, assets, pill, width, now)
     } else {
         scene
+    }
+}
+
+fn weather_tick(state: &mut State, service: &weather_service::Service, visible: bool) {
+    let now = OffsetDateTime::now_utc().unix_timestamp();
+    let (command, changed) = state.weather.sync(
+        &state.preferences,
+        visible && state.page == state::Page::Home,
+        now,
+    );
+    state.dirty |= changed;
+    service.generations(state.weather.generations());
+    if let Some(command) = command {
+        service.send(command);
+    }
+    while let Ok(response) = service.receiver.try_recv() {
+        match response {
+            weather_service::Response::Search { id, result } => {
+                state.dirty |= state.weather.accept_search(id, result)
+            }
+            weather_service::Response::Forecast { id, key, result } => {
+                let (changed, command) = state.weather.accept_forecast(id, &key, result, now);
+                state.dirty |= changed;
+                if let Some(command) = command {
+                    service.send(command);
+                }
+            }
+        }
     }
 }
 
@@ -297,6 +338,15 @@ fn run() -> Result<(), String> {
         .map(Ok)
         .unwrap_or_else(|| storage::default_path(webos))?;
     let mut state = State::new(storage::load(&preferences_path)?);
+    if webos && options.weather_test_server.is_some() {
+        return Err("Weather test servers are only available in desktop builds".into());
+    }
+    let weather_cache = weather_service::cache_path(&preferences_path);
+    state.weather.cache = weather_service::load_cache(&weather_cache);
+    let weather_service = weather_service::Service::new(
+        weather_service::Client::new(options.weather_test_server.as_deref())?,
+        weather_cache,
+    );
     // Some libc/time combinations cannot discover the offset after threads start.
     let local_offset = OffsetDateTime::now_local()
         .map(|now| now.offset())
@@ -307,6 +357,7 @@ fn run() -> Result<(), String> {
         &mut state,
         &platform,
         &preferences_path,
+        &weather_service,
     );
 
     let sdl = sdl2::init()?;
@@ -411,6 +462,7 @@ fn run() -> Result<(), String> {
                 }
             }
         }
+        weather_tick(&mut state, &weather_service, visible);
         // Rebuild hit regions before input whenever inventory/layout changed.
         if state.dirty {
             scene = compose(&mut state, &assets, pill, pill_width, now);
@@ -584,7 +636,13 @@ fn run() -> Result<(), String> {
                 }
                 _ => {}
             }
-            running &= effects(pending, &mut state, &platform, &preferences_path);
+            running &= effects(
+                pending,
+                &mut state,
+                &platform,
+                &preferences_path,
+                &weather_service,
+            );
             if press
                 .as_ref()
                 .is_some_and(|p| !p.held && p.target != state.focus)
@@ -611,15 +669,26 @@ fn run() -> Result<(), String> {
         }
         if !state.loading
             && frame.is_multiple_of(3)
+            && !options.script.front().is_some_and(|action| {
+                (action == "await-search" && state.weather.searching)
+                    || (action == "await-weather" && state.weather.fetching())
+            })
             && let Some(action) = options.script.pop_front()
         {
             if let Some(position) = action.strip_prefix("click:") {
                 scripted_click(&sdl, &window, position)?;
             } else {
                 let pending = script(&action, &mut state, &scene.controls)?;
-                running &= effects(pending, &mut state, &platform, &preferences_path);
+                running &= effects(
+                    pending,
+                    &mut state,
+                    &platform,
+                    &preferences_path,
+                    &weather_service,
+                );
             }
         }
+        weather_tick(&mut state, &weather_service, visible);
         let keyboard = matches!(state.overlay, Some(Overlay::Keyboard));
         if keyboard != text_active {
             if keyboard {
@@ -712,7 +781,7 @@ fn run() -> Result<(), String> {
     if let Some(path) = options.dump {
         let state = serde_json::json!({ "page": state.page, "focus": state.focus, "query": state.query,
             "filter": state.filter, "preferences": state.preferences, "apps": state.apps().iter().map(|a| &a.id).collect::<Vec<_>>(),
-            "error": state.error, "scroll": state.scroll, "subpage": state.subpage, "modal": state.overlay.is_some() });
+            "error": state.error, "scroll": state.scroll, "subpage": state.subpage, "modal": state.overlay.is_some(), "weather": state.weather });
         std::fs::write(
             path,
             serde_json::to_vec_pretty(&state).map_err(|e| e.to_string())?,

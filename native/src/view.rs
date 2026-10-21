@@ -2,7 +2,10 @@
 use crate::{
     model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode},
     renderer::{Color, Draw, TextStyle, WHITE},
-    state::{Control, KEYS, Overlay, Page, Rect, State, Subpage, Target},
+    state::{
+        Control, KEYS, Overlay, Page, Rect, State, Subpage, Target, TextField, WEATHER_SECTION,
+    },
+    weather::{self, Unit},
 };
 use std::{
     collections::BTreeMap,
@@ -704,10 +707,17 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect) {
 
 fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let s = state.scroll;
+    let summary = state
+        .preferences
+        .show_weather
+        .then(|| weather_summary_layout(state, assets));
+    let shift = summary
+        .as_ref()
+        .map_or(0., |summary| (summary.height + 18.4) / 2.);
     let date = format!("{:?}, {:?} {}", now.weekday(), now.month(), now.day()).to_uppercase();
     out.text(
         date,
-        Rect::new(84., 227.2 - s, 1200., 17.),
+        Rect::new(84., 227.2 - shift - s, 1200., 17.),
         text(14.4, 600, 0.12),
         c(0xf5f5f5, 0.72),
         false,
@@ -719,11 +729,14 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     };
     out.text(
         greeting,
-        Rect::new(84., 265. - s, 1500., 95.),
+        Rect::new(84., 265. - shift - s, 1500., 95.),
         text(90.4, 500, -0.065).leading(1.05),
         WHITE,
         false,
     );
+    if let Some(summary) = summary {
+        weather_summary(out, state, assets, summary, 265. - shift + 94.92 + 18.4 - s);
+    }
     out.text(
         "Favorites",
         Rect::new(84., 478.5 - s, 1000., 31.),
@@ -894,6 +907,130 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             out.ring(rect, 18.4);
         }
         out.control(Target::Input(input.id.clone()), rect, true);
+    }
+}
+
+struct WeatherSummary {
+    height: f32,
+    width: f32,
+    icon: String,
+    parts: Vec<(String, TextStyle, Color, Rect)>,
+}
+type WeatherPart = (String, TextStyle, Color, f32, f32);
+fn weather_summary_layout(state: &State, assets: &Assets) -> WeatherSummary {
+    let base = text(23.2, 400, -0.025).leading(1.5);
+    let mut parts = Vec::new();
+    let mut icon = "location".to_owned();
+    if let Some(place) = &state.preferences.weather_location {
+        parts.push((place.name.clone(), base.weight(450), c(0xf5f5f5, 0.72)));
+        parts.push(("·".into(), base, c(0xf5f5f5, 0.324)));
+        if let Some(reading) = state.weather.reading(place) {
+            let condition = weather::condition(reading);
+            icon = format!("weather-{}", condition.icon);
+            parts.push((
+                weather::format_temperature(
+                    reading.temperature,
+                    state.preferences.temperature_unit,
+                ),
+                base.weight(550),
+                c(0xf5f5f5, 0.91),
+            ));
+            parts.push((condition.label.into(), base, c(0xf5f5f5, 0.58)));
+            if state.weather.failed {
+                parts.push((
+                    "Saved reading".into(),
+                    text(15.08, 400, 0.).leading(1.5),
+                    c(0xf2d5a5, 0.65),
+                ));
+            }
+        } else {
+            parts.push((
+                if state.weather.loading {
+                    "Loading weather…"
+                } else {
+                    "Weather unavailable"
+                }
+                .into(),
+                base,
+                c(0xf5f5f5, 0.58),
+            ));
+        }
+    } else {
+        parts.push(("Set weather location".into(), base, c(0xf5f5f5, 0.72)));
+    }
+    let mut rows: Vec<Vec<WeatherPart>> = vec![Vec::new()];
+    let mut used = 0.;
+    for (label, style, color) in parts {
+        let width = assets.width(&label, style).min(1714.4);
+        let height =
+            assets.lines(&label, style, width.max(1.)) as f32 * style.size * style.line_height;
+        if used > 0. && used + 11.2 + width > 1714.4 {
+            rows.push(Vec::new());
+            used = 0.;
+        }
+        rows.last_mut()
+            .unwrap()
+            .push((label, style, color, width, height));
+        used += width + if used > 0. { 11.2 } else { 0. };
+    }
+    let mut positioned = Vec::new();
+    let mut top = 1.6;
+    let mut right: f32 = 0.;
+    for row in rows {
+        let height = row.iter().map(|part| part.4).fold(34.8, f32::max);
+        let mut x = 121.6;
+        for (label, style, color, width, item_height) in row {
+            positioned.push((
+                label,
+                style,
+                color,
+                Rect::new(
+                    x,
+                    top + (height - item_height) / 2.,
+                    width + 1.,
+                    item_height,
+                ),
+            ));
+            x += width + 11.2;
+        }
+        right = right.max(x - 11.2);
+        top += height + 11.2;
+    }
+    WeatherSummary {
+        height: top - 11.2 + 1.6,
+        width: right - 84.,
+        icon,
+        parts: positioned,
+    }
+}
+fn weather_summary(
+    out: &mut Scene,
+    state: &State,
+    assets: &Assets,
+    summary: WeatherSummary,
+    y: f32,
+) {
+    out.icon(
+        assets,
+        &summary.icon,
+        Rect::new(84., y + 5.8, 26.4, 26.4),
+        c(0xdedede, 0.83),
+    );
+    for (label, style, color, rect) in summary.parts {
+        out.text(
+            label,
+            Rect::new(rect.x, rect.y + y, rect.w, rect.h),
+            style,
+            color,
+            false,
+        );
+    }
+    if state.preferences.weather_location.is_none() {
+        let rect = Rect::new(84., y, summary.width, summary.height);
+        if state.focus == Target::WeatherConfigure && !state.pointer {
+            out.border(rect.inset(-7.), 12.6, 2., c(0xf0f0f0, 0.95));
+        }
+        out.control(Target::WeatherConfigure, rect, true);
     }
 }
 
@@ -1119,14 +1256,15 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
         } else {
             (row.rect.h - 29.12) / 2.
         };
+    let title_width = row.rect.w - (x - row.rect.x) - if row.value.is_some() { 210. } else { 64. };
+    let title_height = if row.description.is_some() {
+        assets.lines(row.title, text(20.8, 550, -0.02), title_width) as f32 * 29.12
+    } else {
+        29.12
+    };
     out.text(
         row.title,
-        Rect::new(
-            x,
-            title_y,
-            row.rect.w - (x - row.rect.x) - if row.value.is_some() { 210. } else { 64. },
-            30.,
-        ),
+        Rect::new(x, title_y, title_width, title_height),
         text(20.8, 550, -0.02).leading(1.4),
         color,
         false,
@@ -1134,7 +1272,12 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
     if let Some(description) = row.description {
         out.text(
             description,
-            Rect::new(x, title_y + 33.9, row.rect.w - 100., 24.),
+            Rect::new(
+                x,
+                title_y + title_height + 4.8,
+                row.rect.w - 100.,
+                (row.rect.h - 34. - title_height - 4.8).max(22.8),
+            ),
             text(15.2, 400, 0.).leading(1.5),
             if bright {
                 c(0x555555, 1.)
@@ -1182,9 +1325,249 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
     out.control(row.target, row.rect, true);
 }
 
+fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let s = state.scroll;
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::WeatherToggle,
+            rect: Rect::new(640., 164.8 - s, 1120., 72.),
+            title: "Show widget",
+            icon: Some("eye"),
+            value: Some(if state.preferences.show_weather {
+                "On"
+            } else {
+                "Off"
+            }),
+            description: None,
+            selected: false,
+            chevron: false,
+        },
+    );
+    let city = state
+        .preferences
+        .weather_location
+        .as_ref()
+        .map(|place| place.name.as_str());
+    let style = text(18.4, 450, 0.).leading(1.4);
+    let city_lines = city.map_or(1, |city| assets.lines(city, style, 450.));
+    let height = (34. + city_lines as f32 * 25.76).max(72.);
+    let rect = Rect::new(640., 264.8 - s, 1120., height);
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::WeatherLocation,
+            rect,
+            title: "Location",
+            icon: Some("location"),
+            value: None,
+            description: None,
+            selected: false,
+            chevron: true,
+        },
+    );
+    if let Some(city) = city {
+        out.text(
+            city,
+            Rect::new(
+                rect.x + rect.w - 508.6,
+                rect.y + (height - city_lines as f32 * 25.76) / 2.,
+                450.,
+                city_lines as f32 * 25.76,
+            ),
+            style.right(),
+            if state.focus == Target::WeatherLocation {
+                c(0x444444, 1.)
+            } else {
+                c(0xeeeeee, 0.73)
+            },
+            false,
+        );
+    }
+    let y = rect.y + height + 12.;
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::WeatherTemperature,
+            rect: Rect::new(640., y, 1120., 72.),
+            title: "Temperature",
+            icon: Some("thermometer"),
+            value: Some(state.preferences.temperature_unit.symbol()),
+            description: None,
+            selected: false,
+            chevron: true,
+        },
+    );
+    out.text(
+        "Weather data: Open-Meteo · CC BY 4.0",
+        Rect::new(664.2, y + 100., 1000., 24.),
+        text(12.48, 400, 0.),
+        c(0xf5f5f5, 0.56),
+        false,
+    );
+}
+
+fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let mut y = 164.8 - state.scroll;
+    if let Some(place) = &state.preferences.weather_location {
+        let rect = Rect::new(640., y, 1120., 76.2);
+        out.shape(rect, 20., c(0x171c20, 0.72));
+        out.border(rect, 20., 1., c(0xffffff, 0.04));
+        out.icon(
+            assets,
+            "location",
+            Rect::new(664.2, y + 29.1, 18., 18.),
+            c(0xcccccc, 1.),
+        );
+        out.text(
+            &place.name,
+            Rect::new(698.2, y + 17., 920., 25.),
+            text(18.4, 500, 0.),
+            WHITE,
+            false,
+        );
+        out.text(
+            place.detail(),
+            Rect::new(698.2, y + 42.3, 920., 22.),
+            text(14.4, 400, 0.),
+            c(0xf5f5f5, 0.56),
+            false,
+        );
+        let clear = Rect::new(1695.8, y + 18.1, 40., 40.);
+        out.shape(clear, 20., c(0x23282c, 0.5));
+        out.border(clear, 20., 1., c(0xffffff, 0.07));
+        out.icon(assets, "close", clear.inset(12.), WHITE);
+        if state.focus == Target::WeatherClear {
+            out.border(clear.inset(-2.), 22., 2., c(0xf0f0f0, 0.95));
+        }
+        out.control(Target::WeatherClear, clear, true);
+        y += 96.2;
+    }
+    let query = Rect::new(640., y, 1044., 64.);
+    let focused = state.focus == Target::WeatherQuery;
+    out.shape(
+        query,
+        48.,
+        if focused {
+            c(0x303438, 1.)
+        } else {
+            c(0x171c20, 0.72)
+        },
+    );
+    out.border(
+        query,
+        48.,
+        1.,
+        c(0xffffff, if focused { 0.70 } else { 0.07 }),
+    );
+    if focused {
+        out.border(query.inset(-3.), 51., 3., c(0xffffff, 0.063));
+    }
+    out.icon(
+        assets,
+        "search",
+        Rect::new(664.2, y + 21.2, 21.6, 21.6),
+        c(0xeeeeee, 0.73),
+    );
+    out.text(
+        if state.weather.query.is_empty() {
+            "City or postcode"
+        } else {
+            &state.weather.query
+        },
+        Rect::new(699.4, y + 20.9, 950., 24.),
+        text(18.4, 400, -0.02),
+        c(0xeeeeee, 0.73),
+        false,
+    );
+    out.control(Target::WeatherQuery, query, true);
+    let search = Rect::new(1696., y, 64., 64.);
+    out.shape(search, 32., c(0x171c20, 0.72));
+    out.border(search, 32., 1., c(0xffffff, 0.07));
+    out.icon(
+        assets,
+        if state.weather.searching {
+            "refresh"
+        } else {
+            "search"
+        },
+        search.inset(20.8),
+        WHITE,
+    );
+    if state.focus == Target::WeatherSearch {
+        out.border(search.inset(-7.), 39., 2., c(0xf0f0f0, 0.95));
+    }
+    out.control(Target::WeatherSearch, search, true);
+    y += 84.;
+    if state.weather.searching || state.weather.message.is_some() {
+        out.text(
+            if state.weather.searching {
+                "Searching…"
+            } else {
+                state.weather.message.as_deref().unwrap_or("")
+            },
+            Rect::new(664.2, y, 1071.6, 58.),
+            text(16., 400, 0.).leading(1.5),
+            c(0xe0e0e0, 0.68),
+            false,
+        );
+    }
+    for (index, place) in state.weather.results.iter().enumerate() {
+        let detail = place.detail();
+        let height = (34.
+            + assets.lines(&place.name, text(20.8, 550, -0.02), 992.6) as f32 * 29.12
+            + 4.8
+            + assets.lines(&detail, text(15.2, 400, 0.), 1020.) as f32 * 22.8)
+            .max(90.7);
+        let rect = Rect::new(640., y, 1120., height);
+        row(
+            out,
+            state,
+            assets,
+            Row {
+                target: Target::WeatherResult(index),
+                rect,
+                title: &place.name,
+                icon: Some("location"),
+                value: None,
+                description: Some(&detail),
+                selected: false,
+                chevron: false,
+            },
+        );
+        if state
+            .preferences
+            .weather_location
+            .as_ref()
+            .is_some_and(|saved| saved.key() == place.key())
+        {
+            out.icon(
+                assets,
+                "check",
+                Rect::new(1717.4, y + (height - 18.4) / 2., 18.4, 18.4),
+                if state.focus == Target::WeatherResult(index) {
+                    c(0x444444, 1.)
+                } else {
+                    c(0xe4e4e4, 0.61)
+                },
+            );
+        }
+        y += height + 12.;
+    }
+}
+
 fn settings(out: &mut Scene, state: &State, assets: &Assets) {
     let s = state.scroll;
-    for (index, label) in ["General", "Background", "Inputs"].into_iter().enumerate() {
+    for (index, label) in ["General", "Background", "Weather", "Inputs"]
+        .into_iter()
+        .enumerate()
+    {
         let rect = Rect::new(160., 164.8 + index as f32 * 84. - s, 403.2, 72.);
         let focused = state.focus == Target::Sidebar(index);
         out.pill(rect, focused, state.section == index);
@@ -1204,9 +1587,11 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     .iter()
                     .find(|input| &input.id == id)
                     .map_or("Inputs", |input| input.port.as_str()),
+                Some(Subpage::WeatherLocation) => "Location",
+                Some(Subpage::Temperature) => "Temperature",
                 None => "",
             };
-            let parent_width = if index == 0 { 73. } else { 60. };
+            let parent_width = assets.width(label, text(20.8, 550, -0.02)) + 2.;
             out.text(
                 label,
                 Rect::new(rect.x + 24.2, rect.y + 23.5, parent_width, 25.),
@@ -1252,6 +1637,13 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
     }
     if let Some(subpage) = &state.subpage {
         let start = out.draw.len();
+        if *subpage == Subpage::WeatherLocation {
+            location_settings(out, state, assets);
+            if let Some(opened) = state.panel_started {
+                out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
+            }
+            return;
+        }
         let options: Vec<(&str, Option<&str>, bool)> = match subpage {
             Subpage::Clock => vec![
                 ("12-hour", None, !state.preferences.hour_24),
@@ -1274,6 +1666,19 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     ),
                 ]
             }
+            Subpage::Temperature => vec![
+                (
+                    "Celsius",
+                    None,
+                    state.preferences.temperature_unit == Unit::Celsius,
+                ),
+                (
+                    "Fahrenheit",
+                    None,
+                    state.preferences.temperature_unit == Unit::Fahrenheit,
+                ),
+            ],
+            Subpage::WeatherLocation => unreachable!(),
         };
         for (index, (title, description, selected)) in options.into_iter().enumerate() {
             let h = if description.is_some() { 90.7 } else { 72. };
@@ -1411,6 +1816,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 );
             }
         }
+        WEATHER_SECTION => weather_settings(out, state, assets),
         _ => {
             for (index, input) in state.inventory.inputs.iter().enumerate() {
                 let mode = state
@@ -1789,7 +2195,11 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
     ));
     out.border(panel, 27.2, 1., c(0xffffff, 0.12));
     out.text(
-        "Find an app",
+        if state.keyboard_field == TextField::Location {
+            "City or postcode"
+        } else {
+            "Find an app"
+        },
         Rect::new(389., 324., 1000., 44.),
         text(37.6, 500, -0.055).leading(1.1),
         WHITE,
@@ -1809,7 +2219,7 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
         c(0xeeeeee, 0.73),
     );
     out.text(
-        format!("{}|", state.query),
+        format!("{}|", state.editing_text()),
         Rect::new(446., 406., 1058., 25.),
         text(20.8, 400, -0.02),
         WHITE,

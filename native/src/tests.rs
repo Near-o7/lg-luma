@@ -315,7 +315,7 @@ fn clock_format_subpage_saves_and_restores_its_parent_row() {
 fn input_visibility_has_explicit_choices_and_returns_to_the_same_input() {
     let mut state = ready();
     state.open(2);
-    state.section = 2;
+    state.section = crate::state::INPUTS_SECTION;
     let id = "com.webos.app.hdmi1".to_string();
     state.focus = Target::InputMode(id.clone());
     state.activate();
@@ -456,4 +456,90 @@ fn pinning_a_hidden_app_restores_it_and_leaves_hidden_when_empty() {
             .contains(&"org.jellyfin.webos".into())
     );
     assert_eq!(state.focus, Target::App("org.jellyfin.webos".into()));
+}
+
+#[test]
+fn weather_location_keyboard_back_and_sidebar_routes_restore_focus() {
+    let mut state = ready();
+    state.open(2);
+    state.focus = Target::Sidebar(crate::state::WEATHER_SECTION);
+    state.section = crate::state::WEATHER_SECTION;
+    state.activate();
+    assert_eq!(state.focus, Target::WeatherToggle);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::WeatherLocation);
+    state.activate();
+    assert_eq!(state.focus, Target::WeatherQuery);
+    state.activate();
+    state.text("Vienna");
+    state.back();
+    assert_eq!(state.focus, Target::WeatherSearch);
+    assert_eq!(state.weather.query, "Vienna");
+    assert_eq!(state.subpage, Some(crate::state::Subpage::WeatherLocation));
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::WeatherLocation);
+    assert!(state.subpage.is_none());
+}
+
+#[test]
+fn weather_units_save_without_replacing_celsius_cache_and_hide_keeps_city() {
+    let mut state = ready();
+    state.open(2);
+    state.section = crate::state::WEATHER_SECTION;
+    let place = crate::weather::Location {
+        name: "Vienna".into(),
+        region: "Vienna".into(),
+        country: "Austria".into(),
+        latitude: 48.2085,
+        longitude: 16.3721,
+    };
+    state.preferences.weather_location = Some(place.clone());
+    state.weather.cache = Some(crate::weather::Cache {
+        key: place.key(),
+        updated_at: 1000,
+        reading: crate::weather::Reading {
+            temperature: 14.2,
+            code: 2,
+            is_day: true,
+        },
+    });
+    state.focus = Target::WeatherTemperature;
+    state.activate();
+    assert_eq!(state.focus, Target::Choice(0));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(
+        state.preferences.temperature_unit,
+        crate::weather::Unit::Fahrenheit
+    );
+    assert_eq!(
+        state.weather.cache.as_ref().unwrap().reading.temperature,
+        14.2
+    );
+    assert_eq!(state.focus, Target::WeatherTemperature);
+    state.focus = Target::WeatherToggle;
+    state.activate();
+    assert!(!state.preferences.show_weather);
+    assert_eq!(state.preferences.weather_location, Some(place));
+}
+
+#[test]
+fn removing_weather_location_clears_cache_and_cancels_pending_results() {
+    let mut state = ready();
+    state.open(2);
+    state.section = crate::state::WEATHER_SECTION;
+    state.focus = Target::WeatherLocation;
+    state.activate();
+    state.focus = Target::WeatherClear;
+    let effects = state.activate();
+    assert_eq!(
+        effects,
+        vec![
+            Effect::Save,
+            Effect::Weather(crate::weather::Command::ClearCache)
+        ]
+    );
+    assert!(state.weather.cache.is_none());
+    assert!(state.preferences.weather_location.is_none());
+    assert_eq!(state.focus, Target::WeatherSearch);
 }

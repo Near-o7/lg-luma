@@ -84,7 +84,7 @@ try {
   assert.deepEqual(saved.preferences.favorites.slice(0, 2), ['youtube.leanback.v4', 'netflix']);
   const clock = await scenario('clock', 'settings,click:900:284');
   assert.equal(clock.subpage, 'Clock');
-  const input = await scenario('inputs', 'settings,down,down,down,enter,enter,up,enter');
+  const input = await scenario('inputs', 'settings,down,down,down,down,enter,enter,up,enter');
   assert.equal(input.preferences.input_modes['com.webos.app.hdmi1'], 'Off');
   assert.equal(input.subpage, null);
   const closed = await scenario('dialog-closed', 'apps,down,menu,click:100:900');

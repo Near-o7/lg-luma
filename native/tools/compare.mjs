@@ -91,7 +91,7 @@ const scenarios = [
   },
   {
     name: 'inputs',
-    script: 'settings,down,down,down',
+    script: 'settings,down,down,down,down',
     web: async (p) => {
       await click(p, 'nav-settings');
       await focus(p, 'settings-section-inputs');
@@ -99,7 +99,7 @@ const scenarios = [
   },
   {
     name: 'input-mode',
-    script: 'settings,down,down,down,enter,enter',
+    script: 'settings,down,down,down,down,enter,enter',
     web: async (p) => {
       await click(p, 'nav-settings');
       await focus(p, 'settings-section-inputs');
@@ -151,8 +151,7 @@ if (!process.argv.includes('--native-only')) {
       await page.evaluate(() => document.fonts.ready);
       // Compare only the features requested for native parity.
       await page.addStyleTag({
-        content:
-          '[data-focusable="settings-section-weather"], [data-focusable="setting-language"] { display: none !important; }',
+        content: '[data-focusable="setting-language"] { display: none !important; }',
       });
       await scenario.web?.(page);
       await page.mouse.move(1, 1);
@@ -232,6 +231,7 @@ if (!process.argv.includes('--web-only')) {
         reduced_motion: true,
         hour_24: false,
         show_names: !!scenario.names,
+        show_weather: false,
         hidden: scenario.hidden ? ['netflix'] : [],
         favorites: scenario.empty ? [] : null,
       }),
