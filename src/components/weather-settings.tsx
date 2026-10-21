@@ -153,7 +153,13 @@ export function WeatherSettings({
                 type="search"
                 aria-label={t('cityPostcode')}
                 data-focusable="weather-location-query"
-                data-focus-up={`setting-temperature-${unit}`}
+                data-focus-up={
+                  showControls
+                    ? `setting-temperature-${unit}`
+                    : location
+                      ? 'weather-location-clear'
+                      : focusUp
+                }
                 value={query}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape' || event.keyCode === 461) {

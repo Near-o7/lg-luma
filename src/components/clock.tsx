@@ -56,13 +56,3 @@ export function Greeting({ language }: { language: Language }) {
     </>
   );
 }
-
-export function AmbientClock({ clock24, language }: { clock24: boolean; language: Language }) {
-  const now = useClock();
-  return (
-    <>
-      <span className="ambient-date">{formatDate(now, localeFor(language))}</span>
-      <span className="ambient-time">{formatTime(now, clock24, localeFor(language))}</span>
-    </>
-  );
-}

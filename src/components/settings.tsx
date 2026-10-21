@@ -12,7 +12,7 @@ import {
 import { WeatherSettings } from './weather-settings';
 import { InputSettings, InputVisibilitySettings } from './input-settings';
 import type { Language, Preferences, TVInput } from '../types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { wallpapers, wallpaperThumbnail } from '../wallpapers';
 import { useTranslation, wallpaperLabel } from '../i18n';
 import { getInputVisibility } from '../inputs';
@@ -32,6 +32,15 @@ const subpageTitles = {
   'clock-format': 'clockFormat',
 } as const;
 
+// Match the two-column gallery breakpoint in settings.css without measuring on keypresses.
+const galleryLayoutQuery = '(max-width: 600px)';
+const getGalleryColumns = () => (window.matchMedia(galleryLayoutQuery).matches ? 2 : 3);
+const subscribeGalleryLayout = (onChange: () => void) => {
+  const query = window.matchMedia(galleryLayoutQuery);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+};
+
 interface Props {
   preferences: Preferences;
   inputs: TVInput[];
@@ -50,6 +59,7 @@ export function Settings({
   onRefresh,
 }: Props) {
   const { t, language } = useTranslation();
+  const galleryColumns = useSyncExternalStore(subscribeGalleryLayout, getGalleryColumns);
   const [section, setSection] = useState<SettingsSection>('interface');
   const [subpage, setSubpage] = useState<SettingsSubpage | null>(null);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
@@ -121,12 +131,16 @@ export function Settings({
     );
   };
   useEffect(() => {
-    if (!subpage) return;
+    if (!subpage && section !== 'background') return;
     const onBack = (event: KeyboardEvent) => {
+      if (
+        !subpage &&
+        (!(event.target instanceof HTMLElement) || !event.target.closest('.wallpaper-options'))
+      )
+        return;
       if (event.key === 'ArrowLeft') {
         if (
           !(event.target instanceof HTMLElement) ||
-          event.target instanceof HTMLInputElement ||
           !event.target.closest('[data-settings-subpage]')
         )
           return;
@@ -135,6 +149,13 @@ export function Settings({
       if (event.target instanceof HTMLInputElement && event.key === 'Backspace') return;
       event.preventDefault();
       event.stopPropagation();
+      if (!subpage) {
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'instant' });
+        document
+          .querySelector<HTMLElement>('[data-focusable="settings-section-background"]')
+          ?.focus({ preventScroll: true });
+        return;
+      }
       const focusable = subpageReturnFocus;
       setSubpage(null);
       requestAnimationFrame(() =>
@@ -145,7 +166,7 @@ export function Settings({
     };
     document.addEventListener('keydown', onBack);
     return () => document.removeEventListener('keydown', onBack);
-  }, [subpage, subpageReturnFocus]);
+  }, [section, subpage, subpageReturnFocus]);
   const sectionOrder = ['interface', 'background', 'weather', 'inputs'] as const;
   const sectionTitle = (id: (typeof sectionOrder)[number]) => t(id);
   const enterSection = (next: (typeof sectionOrder)[number]) => {
@@ -230,12 +251,11 @@ export function Settings({
                     className={`wallpaper-option${preferences.wallpaper === wallpaper.id ? ' selected' : ''}`}
                     data-focusable={`wallpaper-${wallpaper.id}`}
                     data-focus-left={
-                      index === 0
+                      index % galleryColumns === 0
                         ? 'settings-section-background'
                         : `wallpaper-${wallpapers[index - 1].id}`
                     }
                     data-focus-right={`wallpaper-${(wallpapers[index + 1] ?? wallpaper).id}`}
-                    data-focus-up="settings-section-background"
                     aria-pressed={preferences.wallpaper === wallpaper.id}
                     onClick={() => onUpdate({ wallpaper: wallpaper.id })}
                   >
@@ -366,7 +386,6 @@ export function Settings({
                   <span>
                     <strong>{t('refreshApps')}</strong>
                   </span>
-                  <ChevronRight />
                 </button>
               </div>
             </section>

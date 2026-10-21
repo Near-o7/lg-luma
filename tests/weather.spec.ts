@@ -46,13 +46,6 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   await expect(page.locator('.weather-summary')).toContainText('14°C');
   await expect(page.locator('[data-focusable="weather-configure"]')).toHaveCount(0);
   expect(forecasts).toBe(1);
-  await page.getByRole('button', { name: 'Enter ambient mode' }).click();
-  await expect(page.locator('.ambient-hint')).toContainText('Vienna');
-  await expect(page.locator('.ambient-hint')).toContainText('14°C');
-  await expect(page.locator('.ambient-screen button')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
-  expect(forecasts).toBe(1);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Weather', exact: true }).click();
   await page.locator('[data-focusable="setting-weather-location"]').press('ArrowRight');
@@ -85,7 +78,7 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   expect(forecasts).toBe(1);
 });
 
-test('temperature units persist, work with the remote, and convert cached readings on Home and ambient', async ({
+test('temperature units persist, work with the remote, and convert cached readings on Home', async ({
   page,
 }) => {
   let requests = 0;
@@ -122,9 +115,6 @@ test('temperature units persist, work with the remote, and convert cached readin
   await expect(page.locator('.weather-temperature')).toHaveText('58°F');
   await page.reload();
   await expect(page.locator('.weather-temperature')).toHaveText('58°F');
-  await page.getByRole('button', { name: 'Enter ambient mode' }).click();
-  await expect(page.locator('.ambient-hint .weather-temperature')).toHaveText('58°F');
-  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Weather', exact: true }).click();
   await expect(fahrenheit).toHaveAttribute('aria-selected', 'true');
@@ -248,8 +238,6 @@ test('weather visibility preserves the city and prevents requests when the widge
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await expect(page.locator('.weather-summary')).toHaveCount(0);
   expect(requests).toBe(1);
-  await page.getByRole('button', { name: 'Enter ambient mode' }).click();
-  await expect(page.locator('.ambient-hint')).toHaveText('Press any button to return');
 });
 
 test('Back exits city editing before leaving Settings, including the TV Back key', async ({

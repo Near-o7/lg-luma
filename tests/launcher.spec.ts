@@ -60,6 +60,20 @@ for (const width of [1920, 1280, 390]) {
       await expect(controls.first()).toBeFocused();
     });
   }
+
+  test(`Up from the first app enters the first category at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+    await page.goto('/');
+    const apps = page.getByRole('button', { name: 'Apps', exact: true });
+    await apps.click();
+    const first = page.locator('.library-grid .app-tile').first();
+    await expect(first).toBeVisible();
+    await first.focus();
+    await page.keyboard.press('ArrowUp');
+    await expect(page.getByRole('button', { name: 'Streaming', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(apps).toBeFocused();
+  });
 }
 
 async function moveUpToHeader(page: Page) {
@@ -68,6 +82,14 @@ async function moveUpToHeader(page: Page) {
     if (await page.locator('.header :focus').count()) return;
   }
   throw new Error('Repeated Up did not reach the header.');
+}
+
+async function pressBack(page: Page, key: 'Escape' | 'TV Back') {
+  if (key === 'Escape') await page.keyboard.press('Escape');
+  else
+    await page
+      .locator(':focus')
+      .dispatchEvent('keydown', { key: 'Unidentified', keyCode: 461, bubbles: true });
 }
 
 for (const width of [1920, 390]) {
@@ -114,6 +136,81 @@ for (const width of [1920, 390]) {
     await expect(apps).toBeFocused();
     await expect(search).toHaveValue('youtube');
   });
+
+  test(`Left leaves Apps search at its category controls at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+    await page.goto('/');
+    const apps = page.getByRole('button', { name: 'Apps', exact: true });
+    await apps.click();
+    const search = page.getByRole('searchbox', { name: 'Find an app' });
+    await search.fill('youtube');
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('button', { name: 'Utilities', exact: true })).toBeFocused();
+    await expect(search).toHaveValue('youtube');
+    await page.getByRole('button', { name: 'Music', exact: true }).click();
+    await search.fill('spotify');
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('button', { name: 'Utilities', exact: true })).toBeFocused();
+    await expect(search).toHaveValue('spotify');
+    await page.keyboard.press('ArrowUp');
+    await expect(apps).toBeFocused();
+  });
+
+  test(`Left from app search enters Hidden when it is available at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'luma.preferences.v1',
+        JSON.stringify({ version: 1, hidden: ['netflix'] }),
+      );
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Apps', exact: true }).click();
+    const hidden = page.getByRole('button', { name: 'Hidden (1)', exact: true });
+    await expect(hidden).toBeVisible();
+    const search = page.getByRole('searchbox', { name: 'Find an app' });
+    await search.fill('youtube');
+    await page.keyboard.press('ArrowLeft');
+    await expect(hidden).toBeFocused();
+    await expect(hidden).toHaveAttribute('aria-pressed', 'false');
+    await expect(search).toHaveValue('youtube');
+    await hidden.click();
+    await search.fill('netflix');
+    await page.keyboard.press('ArrowLeft');
+    await expect(hidden).toBeFocused();
+    await expect(hidden).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  for (const key of ['Escape', 'TV Back'] as const) {
+    test(`${key} leaves Apps search at the Apps tab at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+      await page.goto('/');
+      const apps = page.getByRole('button', { name: 'Apps', exact: true });
+      await apps.click();
+      const search = page.getByRole('searchbox', { name: 'Find an app' });
+      await search.fill('youtube');
+      await pressBack(page, key);
+      await expect(apps).toBeFocused();
+      await expect(apps).toHaveAttribute('aria-current', 'page');
+      await expect(search).toHaveValue('');
+      await search.focus();
+      await pressBack(page, key);
+      await expect(apps).toBeFocused();
+      await expect(page.locator('main')).toHaveClass(/page-apps/);
+      await search.fill('netflix');
+      await page.locator('[data-focusable="search-clear"]').focus();
+      await pressBack(page, key);
+      await expect(apps).toBeFocused();
+      await expect(search).toHaveValue('');
+      await pressBack(page, key);
+      await expect(page.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    });
+  }
 }
 
 for (const [section, control, selected, first, subpage] of [
@@ -168,9 +265,7 @@ for (const [section, control, selected, first, subpage] of [
   });
 }
 
-test('Left edits the city query and returns from its action button to the Weather setting', async ({
-  page,
-}) => {
+test('Left returns from the location search action to the Weather setting', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Weather', exact: true }).click();
@@ -180,14 +275,38 @@ test('Left edits the city query and returns from its action button to the Weathe
   const search = page.getByRole('searchbox', { name: 'City or postcode' });
   await expect(search).toBeFocused();
   await search.fill('Berlin');
-  await page.keyboard.press('ArrowLeft');
-  await expect(search).toBeFocused();
-  await expect(search).toHaveValue('Berlin');
   await page.getByRole('button', { name: 'Search locations', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
   await expect(location).toBeFocused();
   await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
 });
+
+for (const width of [1920, 390]) {
+  for (const key of ['ArrowUp', 'ArrowLeft'] as const) {
+    test(`${key} leaves the location input at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+      await page.goto('/');
+      const settings = page.getByRole('button', { name: 'Settings', exact: true });
+      await settings.click();
+      await page.getByRole('button', { name: 'Weather', exact: true }).click();
+      await expect(page.locator('[data-focusable="setting-show-weather"]')).toBeFocused();
+      const location = page.locator('[data-focusable="setting-weather-location"]');
+      await location.press('ArrowRight');
+      const field = page.getByRole('searchbox', { name: 'City or postcode' });
+      await expect(field).toBeFocused();
+      await field.fill('Berlin');
+      await page.keyboard.press(key);
+      if (key === 'ArrowUp') {
+        await expect(settings).toBeFocused();
+        await expect(field).toHaveValue('Berlin');
+        await field.focus();
+        await page.keyboard.press('ArrowLeft');
+      }
+      await expect(location).toBeFocused();
+      await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
+    });
+  }
+}
 
 test('Up keeps app options inside their modal focus scope', async ({ page }) => {
   await page.goto('/');
@@ -589,11 +708,20 @@ for (const width of [1920, 390]) {
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('button', { name: 'San Francisco', exact: true })).toBeFocused();
     await page.keyboard.press('ArrowLeft');
-    await expect(selected).toBeFocused();
-    for (const name of ['Prism', 'Midnight', 'Slate']) {
-      await page.keyboard.press('ArrowLeft');
-      await expect(page.getByRole('button', { name, exact: true })).toBeFocused();
+    if (width <= 600) {
+      await expect(page.getByRole('button', { name: 'Background', exact: true })).toBeFocused();
+      await page.keyboard.press('ArrowRight');
     }
+    await expect(selected).toBeFocused();
+    if (width <= 600) {
+      await page.keyboard.press('ArrowLeft');
+      await expect(page.getByRole('button', { name: 'Prism', exact: true })).toBeFocused();
+    }
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('button', { name: 'Background', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(selected).toBeFocused();
+    await page.getByRole('button', { name: 'Forest', exact: true }).focus();
     await page.keyboard.press('ArrowLeft');
     await expect(page.getByRole('button', { name: 'Background', exact: true })).toBeFocused();
     await page.keyboard.press('ArrowRight');
@@ -606,6 +734,40 @@ for (const width of [1920, 390]) {
     await expect(page.getByRole('button', { name: 'Northern lights', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.locator('.wallpaper')).toHaveClass(/wallpaper-northern-lights/);
+  });
+
+  test(`Up follows background columns and Back returns to its category at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const background = page.getByRole('button', { name: 'Background', exact: true });
+    await background.click();
+    const monumentValley = page.getByRole('button', { name: 'Monument Valley', exact: true });
+    await expect(monumentValley).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(
+      page.getByRole('button', { name: width > 600 ? 'Slate' : 'Midnight', exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(monumentValley).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('button', { name: 'San Francisco', exact: true })).toBeFocused();
+    await pressBack(page, 'Escape');
+    await expect(background).toBeFocused();
+    await expect(background).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('main')).toHaveClass(/page-settings/);
+    await page.keyboard.press('ArrowRight');
+    await expect(monumentValley).toBeFocused();
+    await pressBack(page, 'TV Back');
+    await expect(background).toBeFocused();
+    await expect(page.locator('.wallpaper')).toHaveClass(/wallpaper-dunes/);
+    await pressBack(page, 'Escape');
+    await expect(page.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 }
 
@@ -837,15 +999,6 @@ test('mobile preview remains usable without horizontal overflow', async ({ page 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-});
-
-test('ambient mode wakes without launching an app and restores remote focus', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Enter ambient mode' }).click();
-  await expect(page.getByRole('button', { name: 'Return to Luma' })).toBeVisible();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
-  await expect(page.getByRole('status')).toHaveCount(0);
 });
 
 test('one persistent navigation pill slides with native CSS and follows remote input and resizing', async ({

@@ -14,12 +14,6 @@
   height: 1.65rem;
   color: #dededed4;
 }
-.ambient-hint .weather-summary {
-  justify-content: center;
-  min-height: 0;
-  font-size: 1rem;
-  color: #f5f5f5a6;
-}
 .weather-city {
   font-weight: 450;
 }

@@ -223,8 +223,14 @@
   aspect-ratio: 16/9;
   border-radius: 1rem;
 }
-.settings-page .wallpaper-option:focus-visible {
-  outline-offset: 5px;
+.settings-page .wallpaper-option:focus {
+  outline: none;
+}
+.settings-page .wallpaper-option:focus .wallpaper-thumbnail {
+  outline: none;
+  box-shadow:
+    0 0 0 0.2rem var(--ring),
+    0 0 0 0.43rem #ffffff19;
 }
 .settings-page .wallpaper-option > span:not(.wallpaper-thumbnail) {
   margin: 0;
