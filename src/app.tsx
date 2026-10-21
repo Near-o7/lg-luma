@@ -11,7 +11,6 @@ import {
   Search,
   Settings2,
   Sparkles,
-  Tv,
   X,
 } from 'lucide-react';
 import { AppTile } from './components/app-tile';
@@ -27,6 +26,7 @@ import { moveFocus, type Direction } from './navigation';
 import { loadPreferences, savePreferences } from './storage';
 import { wallpapers } from './wallpapers';
 import { moveFavorite } from './favorites';
+import { visibleInputs } from './inputs';
 import type { Category, Inventory, Page, Preferences, TVApp, TVInput } from './types';
 import { categoryLabel, LanguageProvider, useTranslation } from './i18n';
 
@@ -93,6 +93,10 @@ function Launcher({
         return app && !hiddenIds.has(id) ? [app] : [];
       }),
     [favoriteIds, appMap, hiddenIds],
+  );
+  const homeInputs = useMemo(
+    () => visibleInputs(inventory.inputs, preferences.inputVisibility),
+    [inventory.inputs, preferences.inputVisibility],
   );
   const hiddenCount = useMemo(
     () => inventory.apps.filter((app) => hiddenIds.has(app.id)).length,
@@ -446,6 +450,15 @@ function Launcher({
     />
   );
   const wallpaper = wallpapers.find((item) => item.id === preferences.wallpaper) ?? wallpapers[0];
+  const pageEntryFocus: Record<Page, string> = {
+    home: favorites[0]
+      ? `favorite-${favorites[0].id}`
+      : error && !inventory.apps.length
+        ? 'retry'
+        : 'browse-apps',
+    apps: filteredApps[0] ? `library-${filteredApps[0].id}` : 'filter-Streaming',
+    settings: 'settings-section-interface',
+  };
 
   return (
     <div className={`luma${reducedMotion ? ' reduce-motion' : ''}${ambient ? ' is-ambient' : ''}`}>
@@ -473,7 +486,7 @@ function Launcher({
         </button>
       ) : (
         <div className="shell">
-          <header className="header" data-focus-down={undefined}>
+          <header className="header" data-focus-down={pageEntryFocus[page]}>
             <Clock clock24={preferences.clock24} language={language} />
             <Navigation page={page} onChange={openPage} />
             <div className="header-right">
@@ -582,13 +595,13 @@ function Launcher({
                     </div>
                   )}
                 </section>
-                {inventory.inputs.length ? (
+                {homeInputs.length ? (
                   <section className="home-inputs" aria-labelledby="inputs-heading">
                     <div className="section-heading">
                       <h2 id="inputs-heading">{t('inputsHeading')}</h2>
                     </div>
                     <div className="input-grid home-input-grid">
-                      {inventory.inputs.slice(0, 3).map((input) => (
+                      {homeInputs.map((input) => (
                         <InputCard key={input.id} input={input} onLaunch={onLaunch} />
                       ))}
                     </div>
@@ -708,34 +721,12 @@ function Launcher({
                 )}
               </>
             ) : null}
-            {page === 'inputs' ? (
-              <>
-                <h1 className="sr-only">{t('inputs')}</h1>
-                {inventory.inputs.length ? (
-                  <div className="input-grid full-input-grid">
-                    {inventory.inputs.map((input) => (
-                      <InputCard key={input.id} input={input} onLaunch={onLaunch} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    <Tv />
-                    <h3>{loading ? t('findingInputs') : t('noInputs')}</h3>
-                    <p>{inventory.warnings[0] || t('physicalInputs')}</p>
-                    <button
-                      className="primary-button"
-                      data-focusable="inputs-retry"
-                      onClick={() => void refresh()}
-                    >
-                      {t('refreshInputs')}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : null}
             {page === 'settings' ? (
               <Settings
                 preferences={preferences}
+                inputs={inventory.inputs}
+                inputsLoading={loading}
+                inputsWarning={inventory.warnings[0]}
                 onUpdate={update}
                 onRefresh={() => {
                   void refresh();

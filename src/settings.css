@@ -87,6 +87,20 @@
   display: grid;
   gap: 1.75rem;
 }
+.settings-description {
+  padding-inline: 1.45rem;
+  color: var(--soft);
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+.settings-input-title {
+  margin-bottom: 1.5rem;
+  padding-inline: 1.45rem;
+  font-size: 1.5rem;
+  font-weight: 550;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
 .settings-page .settings-group {
   margin: 0;
   border: 0;

@@ -2,10 +2,9 @@ import { memo, useCallback, useLayoutEffect, useRef } from 'react';
 import type { Page } from '../types';
 import { useTranslation } from '../i18n';
 
-const tabs: { id: Page; label: 'home' | 'apps' | 'inputs' | 'settings' }[] = [
+const tabs: { id: Page; label: 'home' | 'apps' | 'settings' }[] = [
   { id: 'home', label: 'home' },
   { id: 'apps', label: 'apps' },
-  { id: 'inputs', label: 'inputs' },
   { id: 'settings', label: 'settings' },
 ];
 

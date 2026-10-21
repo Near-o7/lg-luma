@@ -707,13 +707,6 @@ button svg {
   background: #9cbfa0;
   box-shadow: 0 0 8px #a4d4a51a;
 }
-.input-arrow {
-  margin-left: auto;
-  align-self: flex-start;
-  opacity: 0.4;
-  width: 1.05rem;
-  height: 1.05rem;
-}
 .footer {
   min-height: 3.7rem;
   display: flex;
@@ -885,13 +878,6 @@ button svg {
 .hidden-app .app-label:after {
   content: ' · Hidden';
   font-size: 0.8em;
-}
-.full-input-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 3.5rem;
-}
-.page-inputs > .empty-state {
-  margin-top: 3.5rem;
 }
 .empty-state {
   display: flex;
@@ -1592,9 +1578,6 @@ button svg {
     flex-direction: column;
     margin-top: 2.5rem;
     margin-bottom: 1.5rem;
-  }
-  .full-input-grid {
-    grid-template-columns: 1fr;
   }
   .dialog-scrim {
     padding: 1rem;

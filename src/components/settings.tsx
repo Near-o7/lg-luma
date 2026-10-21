@@ -11,23 +11,43 @@ import {
   Type,
 } from 'lucide-react';
 import { WeatherSettings } from './weather-settings';
-import type { Language, Preferences } from '../types';
+import { InputSettings, InputVisibilitySettings } from './input-settings';
+import type { Language, Preferences, TVInput } from '../types';
 import { useEffect, useState } from 'react';
 import { wallpapers, wallpaperThumbnail } from '../wallpapers';
 import { useTranslation, wallpaperLabel } from '../i18n';
+import { getInputVisibility } from '../inputs';
+
+type SettingsSection = 'interface' | 'background' | 'weather' | 'inputs';
+type SettingsSubpage =
+  | 'language'
+  | 'weather-location'
+  | 'temperature'
+  | 'clock-format'
+  | 'input-visibility';
 
 interface Props {
   preferences: Preferences;
+  inputs: TVInput[];
+  inputsLoading: boolean;
+  inputsWarning?: string;
   onUpdate: (patch: Partial<Preferences>) => void;
   onRefresh: () => void;
 }
 
-export function Settings({ preferences, onUpdate, onRefresh }: Props) {
+export function Settings({
+  preferences,
+  inputs,
+  inputsLoading,
+  inputsWarning,
+  onUpdate,
+  onRefresh,
+}: Props) {
   const { t, language } = useTranslation();
-  const [section, setSection] = useState<'interface' | 'background' | 'weather'>('interface');
-  const [subpage, setSubpage] = useState<
-    'language' | 'weather-location' | 'temperature' | 'clock-format' | null
-  >(null);
+  const [section, setSection] = useState<SettingsSection>('interface');
+  const [subpage, setSubpage] = useState<SettingsSubpage | null>(null);
+  const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
+  const selectedInput = inputs.find((input) => input.id === selectedInputId);
   const [subpageReturnFocus, setSubpageReturnFocus] = useState('setting-language');
   const chooseLanguage = (next: Language) => {
     onUpdate({ language: next });
@@ -38,9 +58,7 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
         ?.focus({ preventScroll: true }),
     );
   };
-  const subpageReturnFocusId = (
-    target: 'language' | 'weather-location' | 'temperature' | 'clock-format',
-  ) => {
+  const subpageReturnFocusId = (target: SettingsSubpage) => {
     switch (target) {
       case 'language':
         return 'setting-language';
@@ -50,13 +68,11 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
         return 'setting-clock-format';
       case 'weather-location':
         return 'setting-weather-location';
+      case 'input-visibility':
+        return 'settings-section-inputs';
     }
   };
-  const openSubpage = (
-    next: 'language' | 'weather-location' | 'temperature' | 'clock-format',
-    focusable: string,
-    returnFocus?: string,
-  ) => {
+  const openSubpage = (next: SettingsSubpage, focusable: string, returnFocus?: string) => {
     setSubpage(next);
     setSubpageReturnFocus(returnFocus ?? subpageReturnFocusId(next));
     requestAnimationFrame(() => {
@@ -110,7 +126,7 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
     document.addEventListener('keydown', onBack);
     return () => document.removeEventListener('keydown', onBack);
   }, [subpage, subpageReturnFocus]);
-  const sectionOrder = ['interface', 'background', 'weather'] as const;
+  const sectionOrder = ['interface', 'background', 'weather', 'inputs'] as const;
   const sectionTitle = (id: (typeof sectionOrder)[number]) => t(id);
   const enterSection = (next: (typeof sectionOrder)[number]) => {
     setSection(next);
@@ -124,9 +140,20 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
     interface: 'setting-home-app-names',
     background: `wallpaper-${preferences.wallpaper}`,
     weather: 'setting-show-weather',
+    inputs: inputs[0] ? `setting-input-${inputs[0].id}` : 'setting-inputs-refresh',
   };
-  const sectionPrevious = { interface: 'weather', background: 'interface', weather: 'background' };
-  const sectionNext = { interface: 'background', background: 'weather', weather: 'interface' };
+  const sectionPrevious = {
+    interface: 'inputs',
+    background: 'interface',
+    weather: 'background',
+    inputs: 'weather',
+  };
+  const sectionNext = {
+    interface: 'background',
+    background: 'weather',
+    weather: 'inputs',
+    inputs: 'interface',
+  };
   return (
     <section className="settings-page" aria-label={t('settingsRegion')}>
       <h1 className="sr-only">{t('settings')}</h1>
@@ -184,15 +211,18 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
         >
           {!subpage && section === 'background' ? (
             <section className="settings-content" aria-label={t('background')}>
-              <div
-                className="wallpaper-options"
-                data-focus-right={`wallpaper-${preferences.wallpaper}`}
-              >
-                {wallpapers.map((wallpaper) => (
+              <div className="wallpaper-options">
+                {wallpapers.map((wallpaper, index) => (
                   <button
                     key={wallpaper.id}
                     className={`wallpaper-option${preferences.wallpaper === wallpaper.id ? ' selected' : ''}`}
                     data-focusable={`wallpaper-${wallpaper.id}`}
+                    data-focus-left={
+                      index === 0
+                        ? 'settings-section-background'
+                        : `wallpaper-${wallpapers[index - 1].id}`
+                    }
+                    data-focus-right={`wallpaper-${(wallpapers[index + 1] ?? wallpaper).id}`}
                     data-focus-up="settings-section-background"
                     aria-pressed={preferences.wallpaper === wallpaper.id}
                     onClick={() => onUpdate({ wallpaper: wallpaper.id })}
@@ -404,21 +434,42 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
               </div>
             </section>
           ) : null}
+          {!subpage && section === 'inputs' ? (
+            <InputSettings
+              inputs={inputs}
+              visibility={preferences.inputVisibility}
+              loading={inputsLoading}
+              warning={inputsWarning}
+              onRefresh={onRefresh}
+              onOpen={(input) => {
+                setSelectedInputId(input.id);
+                openSubpage(
+                  'input-visibility',
+                  `input-visibility-option-${getInputVisibility(input.id, preferences.inputVisibility)}`,
+                  `setting-input-${input.id}`,
+                );
+              }}
+            />
+          ) : null}
           {subpage ? (
             <div
               key={subpage}
               className={`settings-subpage settings-subpage-${subpage}`}
               data-settings-subpage="true"
               role="region"
-              aria-label={t(
-                subpage === 'language'
-                  ? 'language'
-                  : subpage === 'temperature'
-                    ? 'temperature'
-                    : subpage === 'clock-format'
-                      ? 'clockFormat'
-                      : 'weather',
-              )}
+              aria-label={
+                subpage === 'input-visibility'
+                  ? (selectedInput?.title ?? t('inputs'))
+                  : t(
+                      subpage === 'language'
+                        ? 'language'
+                        : subpage === 'temperature'
+                          ? 'temperature'
+                          : subpage === 'clock-format'
+                            ? 'clockFormat'
+                            : 'weather',
+                    )
+              }
               data-focus-left={`settings-subpage-back-${subpage}`}
             >
               <button
@@ -529,6 +580,17 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                     </button>
                   ))}
                 </div>
+              ) : subpage === 'input-visibility' && selectedInput ? (
+                <InputVisibilitySettings
+                  input={selectedInput}
+                  value={getInputVisibility(selectedInput.id, preferences.inputVisibility)}
+                  onChange={(mode) => {
+                    onUpdate({
+                      inputVisibility: { ...preferences.inputVisibility, [selectedInput.id]: mode },
+                    });
+                    closeSubpage();
+                  }}
+                />
               ) : subpage === 'weather-location' ? (
                 <section className="settings-weather-subpage" aria-label={t('weather')}>
                   <WeatherSettings

@@ -71,6 +71,8 @@ Gallery previews use clipped image elements with an inset border, avoiding repea
 | Back on Home           | webOS's normal platform Back behavior                    |
 | Magic Remote pointer   | Point, click, or hold a tile for options                 |
 
+From the top navigation, Down enters Home at the first visible favorite, Apps at the first matching app, and Inputs at the first input. Empty Home and Inputs pages enter their primary action; Apps with no matching results enters the first category. In Background settings, Left/Right step through backgrounds in gallery order; Left from the first returns to the section list, and OK applies the focused background.
+
 On Home, hold OK on a favorite to enter move mode, press Left/Right to change its position, then press Back to finish. The new order is saved immediately and the selected app stays focused. Apps → select an app → hold OK to add/remove favorites or hide apps. The action menu shows the app name and category, and closes after either action. Favorites have a filled-heart badge and sort first in the saved Home order; other apps sort alphabetically. Hidden apps remain installed and can be restored from the **Hidden (count)** category pill, which shows only hidden apps. Choose a category beside search to filter the library; select it again or use the × button to clear the filter. Long app names wrap instead of being truncated.
 
 Home shows Favorites and Inputs without a recent-app section or permanent control hints. App names beneath Home cards are hidden by default; enable **Settings → Interface → Show app names** to display them. The Apps library always shows names. The header clock is at the top left.

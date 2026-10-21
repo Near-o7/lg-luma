@@ -1,4 +1,3 @@
-import { ArrowUpRight } from 'lucide-react';
 import { ConnectionIcon } from './connection-icon';
 import type { TVInput } from '../types';
 import { useTranslation } from '../i18n';
@@ -38,7 +37,6 @@ export function InputCard({
           )}
         </span>
       </span>
-      <ArrowUpRight className="input-arrow" size={22} />
     </button>
   );
 }
