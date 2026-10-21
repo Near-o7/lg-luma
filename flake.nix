@@ -89,10 +89,7 @@
           name = "luma-nixfmt";
           runtimeInputs = [ pkgs.nixfmt ];
           text = ''
-            if [ "$#" -eq 0 ]; then
-              set -- flake.nix
-            fi
-            exec nixfmt "$@"
+            exec nixfmt "$@" flake.nix
           '';
         }
       );
