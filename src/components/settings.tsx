@@ -204,6 +204,9 @@ export function Settings({
               data-focus-down={`settings-section-${sectionNext[id]}`}
               data-focus-right={sectionFirst[id]}
               aria-current={section === id ? 'page' : undefined}
+              aria-label={
+                section === id && subpage ? `${sectionTitle(id)}: ${subpageTitle}` : undefined
+              }
               onFocus={() => {
                 if (section !== id) {
                   setSection(id);
@@ -232,8 +235,16 @@ export function Settings({
                 );
               }}
             >
-              <span>{sectionTitle(id)}</span>
-              {section === id ? <ChevronRight aria-hidden="true" /> : null}
+              {section === id && subpage ? (
+                <span className="settings-sidebar-path">
+                  <span className="settings-sidebar-parent">{sectionTitle(id)}</span>
+                  <ChevronRight className="settings-sidebar-separator" aria-hidden="true" />
+                  <span className="settings-sidebar-subpage">{subpageTitle}</span>
+                </span>
+              ) : (
+                <span>{sectionTitle(id)}</span>
+              )}
+              {section === id && !subpage ? <ChevronRight aria-hidden="true" /> : null}
             </button>
           ))}
         </nav>

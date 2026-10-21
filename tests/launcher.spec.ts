@@ -229,14 +229,22 @@ for (const width of [1920, 390]) {
   }
 }
 
-for (const [section, control, selected, first, subpage] of [
-  ['General', 'setting-language', 'language-option-en', 'language-option-en', 'language'],
+for (const [section, control, selected, first, subpage, title] of [
+  [
+    'General',
+    'setting-language',
+    'language-option-en',
+    'language-option-en',
+    'language',
+    'Language',
+  ],
   [
     'General',
     'setting-clock-format',
     'clock-format-option-12',
     'clock-format-option-12',
     'clock-format',
+    'Clock format',
   ],
   [
     'Weather',
@@ -244,6 +252,7 @@ for (const [section, control, selected, first, subpage] of [
     'temperature-option-celsius',
     'temperature-option-celsius',
     'temperature',
+    'Temperature',
   ],
   [
     'Inputs',
@@ -251,6 +260,7 @@ for (const [section, control, selected, first, subpage] of [
     'input-visibility-option-auto',
     'input-visibility-option-on',
     'input-visibility',
+    'PlayStation 5',
   ],
 ] as const) {
   test(`${subpage} options return with Left and exit upward to the Settings tab`, async ({
@@ -263,11 +273,16 @@ for (const [section, control, selected, first, subpage] of [
     await expect(page.locator('.settings-pane [data-focusable]').first()).toBeFocused();
     await page.locator(`[data-focusable="${control}"]`).press('ArrowRight');
     await expect(page.locator(`[data-focusable="${selected}"]`)).toBeFocused();
+    const category = page.locator('.settings-sidebar-item.selected');
+    await expect(category).toHaveAccessibleName(`${section}: ${title}`);
+    await expect(category.locator('.settings-sidebar-parent')).toHaveText(section);
+    await expect(category.locator('.settings-sidebar-subpage')).toHaveText(title);
     await expect(page.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
     await page.locator(`[data-focusable="${first}"]`).focus();
     await page.keyboard.press('ArrowLeft');
     await expect(page.locator(`[data-focusable="${control}"]`)).toBeFocused();
     await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
+    await expect(category).toHaveAccessibleName(section);
     await page.keyboard.press('ArrowRight');
     await expect(page.locator(`[data-focusable="${selected}"]`)).toBeFocused();
     await page.locator(`[data-focusable="${first}"]`).focus();
@@ -316,11 +331,15 @@ test('Left returns from the location search action to the Weather setting', asyn
   await location.press('ArrowRight');
   const search = page.getByRole('searchbox', { name: 'City or postcode' });
   await expect(search).toBeFocused();
+  const category = page.locator('[data-focusable="settings-section-weather"]');
+  await expect(category).toHaveAccessibleName('Weather: Location');
+  await expect(category.locator('.settings-sidebar-subpage')).toHaveText('Location');
   await search.fill('Berlin');
   await page.getByRole('button', { name: 'Search locations', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
   await expect(location).toBeFocused();
   await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
+  await expect(category).toHaveAccessibleName('Weather');
 });
 
 for (const width of [1920, 390]) {
