@@ -82,6 +82,7 @@ function measureFocus(scope: HTMLElement | Document): FocusSnapshot {
         'data-focus-down',
         'data-focus-left',
         'data-focus-right',
+        'data-focus-exit-up',
         'data-focus-scroll-top',
       ],
     });
@@ -152,7 +153,16 @@ export function moveFocus(direction: Direction): void {
     ?.getAttribute(`data-focus-${direction}`);
   const preferred = route ? measured.entries.find((entry) => entry.rect.id === route) : undefined;
   const target = preferred?.rect.id ?? nextFocus(current.rect, measured.rects, direction);
-  const entry = preferred ?? measured.entries.find((entry) => entry.rect.id === target);
+  let entry = preferred ?? measured.entries.find((entry) => entry.rect.id === target);
+  if (
+    direction === 'up' &&
+    measured.main?.contains(current.node) &&
+    (!entry || !measured.main.contains(entry.node))
+  ) {
+    // Leave page content through its active tab before entering other header controls.
+    const exit = measured.main.dataset.focusExitUp;
+    entry = measured.entries.find((candidate) => candidate.rect.id === exit) ?? entry;
+  }
   if (entry) {
     entry.node.focus({ preventScroll: true });
     if (entry.node.closest('[data-focus-scroll-top="true"]'))

@@ -116,30 +116,28 @@ export function InputVisibilitySettings({
 }) {
   const { t } = useTranslation();
   return (
-    <>
-      <h2 className="settings-input-title">{input.title}</h2>
-      <div className="settings-subpage-options" role="listbox" aria-label={input.title}>
-        {inputVisibilityModes.map((mode, index) => (
-          <button
-            key={mode}
-            type="button"
-            className="setting-row settings-list-item"
-            role="option"
-            aria-selected={value === mode}
-            data-focusable={`input-visibility-option-${mode}`}
-            data-focus-left="settings-subpage-back-input-visibility"
-            data-focus-up={`input-visibility-option-${inputVisibilityModes[(index + inputVisibilityModes.length - 1) % inputVisibilityModes.length]}`}
-            data-focus-down={`input-visibility-option-${inputVisibilityModes[(index + 1) % inputVisibilityModes.length]}`}
-            onClick={() => onChange(mode)}
-          >
-            <span>
-              <strong>{t(visibilityLabels[mode])}</strong>
-              <small>{t(visibilityDescriptions[mode])}</small>
-            </span>
-            {value === mode ? <Check aria-hidden="true" /> : null}
-          </button>
-        ))}
-      </div>
-    </>
+    <div className="settings-subpage-options" role="listbox" aria-label={input.title}>
+      {inputVisibilityModes.map((mode, index) => (
+        <button
+          key={mode}
+          type="button"
+          className="setting-row settings-list-item"
+          role="option"
+          aria-selected={value === mode}
+          data-focusable={`input-visibility-option-${mode}`}
+          data-focus-up={
+            index ? `input-visibility-option-${inputVisibilityModes[index - 1]}` : 'nav-settings'
+          }
+          data-focus-down={`input-visibility-option-${inputVisibilityModes[(index + 1) % inputVisibilityModes.length]}`}
+          onClick={() => onChange(mode)}
+        >
+          <span>
+            <strong>{t(visibilityLabels[mode])}</strong>
+            <small>{t(visibilityDescriptions[mode])}</small>
+          </span>
+          {value === mode ? <Check aria-hidden="true" /> : null}
+        </button>
+      ))}
+    </div>
   );
 }

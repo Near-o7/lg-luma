@@ -1,6 +1,5 @@
 import {
   Accessibility,
-  ArrowLeft,
   Check,
   ChevronRight,
   Clock3,
@@ -26,6 +25,13 @@ type SettingsSubpage =
   | 'clock-format'
   | 'input-visibility';
 
+const subpageTitles = {
+  language: 'language',
+  'weather-location': 'location',
+  temperature: 'temperature',
+  'clock-format': 'clockFormat',
+} as const;
+
 interface Props {
   preferences: Preferences;
   inputs: TVInput[];
@@ -48,6 +54,12 @@ export function Settings({
   const [subpage, setSubpage] = useState<SettingsSubpage | null>(null);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
   const selectedInput = inputs.find((input) => input.id === selectedInputId);
+  const subpageTitle =
+    subpage === 'input-visibility'
+      ? (selectedInput?.title ?? t('inputs'))
+      : subpage
+        ? t(subpageTitles[subpage])
+        : '';
   const [subpageReturnFocus, setSubpageReturnFocus] = useState('setting-language');
   const chooseLanguage = (next: Language) => {
     onUpdate({ language: next });
@@ -111,7 +123,15 @@ export function Settings({
   useEffect(() => {
     if (!subpage) return;
     const onBack = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' && event.keyCode !== 461 && event.key !== 'Backspace') return;
+      if (event.key === 'ArrowLeft') {
+        if (
+          !(event.target instanceof HTMLElement) ||
+          event.target instanceof HTMLInputElement ||
+          !event.target.closest('[data-settings-subpage]')
+        )
+          return;
+      } else if (event.key !== 'Escape' && event.keyCode !== 461 && event.key !== 'Backspace')
+        return;
       if (event.target instanceof HTMLInputElement && event.key === 'Backspace') return;
       event.preventDefault();
       event.stopPropagation();
@@ -142,12 +162,6 @@ export function Settings({
     weather: 'setting-show-weather',
     inputs: inputs[0] ? `setting-input-${inputs[0].id}` : 'setting-inputs-refresh',
   };
-  const sectionPrevious = {
-    interface: 'inputs',
-    background: 'interface',
-    weather: 'background',
-    inputs: 'weather',
-  };
   const sectionNext = {
     interface: 'background',
     background: 'weather',
@@ -159,21 +173,21 @@ export function Settings({
       <h1 className="sr-only">{t('settings')}</h1>
       <div className="settings-layout">
         <nav className="settings-sidebar" aria-label={t('settingsSections')}>
-          {sectionOrder.map((id) => (
+          {sectionOrder.map((id, index) => (
             <button
               key={id}
               className={`settings-sidebar-item${section === id ? ' selected' : ''}`}
               data-focusable={`settings-section-${id}`}
               tabIndex={section === id ? 0 : -1}
-              data-focus-up={`settings-section-${sectionPrevious[id]}`}
+              data-focus-up={index ? `settings-section-${sectionOrder[index - 1]}` : 'nav-settings'}
               data-focus-down={`settings-section-${sectionNext[id]}`}
               data-focus-right={sectionFirst[id]}
               aria-current={section === id ? 'page' : undefined}
               onFocus={() => {
                 if (section !== id) {
                   setSection(id);
-                  setSubpage(null);
                 }
+                setSubpage(null);
               }}
               onClick={() => enterSection(id)}
               onKeyDown={(event) => {
@@ -204,9 +218,7 @@ export function Settings({
         </nav>
         <div
           className="settings-pane"
-          data-focus-left={
-            subpage ? `settings-subpage-back-${subpage}` : `settings-section-${section}`
-          }
+          data-focus-left={`settings-section-${section}`}
           key={section}
         >
           {!subpage && section === 'background' ? (
@@ -457,29 +469,9 @@ export function Settings({
               className={`settings-subpage settings-subpage-${subpage}`}
               data-settings-subpage="true"
               role="region"
-              aria-label={
-                subpage === 'input-visibility'
-                  ? (selectedInput?.title ?? t('inputs'))
-                  : t(
-                      subpage === 'language'
-                        ? 'language'
-                        : subpage === 'temperature'
-                          ? 'temperature'
-                          : subpage === 'clock-format'
-                            ? 'clockFormat'
-                            : 'weather',
-                    )
-              }
-              data-focus-left={`settings-subpage-back-${subpage}`}
+              aria-label={subpageTitle}
             >
-              <button
-                className="settings-subpage-back"
-                data-focusable={`settings-subpage-back-${subpage}`}
-                onClick={closeSubpage}
-              >
-                <ArrowLeft aria-hidden="true" />
-                <span>{t('back')}</span>
-              </button>
+              <h2 className="settings-subpage-title">{subpageTitle}</h2>
               {subpage === 'language' ? (
                 <div className="settings-subpage-options" role="listbox" aria-label={t('language')}>
                   {(
@@ -496,8 +488,11 @@ export function Settings({
                       aria-selected={preferences.language === option}
                       className="setting-row settings-list-item"
                       data-focusable={`language-option-${option}`}
-                      data-focus-left={`settings-subpage-back-${subpage}`}
-                      data-focus-up={`language-option-${option === 'en' ? 'zh' : option === 'de' ? 'en' : 'de'}`}
+                      data-focus-up={
+                        option === 'en'
+                          ? 'nav-settings'
+                          : `language-option-${option === 'de' ? 'en' : 'de'}`
+                      }
                       data-focus-down={`language-option-${option === 'en' ? 'de' : option === 'de' ? 'zh' : 'en'}`}
                       onClick={() => chooseLanguage(option)}
                     >
@@ -527,8 +522,7 @@ export function Settings({
                       aria-selected={preferences.clock24 === clock24}
                       className="setting-row settings-list-item"
                       data-focusable={focusId}
-                      data-focus-left={`settings-subpage-back-${subpage}`}
-                      data-focus-up={clock24 ? 'clock-format-option-12' : 'clock-format-option-24'}
+                      data-focus-up={clock24 ? 'clock-format-option-12' : 'nav-settings'}
                       data-focus-down={
                         clock24 ? 'clock-format-option-12' : 'clock-format-option-24'
                       }
@@ -560,11 +554,8 @@ export function Settings({
                       aria-selected={preferences.temperatureUnit === unit}
                       className="setting-row settings-list-item"
                       data-focusable={focusId}
-                      data-focus-left={`settings-subpage-back-${subpage}`}
                       data-focus-up={
-                        unit === 'celsius'
-                          ? 'temperature-option-fahrenheit'
-                          : 'temperature-option-celsius'
+                        unit === 'celsius' ? 'nav-settings' : 'temperature-option-celsius'
                       }
                       data-focus-down={
                         unit === 'celsius'
@@ -600,7 +591,7 @@ export function Settings({
                     onEnabledChange={(showWeather) => onUpdate({ showWeather })}
                     unit={preferences.temperatureUnit}
                     onUnitChange={(temperatureUnit) => onUpdate({ temperatureUnit })}
-                    focusUp={`settings-subpage-back-${subpage}`}
+                    focusUp="nav-settings"
                     showControls={false}
                     showTemperature={false}
                     showLocationSearch

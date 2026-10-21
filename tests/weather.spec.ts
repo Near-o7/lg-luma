@@ -229,7 +229,7 @@ test('weather visibility preserves the city and prevents requests when the widge
   await expect(page.locator('.weather-summary')).toHaveCount(0);
   expect(requests).toBe(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.locator('.settings-sidebar')).toContainText('Interface');
+  await expect(page.locator('.settings-sidebar')).toContainText('General');
   await expect(page.getByRole('switch', { name: 'Show widget', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Weather', exact: true }).click();
   await expect(page.getByRole('switch', { name: /Show widget/ })).toBeVisible();

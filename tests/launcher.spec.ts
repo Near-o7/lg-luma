@@ -62,6 +62,145 @@ for (const width of [1920, 1280, 390]) {
   }
 }
 
+async function moveUpToHeader(page: Page) {
+  for (let step = 0; step < 20; step++) {
+    await page.keyboard.press('ArrowUp');
+    if (await page.locator('.header :focus').count()) return;
+  }
+  throw new Error('Repeated Up did not reach the header.');
+}
+
+for (const width of [1920, 390]) {
+  for (const tab of ['Home', 'Apps', 'Settings'] as const) {
+    test(`Up from ${tab} content reaches its active navigation tab first at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+      await page.goto('/');
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
+      const activeTab = page
+        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('button', { name: tab, exact: true });
+      await activeTab.click();
+      if (tab === 'Settings') {
+        await page.getByRole('button', { name: 'Inputs', exact: true }).click();
+        await expect(
+          page.locator('[data-focusable="setting-input-com.webos.app.hdmi1"]'),
+        ).toBeFocused();
+        await page.locator('[data-focusable="setting-inputs-refresh"]').focus();
+      } else {
+        await page
+          .locator(tab === 'Home' ? '.favorites-grid .app-tile' : '.library-grid .app-tile')
+          .last()
+          .focus();
+      }
+      await moveUpToHeader(page);
+      await expect(activeTab).toBeFocused();
+      await expect(activeTab).toHaveAttribute('aria-current', 'page');
+    });
+  }
+
+  test(`Up leaves Apps search through the active navigation tab at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width > 600 ? 1080 : 844 });
+    await page.goto('/');
+    const apps = page.getByRole('button', { name: 'Apps', exact: true });
+    await apps.click();
+    const search = page.getByRole('searchbox', { name: 'Find an app' });
+    await search.fill('youtube');
+    await moveUpToHeader(page);
+    await expect(apps).toBeFocused();
+    await expect(search).toHaveValue('youtube');
+  });
+}
+
+for (const [section, control, selected, first, subpage] of [
+  ['General', 'setting-language', 'language-option-en', 'language-option-en', 'language'],
+  [
+    'General',
+    'setting-clock-format',
+    'clock-format-option-12',
+    'clock-format-option-12',
+    'clock-format',
+  ],
+  [
+    'Weather',
+    'setting-temperature',
+    'temperature-option-celsius',
+    'temperature-option-celsius',
+    'temperature',
+  ],
+  [
+    'Inputs',
+    'setting-input-com.webos.app.hdmi1',
+    'input-visibility-option-auto',
+    'input-visibility-option-on',
+    'input-visibility',
+  ],
+] as const) {
+  test(`${subpage} options return with Left and exit upward to the Settings tab`, async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const settings = page.getByRole('button', { name: 'Settings', exact: true });
+    await settings.click();
+    await page.getByRole('button', { name: section, exact: true }).click();
+    await expect(page.locator('.settings-pane [data-focusable]').first()).toBeFocused();
+    await page.locator(`[data-focusable="${control}"]`).press('ArrowRight');
+    await expect(page.locator(`[data-focusable="${selected}"]`)).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+    await page.locator(`[data-focusable="${first}"]`).focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator(`[data-focusable="${control}"]`)).toBeFocused();
+    await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator(`[data-focusable="${selected}"]`)).toBeFocused();
+    await page.locator(`[data-focusable="${first}"]`).focus();
+    await page.keyboard.press('ArrowUp');
+    await expect(settings).toBeFocused();
+    await expect(settings).toHaveAttribute('aria-current', 'page');
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('[data-focusable="setting-home-app-names"]')).toBeFocused();
+  });
+}
+
+test('Left edits the city query and returns from its action button to the Weather setting', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await expect(page.locator('[data-focusable="setting-show-weather"]')).toBeFocused();
+  const location = page.locator('[data-focusable="setting-weather-location"]');
+  await location.press('ArrowRight');
+  const search = page.getByRole('searchbox', { name: 'City or postcode' });
+  await expect(search).toBeFocused();
+  await search.fill('Berlin');
+  await page.keyboard.press('ArrowLeft');
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('Berlin');
+  await page.getByRole('button', { name: 'Search locations', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(location).toBeFocused();
+  await expect(page.locator('[data-settings-subpage]')).toHaveCount(0);
+});
+
+test('Up keeps app options inside their modal focus scope', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open Netflix', exact: true }).focus();
+  await page.keyboard.press('m');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.locator('[data-focusable]').first().focus();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(dialog.locator(':focus')).toHaveCount(1);
+});
+
 test('Home entry follows the visible saved favorite order', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
@@ -158,6 +297,11 @@ test('Inputs are configured in Settings with persistent On, Off, and Auto Home v
   await expect(consoleInput).toBeFocused();
   await consoleInput.press('ArrowRight');
   await expect(page.locator('[data-focusable="input-visibility-option-auto"]')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(consoleInput).toBeFocused();
+  await expect(consoleInput.locator('.setting-value')).toHaveText('Auto');
+  await consoleInput.press('ArrowRight');
+  await expect(page.locator('[data-focusable="input-visibility-option-auto"]')).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('[data-focusable="input-visibility-option-off"]')).toBeFocused();
   await page.keyboard.press('Enter');
@@ -185,7 +329,8 @@ test('Inputs are configured in Settings with persistent On, Off, and Auto Home v
   await inputs.click();
   await streamer.press('ArrowRight');
   await expect(page.locator('[data-focusable="input-visibility-option-on"]')).toBeFocused();
-  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
   await expect(page.locator('[data-focusable="input-visibility-option-auto"]')).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(streamer).toBeFocused();
@@ -298,8 +443,8 @@ test('Settings sidebar and content support remote navigation and persistent pref
   await expect(settings).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('[data-focusable="settings-section-interface"]').focus();
-  await expect(page.getByRole('button', { name: 'Interface', exact: true })).toBeFocused();
-  await expect(page.locator('.settings-sidebar')).toContainText('Interface');
+  await expect(page.getByRole('button', { name: 'General', exact: true })).toBeFocused();
+  await expect(page.locator('.settings-sidebar')).toContainText('General');
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('[data-focusable="settings-section-background"]')).toBeFocused();
   await page.keyboard.press('ArrowUp');
@@ -346,7 +491,7 @@ test('Settings sidebar and content support remote navigation and persistent pref
 test('nested language menu supports remote navigation and persists', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Interface', exact: true }).click();
+  await page.getByRole('button', { name: 'General', exact: true }).click();
   const trigger = page.getByRole('button', { name: /Language/ });
   await expect(trigger).toBeVisible();
   await trigger.press('ArrowRight');
@@ -357,11 +502,11 @@ test('nested language menu supports remote navigation and persists', async ({ pa
   await expect(page.locator('html')).toHaveAttribute('lang', 'de-DE');
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Luma-Einstellungen', exact: true })).toBeVisible();
-  await expect(page.locator('.settings-sidebar')).toContainText('Oberfläche');
+  await expect(page.locator('.settings-sidebar')).toContainText('Allgemein');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click();
-  await page.getByRole('button', { name: 'Oberfläche', exact: true }).click();
+  await page.getByRole('button', { name: 'Allgemein', exact: true }).click();
   await page.getByRole('button', { name: /Anzeigesprache/ }).press('ArrowRight');
   await expect(page.locator('[data-focusable="language-option-de"]')).toBeFocused();
   await page.keyboard.press('ArrowDown');
@@ -371,12 +516,10 @@ test('nested language menu supports remote navigation and persists', async ({ pa
   await expect(page.getByRole('region', { name: 'Luma 设置', exact: true })).toBeVisible();
 });
 
-test('Interface D-pad moves down to the language selector and up from refresh', async ({
-  page,
-}) => {
+test('General D-pad moves down to the language selector and up from refresh', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Interface', exact: true }).click();
+  await page.getByRole('button', { name: 'General', exact: true }).click();
   await expect(page.locator('[data-focusable="setting-home-app-names"]')).toBeFocused();
   await page.locator('[data-focusable="settings-section-interface"]').focus();
   await page.keyboard.press('ArrowRight');
@@ -419,7 +562,7 @@ test('Settings sidebar uses plain labels and an Apple TV-style focus highlight',
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const interfaceSection = page.getByRole('button', { name: 'Interface', exact: true });
+  const interfaceSection = page.getByRole('button', { name: 'General', exact: true });
   await expect(page.locator('.settings-sidebar-index')).toHaveCount(0);
   await expect(interfaceSection).toBeFocused();
   const focusStyle = await interfaceSection.evaluate((element) => {

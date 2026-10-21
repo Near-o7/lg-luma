@@ -285,20 +285,6 @@ function Launcher({
           setOptionsApp(null);
           return;
         }
-        if (page === 'settings') {
-          const backTarget = document.activeElement as HTMLElement | null;
-          if (backTarget?.dataset.focusable?.startsWith('settings-subpage-back-')) {
-            backTarget.click();
-            return;
-          }
-          const subpageBack = document.querySelector<HTMLElement>(
-            '[data-settings-subpage] [data-focusable^="settings-subpage-back-"]:focus',
-          );
-          if (subpageBack) {
-            subpageBack.click();
-            return;
-          }
-        }
         if (query) {
           setQuery('');
           return;
@@ -382,7 +368,7 @@ function Launcher({
       const languageOption = (event.target as HTMLElement | null)?.dataset.focusable?.startsWith(
         'language-option-',
       );
-      if (editable && event.key !== 'ArrowDown') return;
+      if (editable && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
       if (languageOption && event.key.startsWith('Arrow')) {
         event.preventDefault();
         moveFocus(directions[event.key]);
@@ -508,7 +494,7 @@ function Launcher({
               </button>
             </div>
           </header>
-          <main className={`main page-${page}`}>
+          <main className={`main page-${page}`} data-focus-exit-up={`nav-${page}`}>
             {page === 'home' ? (
               <>
                 <section className="hero" aria-labelledby="greeting">

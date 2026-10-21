@@ -41,6 +41,16 @@ luna-send -i luna://com.webos.appInstallService/dev/install \
 
 Wait for the installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma after updating.
 
+## Inputs on Home
+
+Open **Settings → Inputs** and select an input to choose when it appears on Home:
+
+- **On** — always show it.
+- **Off** — never show it.
+- **Auto** — show it only when the TV reports it connected (the default).
+
+Choices are saved per input. Hidden and disconnected inputs remain available in Settings, and **Refresh inputs** updates the detected devices and their connection states.
+
 ## Optional: open at boot
 
 After testing the installed app, run this inside the TV's root SSH shell:
