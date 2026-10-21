@@ -229,10 +229,14 @@ pub fn scene_with_pill(
     footer(&mut out, state, assets);
     if let Some(overlay) = &state.overlay {
         out.controls.clear();
+        let start = out.draw.len();
         out.shape(Rect::new(0., 0., 1920., 1080.), 0., c(0x080b12, 0.70));
         match overlay {
             Overlay::Options { id, .. } => options(&mut out, state, assets, id),
             Overlay::Keyboard => keyboard(&mut out, state, assets),
+        }
+        if let Some(opened) = state.panel_started {
+            out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
         }
     }
     if let Some((notice, _)) = &state.notice {
@@ -603,7 +607,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let row_height = FACE_HEIGHT + if names { 67.7 } else { 0. };
     let mut grid_height = apps.len().div_ceil(6).max(1) as f32 * row_height
         + apps.len().div_ceil(6).saturating_sub(1) as f32 * 32.;
-    if state.loading && apps.is_empty() {
+    if state.loading && state.inventory.apps.is_empty() {
         for index in 0..6 {
             out.shape(
                 Rect::new(
@@ -617,27 +621,28 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             );
         }
     } else if apps.is_empty() {
-        let error = state.error.is_some();
+        let error = state.error.is_some() && state.inventory.apps.is_empty();
         empty(
             out,
             state,
             assets,
             EmptyState {
-                rect: Rect::new(84., 533.6 - s, 1752., 284.),
+                rect: Rect::new(84., 533.6 - s, 1752., 258.7),
                 icon: if error { "alert" } else { "heart" },
                 title: if error {
                     "A little help?"
                 } else {
                     "Make room for your favorites."
                 },
-                hint: state
-                    .error
-                    .as_deref()
-                    .unwrap_or("Find an app you love. Hold OK to pin it here."),
+                hint: if error {
+                    state.error.as_deref().unwrap_or("")
+                } else {
+                    "Find an app you love. Hold OK to pin it here."
+                },
                 action: Some(if error { Target::Retry } else { Target::Browse }),
             },
         );
-        grid_height = 272.8;
+        grid_height = 247.5;
     }
     for (index, app) in apps.iter().enumerate() {
         tile(
@@ -1096,6 +1101,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         out.control(Target::Sidebar(index), rect, true);
     }
     if let Some(subpage) = &state.subpage {
+        let start = out.draw.len();
         let options: Vec<(&str, Option<&str>, bool)> = match subpage {
             Subpage::Clock => vec![
                 ("12-hour", None, !state.preferences.hour_24),
@@ -1136,6 +1142,9 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     chevron: false,
                 },
             );
+        }
+        if let Some(opened) = state.panel_started {
+            out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
         }
         return;
     }
@@ -1451,7 +1460,7 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
     out.shape(rect, 17.6, c(0xffffff, 0.02));
     out.border(rect, 17.6, 1., c(0xffffff, 0.05));
     let center = rect.x + rect.w / 2.;
-    let top = rect.y + if action.is_some() { 28. } else { 64. };
+    let top = rect.y + if action.is_some() { 33. } else { (rect.h - 123.2) / 2. };
     out.icon(
         assets,
         icon,
@@ -1467,13 +1476,13 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
     );
     out.text(
         hint,
-        Rect::new(center - 352., top + 96., 704., 64.),
+        Rect::new(center - 352., top + 97.6, 704., 64.),
         text(16., 400, 0.).leading(1.6),
         c(0xf5f5f5, 0.72),
         true,
     );
     if let Some(target) = action {
-        let button = Rect::new(center - 108., top + 163., 216., 48.);
+        let button = Rect::new(center - 104.8, top + 144.8, 209.6, 46.8);
         out.shape(button, 11.2, c(0xededed, 1.));
         if state.focus == target {
             out.border(button.inset(-7.), 18.2, 2., WHITE);
@@ -1484,11 +1493,12 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
             } else {
                 "Explore your apps"
             },
-            Rect::new(button.x + 12., button.y + 14., button.w - 24., 24.),
+            Rect::new(button.x + 20.8, button.y + 14.4, button.w - 72., 18.4),
             text(15.2, 600, 0.),
             c(0x242424, 1.),
-            true,
+            false,
         );
+        out.icon(assets, "arrow", Rect::new(button.x + button.w - 38.4, button.y + 14.6, 17.6, 17.6), c(0x242424, 1.));
         out.control(target, button, true);
     }
 }
@@ -1663,6 +1673,7 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
 }
 
 fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
+    let start = out.draw.len();
     let width = (notice.chars().count() as f32 * 8. + 118.).clamp(300., 1200.);
     let rect = Rect::new(960. - width / 2., 970., width, 58.);
     out.shadow(rect, 16., 40., 8., 0.33);
@@ -1688,5 +1699,10 @@ fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
     }
     if state.overlay.is_none() {
         out.control(Target::DismissNotice, close, false);
+    }
+    if !state.preferences.reduced_motion
+        && let Some((_, opened)) = &state.notice
+    {
+        out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
     }
 }

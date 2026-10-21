@@ -39,7 +39,11 @@ try {
     const state = JSON.parse(await fs.readFile(dump, 'utf8'));
     assert.equal(state.error, null);
     const stats = await sharp(screenshot).stats();
-    assert.equal(stats.channels[3].min, 255, 'UI compositing must preserve opaque framebuffer alpha');
+    assert.equal(
+      stats.channels[3].min,
+      255,
+      'UI compositing must preserve opaque framebuffer alpha',
+    );
     assert.ok(
       stats.channels.slice(0, 3).some((channel) => channel.stdev > 10),
       'Framebuffer must contain rendered UI',

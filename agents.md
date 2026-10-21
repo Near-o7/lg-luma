@@ -28,8 +28,11 @@ Project filenames use lowercase kebab-case, including React components (for exam
 `native/` is an experimental Rust/SDL2/GLES2 launcher with independent UI, platform and persistence
 layers. See `native/README.md`. Run `pnpm native:check` for Rust changes and `pnpm native:smoke`
 after generating native assets to exercise desktop OpenGL screenshots and interaction/persistence.
-These commands need Rust, pkg-config and SDL2; asset generation also needs woff2_decompress. When
-missing, use `nix-shell -p pkg-config SDL2 woff2 --run '<command>'`. Native preferences and app ID
+These commands need Rust, pkg-config and SDL2; asset generation also needs woff2_decompress and
+Python/fontTools. When missing, use `nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run '<command>'`.
+`pnpm native:compare` produces fixed-time web/native side-by-side screenshots under
+`.build/native/comparison` (Playwright Chromium required); use it when matching the web design.
+Native preferences and app ID
 are separate from the web app. TV builds use the `webos` feature and must never fall back to demo
 inventory. Keep platform work off the SDL thread and pointer focus free of scrolling side effects.
 

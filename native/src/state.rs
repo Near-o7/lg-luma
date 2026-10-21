@@ -115,6 +115,7 @@ pub struct State {
     pub pointer: bool,
     pub pressed: Option<Target>,
     pub previous_background: Option<(String, Instant)>,
+    pub panel_started: Option<Instant>,
 }
 
 impl State {
@@ -139,6 +140,7 @@ impl State {
             pointer: false,
             pressed: None,
             previous_background: None,
+            panel_started: None,
         }
     }
 
@@ -148,6 +150,22 @@ impl State {
     }
 
     pub fn tick(&mut self) {
+        if let Some(start) = self.panel_started {
+            self.dirty = true;
+            let duration = if self.overlay.is_some() { 120 } else { 150 };
+            if self.preferences.reduced_motion || start.elapsed() >= Duration::from_millis(duration)
+            {
+                self.panel_started = None;
+            }
+        }
+        if self
+            .notice
+            .as_ref()
+            .is_some_and(|(_, start)| start.elapsed() < Duration::from_millis(120))
+            && !self.preferences.reduced_motion
+        {
+            self.dirty = true;
+        }
         if let Some((_, start)) = &self.previous_background {
             self.dirty = true;
             if self.preferences.reduced_motion || start.elapsed() >= Duration::from_millis(400) {
@@ -172,6 +190,16 @@ impl State {
         }
     }
 
+    pub fn animating(&self) -> bool {
+        self.previous_background.is_some()
+            || self.panel_started.is_some()
+            || (!self.preferences.reduced_motion
+                && self
+                    .notice
+                    .as_ref()
+                    .is_some_and(|(_, start)| start.elapsed() < Duration::from_millis(120)))
+    }
+
     pub fn open(&mut self, index: usize) {
         self.page = match index {
             1 => Page::Apps,
@@ -185,6 +213,7 @@ impl State {
         self.overlay = None;
         self.moving = None;
         self.subpage = None;
+        self.panel_started = None;
         self.dirty = true;
     }
 
@@ -364,6 +393,7 @@ impl State {
     }
 
     fn close_subpage(&mut self) {
+        self.panel_started = None;
         self.pointer = false;
         self.focus = match self.subpage.take() {
             Some(Subpage::Clock) => Target::Setting(1),
@@ -611,6 +641,9 @@ impl State {
                 restore: self.focus.clone(),
             });
             self.focus = Target::Option(0);
+            if !self.preferences.reduced_motion {
+                self.panel_started = Some(Instant::now());
+            }
             self.dirty = true;
         }
     }
@@ -680,6 +713,9 @@ impl State {
             Target::Search => {
                 self.overlay = Some(Overlay::Keyboard);
                 self.focus = Target::Key(0);
+                if !self.preferences.reduced_motion {
+                    self.panel_started = Some(Instant::now());
+                }
             }
             Target::Sidebar(index) => {
                 self.section = index;
@@ -692,6 +728,9 @@ impl State {
                     0 => self.preferences.show_names = !self.preferences.show_names,
                     1 => {
                         self.subpage = Some(Subpage::Clock);
+                        if !self.preferences.reduced_motion {
+                            self.panel_started = Some(Instant::now());
+                        }
                         self.focus = Target::Choice(usize::from(self.preferences.hour_24));
                         return vec![];
                     }
@@ -718,6 +757,9 @@ impl State {
                     .copied()
                     .unwrap_or_default();
                 self.subpage = Some(Subpage::Input(id));
+                if !self.preferences.reduced_motion {
+                    self.panel_started = Some(Instant::now());
+                }
                 self.focus = Target::Choice(match mode {
                     InputMode::On => 0,
                     InputMode::Off => 1,
@@ -742,6 +784,7 @@ impl State {
                 let Some(Overlay::Options { id, restore }) = self.overlay.take() else {
                     return vec![];
                 };
+                self.panel_started = None;
                 let old_ids: Vec<_> = self.apps().iter().map(|a| a.id.clone()).collect();
                 let old_index = old_ids.iter().position(|item| item == &id).unwrap_or(0);
                 let mut favorites = self.preferences.favorites(&self.inventory.apps);
@@ -812,6 +855,7 @@ impl State {
             return vec![];
         }
         if let Some(overlay) = self.overlay.take() {
+            self.panel_started = None;
             self.focus = match overlay {
                 Overlay::Options { restore, .. } => restore,
                 Overlay::Keyboard => Target::Search,

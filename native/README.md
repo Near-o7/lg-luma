@@ -8,7 +8,7 @@ independent MIT implementation; no PlxNative source is included.
 ## Desktop preview
 
 From the repository root, with the existing pnpm dependencies installed, Rust 1.88+,
-`pkg-config`, SDL2 development libraries and `woff2_decompress` available:
+`pkg-config`, SDL2 development libraries, `woff2_decompress`, and Python/fontTools available:
 
 ```sh
 pnpm native:assets
@@ -18,7 +18,7 @@ pnpm native:dev
 On this project's Nix setup, use one development shell:
 
 ```sh
-nix-shell -p pkg-config SDL2 woff2 --run 'pnpm native:assets && pnpm native:dev'
+nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run 'pnpm native:assets && pnpm native:dev'
 ```
 
 The preview opens a resizable 1280×720 window, letterboxing the same 1920×1080 layout used on TV.
@@ -27,7 +27,10 @@ a fullscreen preview. Rust changes use incremental compilation and a relaunch.
 
 Assets are prepared under `.build/native/assets` from the existing wallpapers, SVG logos, collected
 app artwork and Inter font. The font is decompressed to TTF and the SVGs are rasterized at build
-time. No asset downloads occur. Regenerate assets after changing their sources.
+time. The variable font is instantiated at the web UI's weights and optical sizes. Wallpaper
+cropping, saturation, shading and tile gradients are prepared ahead of time from the web design,
+and UI/input icons reuse the web components at build time. No asset downloads occur.
+Regenerate assets after changing their sources.
 
 ### Controls
 
@@ -46,7 +49,10 @@ favorites and all eligible physical inputs. Apps supports
 categories, Hidden, favorite-first ordering, wrapped names, and search with a remote-operable
 on-screen keyboard or a physical keyboard. Options add/remove favorites or hide/restore apps.
 Move mode saves on each Left/Right step. General settings control app names, clock format and
-reduced motion. Background has all nine wallpapers. Input settings cycle Auto → On → Off.
+reduced motion. Clock format and each input open nested choice pages with checkmarks; Left/Back
+returns to the parent row. Background has all nine wallpapers and enters at the currently applied
+background. Input choices are On, Off and Auto, with the same descriptions as the web app.
+Hidden appears only when needed, and search/category filters have separate clear controls.
 
 Desktop preferences live in `$XDG_CONFIG_HOME/luma-native/preferences.json`, or
 `~/.config/luma-native/preferences.json`. `--preferences PATH` isolates a test run. Native preferences
@@ -56,12 +62,14 @@ being silently replaced. Writes use a temporary file and atomic rename; run one 
 ## Checks and screenshots
 
 ```sh
-nix-shell -p pkg-config SDL2 woff2 --run 'pnpm native:check && pnpm native:smoke'
+nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run 'pnpm native:check && pnpm native:smoke'
 ```
 
 `native:check` runs rustfmt, Clippy (including the webOS feature) and behavior tests.
 `native:smoke` needs a desktop display: it opens SDL windows, exercises navigation and persistence,
-and reads actual OpenGL framebuffers into `.build/native/*.png`. On Linux it can run under Xvfb
+and reads actual OpenGL framebuffers into `.build/native/*.png`. Captures use an offscreen
+1920×1080 framebuffer, independent of the desktop window's HiDPI scale. It also checks alpha
+compositing, nested settings, and real SDL pointer events. On Linux it can run under Xvfb
 with Mesa software rendering. It does not measure TV performance.
 The separate Native prototype GitHub workflow runs these checks on Linux and uploads its screenshots.
 
@@ -77,6 +85,27 @@ Scripts support `home`, `apps`, `settings`, `up`, `down`, `left`, `right`, `ente
 `hold`, `type:TEXT`, and `wait`. Screenshots are taken before the final buffer swap. The state dump
 provides machine-readable focus, filtering and preferences. The scripts drive the same state
 transitions as the interactive UI.
+
+`--time 2026-10-21T20:41:00+02:00` fixes the clock/date for reproducible previews. Scripted
+`click:X:Y` uses authored 1920×1080 coordinates and injects actual SDL button-down/up events.
+
+### Compare with the web interface
+
+```sh
+pnpm exec playwright install chromium
+nix-shell -p pkg-config SDL2 woff2 python3Packages.fonttools --run 'pnpm native:compare'
+```
+
+The comparison command builds the web app and captures both renderers with the same inventory,
+preferences, time and canvas size. Weather and translation controls are omitted from the web
+references. It covers Home (with/without captions and empty), Apps, options, Music, Hidden,
+search/empty results, General, clock choices, Background, Inputs and input choices.
+
+`.build/native/comparison/*-side-by-side.png` shows **web on the left, native on the right**.
+Web layout/font measurements and an informational image-difference report are stored alongside
+the images. Font antialiasing and shadow rasterization differ across renderers, so the report is
+not a pixel-perfect pass/fail gate. During iteration, `node native/tools/compare.mjs --native-only`
+reuses existing web references.
 
 ## Build for webOS
 
@@ -130,13 +159,15 @@ replaced behind `platform.rs` with direct LS2 integration if the native sandbox 
 
 Implemented: Home, Apps, General/Background/Inputs settings, favorites/reordering, hide/restore,
 search, pointer/remote controls, local persistence, platform worker, native build/package tooling,
-and screenshot/state automation.
+and screenshot/state automation. Layout, typography, branded cards, input artwork, navigation pill,
+focus treatments, menus, footers and settings follow the web implementation's 1920×1080 geometry.
 
 Weather, localization, web-preference migration, audio guidance, native OS virtual-keyboard
 integration and automatic boot/Home-button routing are not ported. Native UI text is English;
 the bundled font currently covers Latin characters. The custom renderer batches consecutive
 draws, caches glyphs and images, evicts old artwork above a 48 MiB image budget, and repaints only
-when the scene changes or the navigation pill animates. Text is CPU-rasterized once per cached
+when the scene changes or the small pill/panel/wallpaper animations run. Reduced motion disables
+these transitions. Text is CPU-rasterized once per cached
 glyph; UI compositing uses the GPU. No TV frame-rate or memory advantage is claimed yet.
 
 ## Code map

@@ -42,7 +42,7 @@ impl Options {
         while let Some(arg) = args.next() {
             if arg == "--help" {
                 println!(
-                    "Luma native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --frames N          Exit after N event-loop frames\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/wait\n  --screenshot PATH   Save final framebuffer as PNG\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
+                    "Luma native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --frames N          Exit after N event-loop frames\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/click:X:Y/wait\n  --time RFC3339      Fix the preview's clock and date\n  --screenshot PATH   Save a 1920x1080 PNG\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
                 );
                 std::process::exit(0);
             }
@@ -202,19 +202,48 @@ fn compose(
     }
 }
 
-fn scripted_click(sdl: &sdl2::Sdl, window: &sdl2::video::Window, position: &str) -> Result<(), String> {
-    let coordinates: Vec<f32> = position.split(':').map(|value| value.parse::<f32>().map_err(|e| e.to_string())).collect::<Result<_, _>>()?;
-    let [x, y] = coordinates.as_slice() else { return Err("click: expects logical x:y coordinates".into()); };
-    if !x.is_finite() || !y.is_finite() { return Err("Pointer coordinates must be finite".into()); }
+fn scripted_click(
+    sdl: &sdl2::Sdl,
+    window: &sdl2::video::Window,
+    position: &str,
+) -> Result<(), String> {
+    let coordinates: Vec<f32> = position
+        .split(':')
+        .map(|value| value.parse::<f32>().map_err(|e| e.to_string()))
+        .collect::<Result<_, _>>()?;
+    let [x, y] = coordinates.as_slice() else {
+        return Err("click: expects logical x:y coordinates".into());
+    };
+    if !x.is_finite() || !y.is_finite() {
+        return Err("Pointer coordinates must be finite".into());
+    }
     let (w, h) = window.size();
     let scale = (w as f32 / 1920.).min(h as f32 / 1080.);
     let x = (x * scale + (w as f32 - 1920. * scale) / 2.).round() as i32;
     let y = (y * scale + (h as f32 - 1080. * scale) / 2.).round() as i32;
     let events = sdl.event()?;
     for event in [
-        Event::MouseButtonDown { timestamp: 0, window_id: window.id(), which: 0, mouse_btn: MouseButton::Left, clicks: 1, x, y },
-        Event::MouseButtonUp { timestamp: 0, window_id: window.id(), which: 0, mouse_btn: MouseButton::Left, clicks: 1, x, y },
-    ] { events.push_event(event)?; }
+        Event::MouseButtonDown {
+            timestamp: 0,
+            window_id: window.id(),
+            which: 0,
+            mouse_btn: MouseButton::Left,
+            clicks: 1,
+            x,
+            y,
+        },
+        Event::MouseButtonUp {
+            timestamp: 0,
+            window_id: window.id(),
+            which: 0,
+            mouse_btn: MouseButton::Left,
+            clicks: 1,
+            x,
+            y,
+        },
+    ] {
+        events.push_event(event)?;
+    }
     Ok(())
 }
 
@@ -524,8 +553,9 @@ fn run() -> Result<(), String> {
             && frame.is_multiple_of(3)
             && let Some(action) = options.script.pop_front()
         {
-            if let Some(position) = action.strip_prefix("click:") { scripted_click(&sdl, &window, position)?; }
-            else {
+            if let Some(position) = action.strip_prefix("click:") {
+                scripted_click(&sdl, &window, position)?;
+            } else {
                 let pending = script(&action, &mut state, &scene.controls)?;
                 running &= effects(pending, &mut state, &platform, &preferences_path);
             }
@@ -574,10 +604,7 @@ fn run() -> Result<(), String> {
         // VSync paces animation; holds and scripted checks need short timed wakes.
         let timeout = if !visible {
             250
-        } else if pill != target
-            || pill_width != target_width
-            || state.previous_background.is_some()
-        {
+        } else if pill != target || pill_width != target_width || state.animating() {
             0
         } else if press.is_some() || options.frames.is_some() {
             8
