@@ -394,17 +394,20 @@ fn header(
     out.shadow(nav, 48., 18., 4., 0.06);
     out.shape(nav, 48., c(0x171c20, 0.72));
     out.border(nav, 48., 1., c(0xffffff, 0.07));
+    let pill = Rect::new(pill_x, 52.3, pill_width, 49.);
     out.draw.push(Draw::RoundedGradient(
-        Rect::new(pill_x, 52.3, pill_width, 49.),
+        pill,
         32.,
         c(0xfafafa, 1.),
         c(0xe5e5e5, 1.),
     ));
+    if matches!(state.focus, Target::Nav(_)) && !state.pointer {
+        // Follow the pill's animated position and width instead of jumping to
+        // the destination tab's control rectangle.
+        out.border(pill.inset(-5.), 37., 2., c(0xf0f0f0, 0.95));
+    }
     for (index, key) in ["home", "apps", "settings"].into_iter().enumerate() {
         let rect = layout.items[index];
-        if state.focus == Target::Nav(index) && !state.pointer {
-            out.border(rect.inset(-5.), 37., 2., c(0xf0f0f0, 0.95));
-        }
         out.text(
             language.t(key),
             Rect::new(rect.x, 64.3, rect.w, 25.),
@@ -1030,6 +1033,18 @@ fn weather_summary(
     summary: WeatherSummary,
     y: f32,
 ) {
+    let label_focus = summary.parts.first().map(|(_, style, _, rect)| {
+        // The label's layout line box includes leading above and below the
+        // text. Keep the focus ring snug to the label rather than the whole
+        // weather row, which also contains the location icon.
+        let leading = style.size * (style.line_height - 1.).max(0.);
+        Rect::new(
+            rect.x,
+            y + rect.y + leading / 2.,
+            rect.w,
+            (rect.h - leading).max(style.size),
+        )
+    });
     out.icon(
         assets,
         &summary.icon,
@@ -1047,8 +1062,11 @@ fn weather_summary(
     }
     if state.preferences.weather_location.is_none() {
         let rect = Rect::new(84., y, summary.width, summary.height);
-        if state.focus == Target::WeatherConfigure && !state.pointer {
-            out.border(rect.inset(-7.), 12.6, 2., c(0xf0f0f0, 0.95));
+        if state.focus == Target::WeatherConfigure
+            && !state.pointer
+            && let Some(label) = label_focus
+        {
+            out.border(label.inset(-5.), 8.6, 2., c(0xf0f0f0, 0.95));
         }
         out.control(Target::WeatherConfigure, rect, true);
     }
