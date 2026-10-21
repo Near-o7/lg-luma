@@ -793,8 +793,11 @@ impl Renderer {
         path: &Path,
         size: Size,
     ) -> Result<RenderStats, String> {
-        if size.width > self.info.max_texture_size || size.height > self.info.max_texture_size
-            || size.width > self.info.max_viewport[0] as u32 || size.height > self.info.max_viewport[1] as u32 {
+        if size.width > self.info.max_texture_size
+            || size.height > self.info.max_texture_size
+            || size.width > self.info.max_viewport[0] as u32
+            || size.height > self.info.max_viewport[1] as u32
+        {
             return Err(format!(
                 "Capture {}x{} exceeds GPU limits: {}px texture, {:?} viewport",
                 size.width, size.height, self.info.max_texture_size, self.info.max_viewport

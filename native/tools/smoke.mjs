@@ -98,9 +98,15 @@ try {
   assert.equal(one.render.capture.viewport.scale, 1);
   assert.equal(two.render.capture.max_logical_font_px, one.render.capture.max_logical_font_px);
   for (const capture of [one.render.capture, two.render.capture]) {
-    assert.ok(Math.abs(capture.max_physical_font_px - capture.max_logical_font_px * capture.viewport.scale) <= 0.126);
+    assert.ok(
+      Math.abs(
+        capture.max_physical_font_px - capture.max_logical_font_px * capture.viewport.scale,
+      ) <= 0.126,
+    );
   }
-  assert.ok(two.render.capture.max_physical_font_px > one.render.capture.max_physical_font_px * 1.9);
+  assert.ok(
+    two.render.capture.max_physical_font_px > one.render.capture.max_physical_font_px * 1.9,
+  );
   assert.ok(two.render.capture.glyph_atlas_pages > 0 && two.render.capture.glyph_atlas_pages <= 4);
   assert.equal(
     two.render.drawable_is_4k,

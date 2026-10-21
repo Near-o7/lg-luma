@@ -419,13 +419,24 @@ fn run() -> Result<(), String> {
             // Window-entry pointer events can arrive after a slow first upload.
             // Bounded scripted captures own input until their final frame; only
             // their explicitly injected SDL clicks may alter pointer focus.
-            let script_owns_input = scripted_input && (options.frames.is_some() || options.profile_frames.is_some() || !options.script.is_empty());
+            let script_owns_input = scripted_input
+                && (options.frames.is_some()
+                    || options.profile_frames.is_some()
+                    || !options.script.is_empty());
             let external_input = match &event {
-                Event::MouseButtonDown { which, .. } | Event::MouseButtonUp { which, .. } => *which != SCRIPT_POINTER,
-                Event::MouseMotion { .. } | Event::MouseWheel { .. } | Event::KeyDown { .. } | Event::KeyUp { .. } | Event::TextInput { .. } => true,
+                Event::MouseButtonDown { which, .. } | Event::MouseButtonUp { which, .. } => {
+                    *which != SCRIPT_POINTER
+                }
+                Event::MouseMotion { .. }
+                | Event::MouseWheel { .. }
+                | Event::KeyDown { .. }
+                | Event::KeyUp { .. }
+                | Event::TextInput { .. } => true,
                 _ => false,
             };
-            if script_owns_input && external_input { continue; }
+            if script_owns_input && external_input {
+                continue;
+            }
             let mut pending = vec![];
             match event {
                 Event::Quit { .. } => running = false,
