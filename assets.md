@@ -13,7 +13,9 @@
   records its Google Fonts revision and SHA-256 checksums. Asset preparation produces renamed
   Luma CJK regular/medium subsets for native rendering and includes the license with the package.
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
-- Native TV packages bundle the webOS SDK's SDL2 shared library, zlib license. Its notice is in
+- Native TV packages bundle [SDL-webOS](https://github.com/webosbrew/SDL-webOS) 2.30.12
+  (`release-2.30.12-webos.5`, standard SDL ABI), zlib license. `native/tools/webos-runtime.mjs`
+  records the release and archive/library SHA-256 checksums. Its notice is in
   `native/assets/licenses/sdl2.txt` and included in the IPK's `licenses/` directory.
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
 

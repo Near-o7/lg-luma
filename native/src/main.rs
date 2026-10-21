@@ -332,6 +332,16 @@ fn run() -> Result<(), String> {
     if !webos && std::path::Path::new("/etc/starfish-release").exists() {
         return Err("This desktop build cannot run on a TV. Build with --features webos.".into());
     }
+    if webos {
+        // SDL-webOS reads APPID for its shell surface and getenv (not a hint)
+        // for WMCLASS. Set these before video init and before starting workers.
+        // SAFETY: startup is still single-threaded here.
+        unsafe {
+            std::env::set_var("APPID", platform::APP_ID);
+            std::env::set_var("SDL_VIDEO_WAYLAND_WMCLASS", platform::APP_ID);
+        }
+        sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_BACK", "true");
+    }
     let root = options.assets.clone().unwrap_or_else(|| {
         if webos {
             std::env::current_exe()
@@ -371,8 +381,22 @@ fn run() -> Result<(), String> {
     );
 
     let sdl = sdl2::init()?;
-    let video = sdl.video()?;
-    sdl2::hint::set("SDL_VIDEO_WAYLAND_WMCLASS", platform::APP_ID);
+    let drivers: Vec<_> = sdl2::video::drivers().collect();
+    if webos && !drivers.contains(&"wayland") {
+        return Err(format!(
+            "SDL has no Wayland backend (drivers: {}). Rebuild the package with the SDL-webOS runtime.",
+            drivers.join(", ")
+        ));
+    }
+    let video = sdl.video().map_err(|error| {
+        format!(
+            "SDL video initialization: {error}; drivers: {}; XDG_RUNTIME_DIR={:?}; WAYLAND_DISPLAY={:?}",
+            drivers.join(", "),
+            std::env::var_os("XDG_RUNTIME_DIR"),
+            std::env::var_os("WAYLAND_DISPLAY"),
+        )
+    })?;
+    eprintln!("Luma SDL video driver: {}", video.current_video_driver());
     let attributes = video.gl_attr();
     if webos {
         attributes.set_context_profile(GLProfile::GLES);

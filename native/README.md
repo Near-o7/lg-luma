@@ -212,17 +212,27 @@ pnpm native:build
 pnpm native:package
 ```
 
-The NDK must expose a webOS-compatible SDL2 and its `sdl2.pc` in the sysroot. The build script
-uses the NDK compiler, explicit sysroot and isolated pkg-config metadata together, keeping desktop
-Nix SDL libraries out of the ARM build. The macOS SDK above includes SDL2 2.24.1. Do not use
-rust-sdl2's generic `bundled` feature for this target: the SDL backend must support the TV's compositor.
-TV builds provide `getauxval` compatibility for the SDK's older libc by reading `/proc/self/auxv`;
-Rust startup and TLS CPU detection receive real kernel values.
+The build uses the NDK compiler and explicit sysroot, but **not its SDL runtime**: the macOS SDK's
+SDL2 2.24.1 has Wayland disabled and exits with `wayland not available`. The build/package tools
+instead prepare [SDL-webOS](https://github.com/webosbrew/SDL-webOS), pinned to
+`release-2.30.12-webos.5`, with SHA-256 verification of both its archive and shared library. The
+standard-SDL-ABI artifact is required for rust-sdl2; the separate `webos-abi` artifact is not used.
+It includes Wayland and LG's webOS shell integration. `pnpm native:runtime` prepares it separately;
+the first run downloads about 1.8 MB, then reuses the verified cache in `.build/native/sdl-webos`.
+No downloads happen on the TV. The SDK remains separate and is still needed for compilation.
 
-Packaging bundles `libSDL2-2.0.so.0` from the SDK automatically, along with its license. To override
+Isolated pkg-config metadata links against that runtime without picking up desktop Nix SDL.
+Do not use rust-sdl2's generic `bundled` feature for this target: an ordinary desktop Wayland
+build does not supply the TV's shell integration. TV builds also provide `getauxval` compatibility
+for the SDK's older libc by reading `/proc/self/auxv`; Rust startup and TLS CPU detection receive
+real kernel values.
+
+Packaging bundles the verified SDL-webOS `libSDL2-2.0.so.0` and its license automatically. To override
 SDL or include other selected ARM webOS shared libraries, set `WEBOS_NATIVE_LIBS` to their directory
-before packaging. Include SDL under its runtime name, `libSDL2-2.0.so.0`. The executable searches
-`$ORIGIN/lib`; avoid copying the entire SDK library directory or replacing the TV's libc/graphics drivers.
+before packaging. Include SDL under its runtime name, `libSDL2-2.0.so.0`. The packager rejects SDL
+libraries without the compiled webOS/Wayland backend, including the SDK's dummy-video build.
+The executable searches `$ORIGIN/lib`; avoid copying the entire SDK library directory or replacing
+the TV's libc/graphics drivers.
 
 The package is created under `.build/native/dist` as **Luma Native**,
 `com.luma.launcher.native`, with the version taken from the root `appinfo.json`.
@@ -244,14 +254,29 @@ bounded response sizes and timeouts. Input-read failures retain the last good in
 declares `application.launcher`, `application.query` and `lunabus.query`; Homebrew Channel must
 provide that permission mapping for the native app ID too.
 
-TV preferences are saved beside the installed executable. The SDL window uses the app ID as its
-Wayland class. Hidden/minimized windows pause drawing, and focus restoration refreshes inventory.
+TV preferences are saved beside the installed executable. Before starting workers or initializing
+video, startup sets `APPID` and the SDL Wayland class to the native app ID and requests Back-key
+delivery. Hidden/minimized windows pause drawing, and focus restoration refreshes inventory.
 Back on Home exits the native app and returns control to the platform.
+
+### Startup troubleshooting
+
+Run this in the TV's root SSH shell to see errors hidden by a normal launcher invocation:
+
+```sh
+RUST_BACKTRACE=1 /media/developer/apps/usr/palm/applications/com.luma.launcher.native/luma-native 2>&1
+printf '\nExit status: %s\n' "$?"
+```
+
+`SDL has no Wayland backend` means an unsuitable SDL was loaded; rebuild/reinstall the IPK with
+the pinned runtime. SDL video initialization errors include the compiled drivers and the
+`XDG_RUNTIME_DIR`/`WAYLAND_DISPLAY` values, distinguishing a display-session problem from a missing
+backend. An SSH shell can differ from the application manager's environment.
 
 **Hardware status:** desktop rendering/state checks and ARM cross-linking/IPK creation have passed
 on Apple Silicon macOS with the SDK above. Native caller permissions, the TV SDL/Wayland backend,
-Magic Remote key mapping, app switching
-and relaunch behavior still require verification on the actual TV. The CLI adapter can later be
+Magic Remote key mapping, app switching and relaunch behavior still require verification on the
+actual TV. The CLI adapter can later be
 replaced behind `platform.rs` with direct LS2 integration if the native sandbox requires it.
 
 ## Weather and language

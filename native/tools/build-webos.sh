@@ -13,6 +13,7 @@ if [ ! -f "$SYSROOT/usr/include/stdint.h" ]; then
   SYSROOT="$WEBOS_NDK/arm-webos-linux-gnueabi/sysroot"
 fi
 [ -f "$SYSROOT/usr/include/stdint.h" ] || { printf '%s\n' "Missing webOS sysroot headers: $SYSROOT" >&2; exit 1; }
+node "$ROOT/native/tools/webos-runtime.mjs"
 export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABI_LINKER="$CC"
 export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABI_RUSTFLAGS="${CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABI_RUSTFLAGS:-} -C link-arg=--sysroot=$SYSROOT -C link-arg=-Wl,-rpath,\$ORIGIN/lib"
 export CC_armv7_unknown_linux_gnueabi="$CC"
@@ -21,6 +22,8 @@ export CFLAGS_armv7_unknown_linux_gnueabi="${CFLAGS_armv7_unknown_linux_gnueabi:
 export PKG_CONFIG_ALLOW_CROSS=1
 # Nix's desktop SDL pkg-config path must not leak into this ARM build.
 export PKG_CONFIG_PATH=
-export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
-export PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig"
+# This metadata contains absolute paths to the verified cross-built SDL runtime,
+# so pkg-config must not prepend the target sysroot to those build-host paths.
+export PKG_CONFIG_SYSROOT_DIR=/
+export PKG_CONFIG_LIBDIR="$ROOT/.build/native/sdl-webos/pkgconfig"
 exec cargo build --locked --manifest-path "$ROOT/native/Cargo.toml" --target armv7-unknown-linux-gnueabi --features webos --release

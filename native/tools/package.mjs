@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { prepareWebosRuntime, verifyWebosSdl } from './webos-runtime.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const version = JSON.parse(await fs.readFile(path.join(root, 'appinfo.json'), 'utf8')).version;
@@ -14,7 +15,9 @@ if (
   bytes.readUInt16LE(18) !== 40 ||
   (bytes.readUInt32LE(36) & 0x400) !== 0
 ) {
-  throw new Error('Packaging requires a 32-bit little-endian ARM soft-float ELF from build-webos.sh.');
+  throw new Error(
+    'Packaging requires a 32-bit little-endian ARM soft-float ELF from build-webos.sh.',
+  );
 }
 const out = path.join(root, '.build/native');
 const stage = path.join(out, 'package');
@@ -43,9 +46,10 @@ async function copyLibrary(directory, name) {
   ) {
     throw new Error(`Not an ARM soft-float webOS library: ${name}`);
   }
+  if (/^libSDL2(?:-2\.0)?\.so(?:\.[0-9]+)*$/.test(name)) verifyWebosSdl(library);
   await fs.writeFile(path.join(stage, 'lib', name), library);
 }
-// Explicitly selected ARM libraries can override the SDK's SDL. Never host libraries.
+// Explicitly selected ARM libraries can override the pinned SDL-webOS runtime.
 if (process.env.WEBOS_NATIVE_LIBS) {
   const directory = path.resolve(process.env.WEBOS_NATIVE_LIBS);
   for (const name of await fs.readdir(directory)) {
@@ -55,13 +59,8 @@ if (process.env.WEBOS_NATIVE_LIBS) {
 }
 const sdlName = 'libSDL2-2.0.so.0';
 if (!(await fs.readdir(path.join(stage, 'lib'))).includes(sdlName)) {
-  if (!process.env.WEBOS_NDK) {
-    throw new Error('Set WEBOS_NDK to bundle SDK SDL2, or provide it through WEBOS_NATIVE_LIBS.');
-  }
-  await copyLibrary(
-    path.join(path.resolve(process.env.WEBOS_NDK), 'arm-webos-linux-gnueabi/sysroot/usr/lib'),
-    sdlName,
-  );
+  const runtime = await prepareWebosRuntime();
+  await copyLibrary(path.join(runtime, 'lib'), sdlName);
 }
 await fs.mkdir(path.join(stage, 'licenses'));
 await fs.copyFile(
