@@ -134,7 +134,7 @@ pnpm dev
 ```
 
 The shell includes Node.js 24, the project's pinned pnpm 10, Rust 1.93 with Cargo/rustfmt/Clippy,
-SDL2, pkg-config, CMake, woff2 and Python/fontTools. It supports Apple Silicon/Intel macOS and
+SDL2, pkg-config, CMake, woff2 and Python/fontTools. It supports Apple Silicon macOS and
 ARM64/x86-64 Linux. Linux also includes Playwright's matching browser binaries and Xvfb; on macOS,
 run `pnpm exec playwright install chromium` before browser tests or screenshot comparisons.
 `nix develop --command pnpm native:check` runs a command without opening an interactive shell.
