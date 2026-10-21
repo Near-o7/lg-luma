@@ -21,6 +21,7 @@ fn controls(state: &State) -> Vec<crate::state::Control> {
             icons: BTreeMap::new(),
             colors: BTreeMap::new(),
             version: "test".into(),
+            metrics: BTreeMap::new(),
         },
         view::pill_target(state.page_index()),
         view::pill_width(state.page_index()),
@@ -401,4 +402,58 @@ fn remote_toolbar_focus_normalizes_scroll_but_hover_does_not() {
     assert_eq!(state.scroll, 100.);
     state.focus(Target::Filter(2), &controls(&state));
     assert_eq!(state.scroll, 0.);
+}
+
+#[test]
+fn long_captions_expand_rows_without_overlapping_the_next_row() {
+    let mut state = ready();
+    state.open(1);
+    state.inventory.apps.iter_mut().find(|app| app.id == "netflix").unwrap().title = "A very long installed application title that needs more than two lines to remain fully readable".into();
+    let targets = controls(&state);
+    let title = targets
+        .iter()
+        .find(|c| c.target == Target::App("netflix".into()))
+        .unwrap();
+    let next_id = state.apps()[6].id.clone();
+    let next = targets
+        .iter()
+        .find(|c| c.target == Target::App(next_id.clone()))
+        .unwrap();
+    assert!(title.rect.h > 240.);
+    assert!(next.rect.y > title.rect.y + title.rect.h);
+}
+
+#[test]
+fn reduced_motion_disables_panel_wallpaper_and_notification_animation() {
+    let mut state = ready();
+    state.preferences.reduced_motion = true;
+    state.open(2);
+    state.focus = Target::Setting(1);
+    state.activate();
+    assert!(!state.animating());
+    state.back();
+    state.focus = Target::Background(6);
+    state.activate();
+    state.notify("Saved");
+    assert!(!state.animating());
+}
+
+#[test]
+fn pinning_a_hidden_app_restores_it_and_leaves_hidden_when_empty() {
+    let mut state = ready();
+    state.open(1);
+    state.filter = 5;
+    state.preferences.hidden.push("org.jellyfin.webos".into());
+    state.focus = Target::App("org.jellyfin.webos".into());
+    state.options();
+    state.activate();
+    assert!(state.preferences.hidden.is_empty());
+    assert_eq!(state.filter, 0);
+    assert!(
+        state
+            .preferences
+            .favorites(&state.inventory.apps)
+            .contains(&"org.jellyfin.webos".into())
+    );
+    assert_eq!(state.focus, Target::App("org.jellyfin.webos".into()));
 }

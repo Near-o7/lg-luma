@@ -681,8 +681,6 @@ impl State {
 
     pub fn activate(&mut self) -> Vec<Effect> {
         if self.moving.is_some() {
-            self.moving = None;
-            self.dirty = true;
             return vec![];
         }
         self.dirty = true;

@@ -21,6 +21,7 @@ pub struct Assets {
     pub icons: BTreeMap<String, String>,
     pub colors: BTreeMap<String, [u8; 3]>,
     pub version: String,
+    pub metrics: BTreeMap<String, BTreeMap<char, f32>>,
 }
 impl Assets {
     pub fn load(root: PathBuf) -> Result<Self, String> {
@@ -31,15 +32,78 @@ impl Assets {
         let icons = serde_json::from_slice(&load("icons.json")?).map_err(|e| e.to_string())?;
         let colors = serde_json::from_slice(&load("colors.json")?).map_err(|e| e.to_string())?;
         let version = String::from_utf8(load("version.txt")?).map_err(|e| e.to_string())?;
+        let metrics =
+            serde_json::from_slice(&load("font-metrics.json")?).map_err(|e| e.to_string())?;
         Ok(Self {
             root,
             icons,
             colors,
             version,
+            metrics,
         })
     }
     fn path(&self, path: impl AsRef<Path>) -> String {
         self.root.join(path).to_string_lossy().into_owned()
+    }
+
+    fn width(&self, value: &str, style: TextStyle) -> f32 {
+        let key = format!(
+            "{}{}",
+            if style.size >= 32. { "display-" } else { "" },
+            style.weight
+        );
+        let advances = self.metrics.get(&key);
+        value
+            .chars()
+            .map(|c| {
+                (advances
+                    .and_then(|a| a.get(&c))
+                    .copied()
+                    .unwrap_or(if c == ' ' { 0.28 } else { 0.53 })
+                    + style.tracking)
+                    * style.size
+            })
+            .sum()
+    }
+
+    fn lines(&self, value: &str, style: TextStyle, width: f32) -> usize {
+        let key = format!(
+            "{}{}",
+            if style.size >= 32. { "display-" } else { "" },
+            style.weight
+        );
+        let advances = self.metrics.get(&key);
+        let advance = |c: char| {
+            (advances
+                .and_then(|a| a.get(&c))
+                .copied()
+                .unwrap_or(if c == ' ' { 0.28 } else { 0.53 })
+                + style.tracking)
+                * style.size
+        };
+        let mut lines = 1;
+        let mut used = 0.;
+        for word in value.split_inclusive(char::is_whitespace) {
+            let w: f32 = word.chars().map(advance).sum();
+            if used > 0. && used + w > width {
+                lines += 1;
+                used = 0.;
+            }
+            for c in word.chars() {
+                if c == '\n' {
+                    lines += 1;
+                    used = 0.;
+                    continue;
+                }
+                let w = advance(c);
+                if used > 0. && used + w > width {
+                    lines += 1;
+                    used = 0.;
+                }
+                used += w;
+            }
+        }
+        lines
     }
 }
 
@@ -224,6 +288,42 @@ pub fn scene_with_pill(
         Page::Apps => library(&mut out, state, assets),
         Page::Settings => settings(&mut out, state, assets),
     }
+    if let Some(error) = &state.error
+        && !state.inventory.apps.is_empty()
+        && !out
+            .controls
+            .iter()
+            .any(|control| control.target == Target::Retry)
+    {
+        let rect = Rect::new(84., main_bottom - 66., 1752., 54.);
+        out.shape(rect, 11.2, c(0xad7c3e, 0.07));
+        out.border(rect, 11.2, 1., c(0xedc596, 0.19));
+        out.icon(
+            assets,
+            "alert",
+            Rect::new(104., rect.y + 18., 18., 18.),
+            c(0xf3ddbd, 1.),
+        );
+        out.text(
+            error,
+            Rect::new(138., rect.y + 16., 1500., 35.),
+            text(14.4, 400, 0.),
+            c(0xf3ddbd, 1.),
+            false,
+        );
+        let retry = Rect::new(1720., rect.y + 8., 96., 38.);
+        out.text(
+            "Try again",
+            Rect::new(retry.x, retry.y + 10., retry.w, 20.),
+            text(14.4, 500, 0.),
+            c(0xf3ddbd, 1.),
+            true,
+        );
+        if state.focus == Target::Retry {
+            out.border(retry, 6.4, 2., WHITE);
+        }
+        out.control(Target::Retry, retry, false);
+    }
     out.draw.push(Draw::Clip(None));
     header(&mut out, state, assets, now, pill_x, pill_width);
     footer(&mut out, state, assets);
@@ -330,7 +430,12 @@ fn tile(
     names: bool,
     pinned: bool,
 ) {
-    let label_height = if names { 67.7 } else { 0. };
+    let caption_height = if names {
+        caption_height(state, assets, app, rect.w)
+    } else {
+        0.
+    };
+    let label_height = if names { 18.4 + caption_height } else { 0. };
     out.control(
         Target::App(app.id.clone()),
         Rect::new(rect.x, rect.y, rect.w, rect.h + label_height),
@@ -473,7 +578,12 @@ fn tile(
                 app.title,
                 if state.filter == 5 { " · Hidden" } else { "" }
             ),
-            Rect::new(rect.x + 4., rect.y + rect.h + 18.4, rect.w - 8., 49.3),
+            Rect::new(
+                rect.x + 4.,
+                rect.y + rect.h + 18.4,
+                rect.w - 8.,
+                caption_height,
+            ),
             text(17.6, if focused { 550 } else { 450 }, -0.02).leading(1.4),
             if focused {
                 c(0xffffff, 1.)
@@ -486,6 +596,25 @@ fn tile(
     if state.moving.is_some() && state.moving.as_ref() != Some(&app.id) {
         out.fade(start, 0.48, 1.);
     }
+}
+
+fn caption_height(state: &State, assets: &Assets, app: &App, width: f32) -> f32 {
+    let title = format!(
+        "{}{}",
+        app.title,
+        if state.filter == 5 { " · Hidden" } else { "" }
+    );
+    let style = text(
+        17.6,
+        if state.focus == Target::App(app.id.clone()) {
+            550
+        } else {
+            450
+        },
+        -0.02,
+    )
+    .leading(1.4);
+    (assets.lines(&title, style, width - 8.) as f32 * style.size * style.line_height).max(49.28)
 }
 
 fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect) {
@@ -546,7 +675,16 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect) {
                 "gaming" => ("gaming", app.title.as_str()),
                 _ => ("generic", app.title.as_str()),
             };
-            let w = (label.chars().count() as f32 * 12. + 54.4).min(rect.w - 32.);
+            let font = if brand == "generic" {
+                text(18.4, 500, -0.035).leading(1.35)
+            } else {
+                text(24., 500, -0.035).leading(1.2)
+            };
+            let w = (assets.width(label, font) + 54.4).min(rect.w - 32.);
+            let label_w = rect.w - 54.4 - 32.;
+            let label_h =
+                (assets.lines(label, font, label_w) as f32 * font.size * font.line_height)
+                    .min(rect.h - 32.);
             out.icon(
                 assets,
                 icon,
@@ -555,8 +693,8 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect) {
             );
             out.text(
                 label,
-                Rect::new(cx - w / 2. + 54.4, cy - 14.4, rect.w - 54.4 - 32., 58.),
-                text(24., 500, -0.035).leading(1.2),
+                Rect::new(cx - w / 2. + 54.4, cy - label_h / 2., label_w, label_h),
+                font,
                 WHITE,
                 false,
             );
@@ -604,9 +742,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     }
     let apps = state.apps();
     let names = state.preferences.show_names;
-    let row_height = FACE_HEIGHT + if names { 67.7 } else { 0. };
-    let mut grid_height = apps.len().div_ceil(6).max(1) as f32 * row_height
-        + apps.len().div_ceil(6).saturating_sub(1) as f32 * 32.;
+    let mut grid_height = FACE_HEIGHT;
     if state.loading && state.inventory.apps.is_empty() {
         for index in 0..6 {
             out.shape(
@@ -644,21 +780,30 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         );
         grid_height = 247.5;
     }
-    for (index, app) in apps.iter().enumerate() {
-        tile(
-            out,
-            state,
-            assets,
-            app,
-            Rect::new(
-                84. + (index % 6) as f32 * GRID_PITCH,
-                544.8 + (index / 6) as f32 * (row_height + 32.) - s,
-                270.,
-                FACE_HEIGHT,
-            ),
-            names,
-            false,
-        );
+    let mut y = 544.8;
+    for row in apps.chunks(6) {
+        let row_height = FACE_HEIGHT
+            + if names {
+                18.4 + row
+                    .iter()
+                    .map(|app| caption_height(state, assets, app, 270.))
+                    .fold(49.28, f32::max)
+            } else {
+                0.
+            };
+        for (column, app) in row.iter().enumerate() {
+            tile(
+                out,
+                state,
+                assets,
+                app,
+                Rect::new(84. + column as f32 * GRID_PITCH, y - s, 270., FACE_HEIGHT),
+                names,
+                false,
+            );
+        }
+        grid_height = y + row_height - 544.8;
+        y += row_height + 32.;
     }
     let input_y = 544.8 + grid_height + 41.6 - s;
     let inputs: Vec<_> = state
@@ -880,21 +1025,26 @@ fn library(out: &mut Scene, state: &State, assets: &Assets) {
             },
         );
     }
-    for (index, app) in apps.iter().enumerate() {
-        tile(
-            out,
-            state,
-            assets,
-            app,
-            Rect::new(
-                84. + (index % 6) as f32 * GRID_PITCH,
-                270.4 + (index / 6) as f32 * 260.5 - s,
-                270.,
-                FACE_HEIGHT,
-            ),
-            true,
-            favorites.contains(&app.id),
-        );
+    let mut y = 270.4;
+    for row in apps.chunks(6) {
+        let row_height = FACE_HEIGHT
+            + 18.4
+            + row
+                .iter()
+                .map(|app| caption_height(state, assets, app, 270.))
+                .fold(49.28, f32::max);
+        for (column, app) in row.iter().enumerate() {
+            tile(
+                out,
+                state,
+                assets,
+                app,
+                Rect::new(84. + column as f32 * GRID_PITCH, y - s, 270., FACE_HEIGHT),
+                true,
+                favorites.contains(&app.id),
+            );
+        }
+        y += row_height + 38.4;
     }
 }
 
@@ -1460,7 +1610,12 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
     out.shape(rect, 17.6, c(0xffffff, 0.02));
     out.border(rect, 17.6, 1., c(0xffffff, 0.05));
     let center = rect.x + rect.w / 2.;
-    let top = rect.y + if action.is_some() { 33. } else { (rect.h - 123.2) / 2. };
+    let top = rect.y
+        + if action.is_some() {
+            33.
+        } else {
+            (rect.h - 123.2) / 2.
+        };
     out.icon(
         assets,
         icon,
@@ -1498,7 +1653,12 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
             c(0x242424, 1.),
             false,
         );
-        out.icon(assets, "arrow", Rect::new(button.x + button.w - 38.4, button.y + 14.6, 17.6, 17.6), c(0x242424, 1.));
+        out.icon(
+            assets,
+            "arrow",
+            Rect::new(button.x + button.w - 38.4, button.y + 14.6, 17.6, 17.6),
+            c(0x242424, 1.),
+        );
         out.control(target, button, true);
     }
 }
@@ -1506,7 +1666,10 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
 fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str) {
     let app = state.inventory.apps.iter().find(|app| app.id == id);
     let title = app.map_or(id, |app| app.title.as_str());
-    let extra = title.chars().count().saturating_sub(27).div_ceil(27) as f32 * 41.4;
+    let extra = assets
+        .lines(title, text(37.6, 500, -0.055).leading(1.1), 432.)
+        .saturating_sub(1) as f32
+        * 41.4;
     let panel = Rect::new(680., 362.9 - extra / 2., 560., 354.2 + extra);
     out.modal = Some(panel);
     out.shadow(panel, 27.2, 120., 25., 0.47);
@@ -1674,7 +1837,7 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
 
 fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
     let start = out.draw.len();
-    let width = (notice.chars().count() as f32 * 8. + 118.).clamp(300., 1200.);
+    let width = (assets.width(notice, text(16., 400, 0.)) + 118.).clamp(240., 1200.);
     let rect = Rect::new(960. - width / 2., 970., width, 58.);
     out.shadow(rect, 16., 40., 8., 0.33);
     out.shape(rect, 16., c(0xededed, 0.96));
