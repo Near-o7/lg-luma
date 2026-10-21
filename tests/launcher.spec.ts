@@ -113,9 +113,7 @@ test('Settings sidebar and content support remote navigation and persistent pref
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
   await page.keyboard.press('ArrowRight');
-  await expect(
-    page.getByRole('switch', { name: 'Show app names on Home', exact: true }),
-  ).toBeFocused();
+  await expect(page.getByRole('switch', { name: 'Show app names', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Summit', exact: true }).click();
   await page.locator('[data-focusable="setting-clock-format"]').focus();
   await page.keyboard.press('ArrowRight');
@@ -134,7 +132,7 @@ test('nested language menu supports remote navigation and persists', async ({ pa
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Interface', exact: true }).click();
-  const trigger = page.getByRole('button', { name: /Display language/ });
+  const trigger = page.getByRole('button', { name: /Language/ });
   await expect(trigger).toBeVisible();
   await trigger.press('ArrowRight');
   await expect(page.locator('[data-focusable="language-option-en"]')).toBeFocused();
@@ -164,6 +162,7 @@ test('Interface D-pad moves down to the language selector and up from refresh', 
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Interface', exact: true }).click();
+  await expect(page.locator('[data-focusable="setting-home-app-names"]')).toBeFocused();
   await page.locator('[data-focusable="settings-section-interface"]').focus();
   await page.keyboard.press('ArrowRight');
   await page.locator('[data-focusable="setting-motion"]').focus();
@@ -709,7 +708,7 @@ test('Home card captions are opt-in, persist, and do not affect library captions
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   await expect(page.locator('.favorites-grid .app-label').first()).toBeHidden();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const names = page.getByRole('switch', { name: 'Show app names on Home', exact: true });
+  const names = page.getByRole('switch', { name: 'Show app names', exact: true });
   await expect(names).toHaveAttribute('aria-checked', 'false');
   await names.click();
   await page.keyboard.press('Escape');

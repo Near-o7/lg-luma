@@ -5,7 +5,9 @@ import {
   ChevronRight,
   Clock3,
   Languages,
+  MapPin,
   RefreshCw,
+  Thermometer,
   Type,
 } from 'lucide-react';
 import { WeatherSettings } from './weather-settings';
@@ -350,16 +352,27 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                   data-focus-up="setting-show-weather"
                   data-focus-down="setting-temperature"
                   onClick={() =>
-                    openSubpage('weather-location', 'weather-location-query', 'setting-weather-location')
+                    openSubpage(
+                      'weather-location',
+                      'weather-location-query',
+                      'setting-weather-location',
+                    )
                   }
                   onKeyDown={(event) => {
                     if (!['ArrowRight', 'Enter', ' '].includes(event.key)) return;
                     event.preventDefault();
                     event.stopPropagation();
-                    openSubpage('weather-location', 'weather-location-query', 'setting-weather-location');
+                    openSubpage(
+                      'weather-location',
+                      'weather-location-query',
+                      'setting-weather-location',
+                    );
                   }}
                 >
-                  <span><strong>{t('location')}</strong></span>
+                  <MapPin aria-hidden="true" />
+                  <span>
+                    <strong>{t('location')}</strong>
+                  </span>
                   {preferences.weatherLocation ? (
                     <span className="setting-value">{preferences.weatherLocation.name}</span>
                   ) : null}
@@ -369,7 +382,9 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                   className="setting-row settings-list-item"
                   data-focusable="setting-temperature"
                   data-focus-up="setting-weather-location"
-                  onClick={() => openSubpage('temperature', `temperature-option-${preferences.temperatureUnit}`)}
+                  onClick={() =>
+                    openSubpage('temperature', `temperature-option-${preferences.temperatureUnit}`)
+                  }
                   onKeyDown={(event) => {
                     if (!['ArrowRight', 'Enter', ' '].includes(event.key)) return;
                     event.preventDefault();
@@ -377,8 +392,13 @@ export function Settings({ preferences, onUpdate, onRefresh }: Props) {
                     openSubpage('temperature', `temperature-option-${preferences.temperatureUnit}`);
                   }}
                 >
-                  <span><strong>{t('temperature')}</strong></span>
-                  <span className="setting-value">{preferences.temperatureUnit === 'celsius' ? '°C' : '°F'}</span>
+                  <Thermometer aria-hidden="true" />
+                  <span>
+                    <strong>{t('temperature')}</strong>
+                  </span>
+                  <span className="setting-value">
+                    {preferences.temperatureUnit === 'celsius' ? '°C' : '°F'}
+                  </span>
                   <ChevronRight aria-hidden="true" />
                 </button>
               </div>
