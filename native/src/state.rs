@@ -79,6 +79,7 @@ pub struct Control {
 pub enum Overlay {
     Options { id: String, restore: Target },
     Keyboard,
+    SystemKeyboard,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -449,6 +450,10 @@ impl State {
     pub fn direction(&mut self, direction: Direction, controls: &[Control]) -> Vec<Effect> {
         self.pointer = false;
         self.dirty = true;
+        if matches!(self.overlay, Some(Overlay::SystemKeyboard)) {
+            // The TV keyboard owns its arrows until Done/Back dismisses it.
+            return vec![];
+        }
         if let Some(id) = self.moving.clone() {
             let mut ids = self.preferences.favorites(&self.inventory.apps);
             let slots: Vec<_> = ids
@@ -774,7 +779,7 @@ impl State {
     }
 
     pub fn text(&mut self, text: &str) {
-        if matches!(self.overlay, Some(Overlay::Keyboard)) {
+        if self.text_input_active() {
             if self.keyboard_field == TextField::Location {
                 let mut query = self.weather.query.clone();
                 query.extend(
@@ -797,7 +802,7 @@ impl State {
     }
 
     pub fn delete(&mut self) {
-        if matches!(self.overlay, Some(Overlay::Keyboard)) {
+        if self.text_input_active() {
             if self.keyboard_field == TextField::Location {
                 let mut query = self.weather.query.clone();
                 query.pop();
@@ -809,6 +814,49 @@ impl State {
         }
     }
 
+    pub fn text_input_active(&self) -> bool {
+        matches!(
+            self.overlay,
+            Some(Overlay::Keyboard | Overlay::SystemKeyboard)
+        )
+    }
+
+    pub fn finish_text_input(&mut self) {
+        if self.text_input_active() {
+            self.overlay = None;
+            self.panel_started = None;
+            self.focus = self.keyboard_return();
+            self.pointer = false;
+            self.dirty = true;
+        }
+    }
+
+    pub fn delete_surrounding_text(&mut self, offset: i32, length: i32) {
+        if !self.text_input_active() || length <= 0 {
+            return;
+        }
+        // SDL-webOS forwards the native text model's UTF-8 byte offsets,
+        // relative to the insertion cursor (at the end of our query).
+        let mut query = self.editing_text().to_owned();
+        let mut start =
+            (query.len() as i64 + i64::from(offset)).clamp(0, query.len() as i64) as usize;
+        let mut end = start.saturating_add(length as usize).min(query.len());
+        while !query.is_char_boundary(start) {
+            start -= 1;
+        }
+        while !query.is_char_boundary(end) {
+            end += 1;
+        }
+        query.replace_range(start..end, "");
+        if self.keyboard_field == TextField::Location {
+            self.weather.edit(query);
+        } else {
+            self.query = query;
+            self.scroll = 0.;
+        }
+        self.dirty = true;
+    }
+
     pub fn editing_text(&self) -> &str {
         if self.keyboard_field == TextField::Location {
             &self.weather.query
@@ -818,6 +866,21 @@ impl State {
     }
     pub fn open_keyboard(&mut self, field: TextField) {
         self.keyboard_field = field;
+        if cfg!(all(
+            feature = "webos",
+            target_os = "linux",
+            target_arch = "arm"
+        )) {
+            self.overlay = Some(Overlay::SystemKeyboard);
+            self.focus = if field == TextField::Location {
+                Target::WeatherQuery
+            } else {
+                Target::Search
+            };
+            self.panel_started = None;
+            self.dirty = true;
+            return;
+        }
         self.overlay = Some(Overlay::Keyboard);
         self.focus = Target::Key(0);
         if !self.preferences.reduced_motion {
@@ -1103,7 +1166,7 @@ impl State {
             self.panel_started = None;
             self.focus = match overlay {
                 Overlay::Options { restore, .. } => restore,
-                Overlay::Keyboard => self.keyboard_return(),
+                Overlay::Keyboard | Overlay::SystemKeyboard => self.keyboard_return(),
             };
             return vec![];
         }

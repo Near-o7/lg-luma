@@ -549,6 +549,7 @@ fn run() -> Result<(), String> {
                 | Event::MouseWheel { .. }
                 | Event::KeyDown { .. }
                 | Event::KeyUp { .. }
+                | Event::TextEditing { .. }
                 | Event::TextInput { .. } => true,
                 _ => false,
             };
@@ -562,6 +563,9 @@ fn run() -> Result<(), String> {
                     WindowEvent::Hidden | WindowEvent::Minimized => {
                         visible = false;
                         press = None;
+                        if matches!(state.overlay, Some(Overlay::SystemKeyboard)) {
+                            state.finish_text_input();
+                        }
                         profile.pause();
                     }
                     WindowEvent::FocusLost => press = None,
@@ -578,6 +582,14 @@ fn run() -> Result<(), String> {
                     _ => {}
                 },
                 Event::TextInput { text, .. } => state.text(&text),
+                Event::TextEditing {
+                    text,
+                    start,
+                    length,
+                    ..
+                } if text.is_empty() && matches!(state.overlay, Some(Overlay::SystemKeyboard)) => {
+                    state.delete_surrounding_text(start, length);
+                }
                 Event::KeyDown {
                     keycode: Some(key),
                     repeat,
@@ -587,6 +599,12 @@ fn run() -> Result<(), String> {
                     Keycode::Down => pending = state.direction(Direction::Down, &scene.controls),
                     Keycode::Left => pending = state.direction(Direction::Left, &scene.controls),
                     Keycode::Right => pending = state.direction(Direction::Right, &scene.controls),
+                    Keycode::Return | Keycode::KpEnter
+                        if matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
+                    {
+                        press = None;
+                        state.finish_text_input();
+                    }
                     Keycode::Return | Keycode::KpEnter if !repeat => {
                         press = Some(Press {
                             target: state.focus.clone(),
@@ -599,8 +617,10 @@ fn run() -> Result<(), String> {
                         press = None;
                         pending = state.back();
                     }
-                    Keycode::Backspace if matches!(state.overlay, Some(Overlay::Keyboard)) => {
-                        state.delete()
+                    Keycode::Backspace if state.text_input_active() => state.delete(),
+                    Keycode::Clear if matches!(state.overlay, Some(Overlay::SystemKeyboard)) => {
+                        let length = state.editing_text().len() as i32;
+                        state.delete_surrounding_text(-length, length);
                     }
                     Keycode::M | Keycode::Menu if !repeat && state.overlay.is_none() => {
                         press = None;
@@ -625,7 +645,10 @@ fn run() -> Result<(), String> {
                         pending = state.activate();
                     }
                 }
-                Event::MouseMotion { x, y, .. } if state.moving.is_none() => {
+                Event::MouseMotion { x, y, .. }
+                    if state.moving.is_none()
+                        && !matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
+                {
                     let hovered = hit(&scene.controls, &window, x, y, &state);
                     if let Some(target) = hovered.clone() {
                         state.pointer_focus(target);
@@ -643,6 +666,9 @@ fn run() -> Result<(), String> {
                     if let Some(target) = hit(&scene.controls, &window, x, y, &state)
                         && state.moving.is_none()
                     {
+                        if matches!(state.overlay, Some(Overlay::SystemKeyboard)) {
+                            state.finish_text_input();
+                        }
                         // Pointer-down must not normalize scroll and move the clicked control.
                         state.pointer_focus(target);
                         if mouse_btn == MouseButton::Right {
@@ -755,7 +781,16 @@ fn run() -> Result<(), String> {
             }
         }
         weather_tick(&mut state, &weather_service, visible);
-        let keyboard = matches!(state.overlay, Some(Overlay::Keyboard));
+        // SDL-webOS disables text input when its own panel is dismissed, even
+        // if it did not forward a Back/Return key to the application.
+        if text_active
+            && matches!(state.overlay, Some(Overlay::SystemKeyboard))
+            && !video.text_input().is_active()
+        {
+            press = None;
+            state.finish_text_input();
+        }
+        let keyboard = state.text_input_active();
         if keyboard != text_active {
             if keyboard {
                 video.text_input().start();
@@ -844,6 +879,9 @@ fn run() -> Result<(), String> {
             100
         };
         queued_event = events.wait_event_timeout(timeout);
+    }
+    if text_active {
+        video.text_input().stop();
     }
     if !options.script.is_empty() {
         return Err("Frame budget ended before the input script completed".into());

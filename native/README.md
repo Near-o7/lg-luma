@@ -122,8 +122,10 @@ default.
 
 Left/Right switches focused top tabs immediately; clicking or OK also selects a tab. Home has
 favorites and all eligible physical inputs. Apps supports
-categories, Hidden, favorite-first ordering, wrapped names, and search with a remote-operable
-on-screen keyboard or a physical keyboard. Options add/remove favorites or hide/restore apps.
+categories, Hidden, favorite-first ordering, wrapped names, and search with the TV's system
+keyboard or a physical keyboard. The desktop preview has a remote-operable keyboard panel.
+TV text fields retain focus while SDL/webOS owns text entry; Done/Back dismisses editing and
+restores the field's next control. Options add/remove favorites or hide/restore apps.
 Move mode saves on each Left/Right step. General settings control app names, clock format and
 reduced motion. Clock format and each input open nested choice pages with checkmarks; Left/Back
 returns to the parent row. Background has all nine wallpapers and enters at the currently applied
@@ -260,6 +262,20 @@ ELFs. For version 1.1.1, the result is `.build/native/dist/com.luma.launcher.nat
 Install it through webOS Dev Manager connected to the TV on port 22 as `root`, then open
 **Luma Native**. It has a separate app ID and preferences from the web launcher.
 
+### Compatibility references
+
+The [webOS Homebrew Can I Use matrix](https://www.webosbrew.org/develop/caniuse) lists firmware
+library versions, including system SDL2. Its [library-version guide](https://www.webosbrew.org/develop/guides/library-version)
+maps internal versions to the marketing names: 7/22, 8/23, 9/24, 10/25 and 11/26.
+Luma bundles SDL-webOS 2.30.12 rather than using the TV's system SDL2.
+
+Upstream SDL-webOS [`release-2.30.12-webos.6`](https://github.com/webosbrew/SDL-webOS/releases/tag/release-2.30.12-webos.6)
+reports hotplug verification in app jails on webOS 3.4, 4 and 10 (25). That is useful evidence for
+the SDL2 port, but it is a newer prerelease than Luma's pinned `.5` runtime and verifies that
+subsystem, not Luma's complete UI, LS2 permissions or Homebrew inventory access. Luma's native
+startup/rendering and app/input inventory have been verified on a rooted webOS 26 TV; a lower
+supported version is not yet established.
+
 ### TV services
 
 Only builds compiled with `--features webos` use TV services; a desktop build refuses to run on a
@@ -334,8 +350,8 @@ a root SSH invocation is not the app's normal sandbox/caller context.
 
 ## Weather and language
 
-**Settings → Weather → Location** opens city/postcode search. Type with the native on-screen
-keyboard or a physical keyboard, close editing with Done/Back, select Search, and choose a result.
+**Settings → Weather → Location** opens city/postcode search. Activate the field to use the TV's
+system keyboard or a physical keyboard, close editing with Done/Back, select Search, and choose a result.
 **Show widget** hides the Home summary while retaining the city. **Temperature** selects °C/°F
 and converts the cached Celsius value immediately. Removing a city clears its cached reading.
 No browser geolocation or IP-based location lookup is used.
@@ -368,8 +384,8 @@ search, pointer/remote controls, local persistence, platform worker, native buil
 and screenshot/state automation. Layout, typography, branded cards, input artwork, navigation pill,
 focus treatments, menus, footers and settings follow the web implementation's 1920×1080 geometry.
 
-Web-preference migration, audio guidance, native OS virtual-keyboard integration and automatic
-boot/Home-button routing are not ported. The custom renderer batches consecutive
+Web-preference migration, audio guidance and automatic boot/Home-button routing are not ported.
+The custom renderer batches consecutive
 draws, caches glyphs and images, evicts old artwork above a 48 MiB image budget, and repaints only
 when the scene changes or the small pill/panel/wallpaper animations run. Reduced motion disables
 these transitions. Text is CPU-rasterized once per cached

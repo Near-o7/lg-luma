@@ -354,13 +354,14 @@ pub fn scene_with_pill(
     out.draw.push(Draw::Clip(None));
     header(&mut out, state, assets, now, pill_x, pill_width);
     footer(&mut out, state, assets);
-    if let Some(overlay) = &state.overlay {
+    if let Some(overlay @ (Overlay::Options { .. } | Overlay::Keyboard)) = &state.overlay {
         out.controls.clear();
         let start = out.draw.len();
         out.shape(Rect::new(0., 0., 1920., 1080.), 0., c(0x080b12, 0.70));
         match overlay {
             Overlay::Options { id, .. } => options(&mut out, state, assets, id),
             Overlay::Keyboard => keyboard(&mut out, state, assets),
+            Overlay::SystemKeyboard => {}
         }
         if let Some(opened) = state.panel_started {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
