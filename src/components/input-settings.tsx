@@ -29,7 +29,6 @@ export function InputSettings({
   const { t } = useTranslation();
   return (
     <section className="settings-content" aria-label={t('inputs')}>
-      <p className="settings-description">{t('inputVisibilityHint')}</p>
       {warning ? (
         <p className="settings-description" role="status">
           {warning}

@@ -490,7 +490,6 @@ export function Settings({
               role="region"
               aria-label={subpageTitle}
             >
-              <h2 className="settings-subpage-title">{subpageTitle}</h2>
               {subpage === 'language' ? (
                 <div className="settings-subpage-options" role="listbox" aria-label={t('language')}>
                   {(
