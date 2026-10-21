@@ -94,31 +94,82 @@ fn checked_response(value: Value) -> Result<Value, String> {
 
 fn inventory_read(uri: &str, field: &str) -> Result<Value, String> {
     // Only these fixed inventory commands use Homebrew's elevated service.
+    // Use the same one-reply invocation as the web launcher, without guessing
+    // CLI behavior from a firmware-version string.
     let command = format!(
-        "if [ \"$(id -u)\" = 0 ]; then MODE=-n; case \"$(cat /etc/starfish-release 2>/dev/null)\" in *\" 10.\"*|*\" 11.\"*) MODE=-t;; esac; /usr/bin/luna-send \"$MODE\" 1 -w 4000 {uri} '{{}}'; else printf '%s\\n' '{{\"returnValue\":false,\"errorText\":\"Homebrew Channel needs root access\"}}'; fi"
+        "if [ \"$(id -u)\" = 0 ]; then /usr/bin/luna-send -n 1 -w 4000 {uri} '{{}}'; else printf '%s\\n' '{{\"returnValue\":false,\"errorText\":\"Homebrew Channel needs root access\"}}'; fi"
     );
     let envelope = call(
         "luna://org.webosbrew.hbchannel.service/exec",
         json!({"command": command}),
     )?;
+    inventory_payload(&envelope, field).map_err(|error| {
+        let error = format!("{uri}: {error}");
+        eprintln!("Luma TV inventory: {error}");
+        error
+    })
+}
+
+fn output_excerpt(output: &str) -> String {
+    output
+        .chars()
+        .map(|c| if c.is_whitespace() { ' ' } else { c })
+        .filter(|c| !c.is_control())
+        .take(320)
+        .collect()
+}
+
+fn inventory_payload(envelope: &Value, field: &str) -> Result<Value, String> {
+    let stdout = envelope
+        .get("stdoutString")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let stderr = envelope
+        .get("stderrString")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let failure = |reason: &str| {
+        format!(
+            "{reason}; stdout: {}; stderr: {}",
+            output_excerpt(stdout),
+            output_excerpt(stderr),
+        )
+    };
     for key in ["returnCode", "exitCode"] {
         if let Some(code) = envelope.get(key)
             && code != 0
             && code != "0"
         {
-            return Err("Homebrew could not read the inventory".into());
+            return Err(failure(&format!(
+                "Homebrew inventory command failed ({key}={code})"
+            )));
         }
     }
-    let stdout = envelope
-        .get("stdoutString")
-        .and_then(Value::as_str)
-        .ok_or("Homebrew returned no inventory")?;
-    let response = checked_response(
-        stdout
-            .lines()
-            .find_map(|line| serde_json::from_str::<Value>(line).ok())
-            .ok_or("Homebrew returned an unreadable inventory")?,
-    )?;
+    if stdout.trim().is_empty() {
+        return Err(failure("Homebrew returned no inventory"));
+    }
+    if stdout.len() > 2 * 1024 * 1024 {
+        return Err("Homebrew inventory exceeds the 2 MiB limit".into());
+    }
+    // Parse an entire JSON object, including pretty-printed multi-line replies.
+    // A stream parser permits CLI timing text after that object; a preamble can
+    // precede its opening brace. Never mistake a nested one-line app for a reply.
+    let start = stdout
+        .find('{')
+        .ok_or_else(|| failure("Homebrew inventory contains no JSON object"))?;
+    let response = serde_json::Deserializer::from_str(&stdout[start..])
+        .into_iter::<Value>()
+        .next()
+        .ok_or_else(|| failure("Homebrew inventory contains no JSON reply"))?
+        .map_err(|error| {
+            failure(&format!(
+                "Homebrew inventory JSON could not be parsed: {error}"
+            ))
+        })?;
+    if !response.is_object() || !response.get("returnValue").is_some_and(Value::is_boolean) {
+        return Err(failure("Homebrew inventory JSON is not a Luna response"));
+    }
+    let response = checked_response(response)?;
     response
         .get(field)
         .cloned()
@@ -133,7 +184,14 @@ fn inventory() -> Result<(Inventory, Option<String>), String> {
     let inputs = inventory_read("luna://com.webos.service.eim/getAllInputStatus", "devices")
         .and_then(|raw| normalize_inputs(&raw));
     match inputs {
-        Ok(inputs) => Ok((Inventory { apps, inputs }, None)),
+        Ok(inputs) => {
+            eprintln!(
+                "Luma TV inventory: {} apps, {} inputs",
+                apps.len(),
+                inputs.len()
+            );
+            Ok((Inventory { apps, inputs }, None))
+        }
         Err(error) => Ok((
             Inventory {
                 apps,

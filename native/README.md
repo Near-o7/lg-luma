@@ -258,7 +258,10 @@ no longer be used. Errors include the service URI and the bus's actual refusal.
 
 App launches use the application manager. Fixed inventory commands still go through Homebrew
 Channel's elevated `exec`, following the web launcher's permission model. Input-read failures
-retain the last good inputs. The manifest
+retain the last good inputs. Inventory uses the web launcher's `luna-send -n 1` invocation and
+parses complete JSON objects, including formatted multi-line output and trailing CLI timing text.
+CLI failures report bounded stdout/stderr excerpts rather than just "unreadable inventory".
+The manifest
 declares `application.launcher`, `application.query` and `lunabus.query`; Homebrew Channel must
 provide that permission mapping for the native app ID too.
 
@@ -266,10 +269,24 @@ TV preferences are saved beside the installed executable. Before starting worker
 video, startup sets `APPID` and the SDL Wayland class to the native app ID and requests Back-key
 delivery. Hidden/minimized windows pause drawing, and focus restoration refreshes inventory.
 Back on Home exits the native app and returns control to the platform.
+webOS supplies native launch metadata as a JSON object in `argv[1]`. TV builds skip that object
+when parsing Luma's own options, leaving the process arguments available to SDL/libhelpers.
 
 ### Startup troubleshooting
 
-Run this in the TV's root SSH shell to see errors hidden by a normal launcher invocation:
+For the app's actual native developer-mode sandbox, stop any existing instance and run this
+in the TV's root SSH shell. This follows the [webOS Homebrew native-development guide](https://www.webosbrew.org/pages/native-development.html):
+
+```sh
+APP=/media/developer/apps/usr/palm/applications/com.luma.launcher.native
+XDG_RUNTIME_DIR=/tmp/xdg RUST_BACKTRACE=1 /usr/bin/jailer \
+  -t native_devmode -i com.luma.launcher.native -p "$APP" \
+  "$APP/luma-native" \
+  '{"@system_native_app":true,"nid":"com.luma.launcher.native"}'
+```
+
+The launch-argument parser should print `Luma webOS launch parameters accepted`. A direct run
+without the jailer is useful for isolating rendering but does not reproduce TV-menu launch:
 
 ```sh
 RUST_BACKTRACE=1 /media/developer/apps/usr/palm/applications/com.luma.launcher.native/luma-native 2>&1
@@ -282,10 +299,12 @@ the pinned runtime. SDL video initialization errors include the compiled drivers
 backend. An SSH shell can differ from the application manager's environment.
 
 **Hardware status:** desktop rendering/state checks and ARM cross-linking/IPK creation have passed
-on Apple Silicon macOS with the SDK above. Native caller permissions, the TV SDL/Wayland backend,
-Magic Remote key mapping, app switching and relaunch behavior still require verification on the
-actual TV. In particular, the native LS2 caller must be checked under a normal application-manager
-launch, because a root SSH invocation is not the app's normal sandbox/caller context.
+on Apple Silicon macOS with the SDK above. The interface has appeared on a rooted webOS 26 TV
+with the pinned SDL-webOS runtime, both with and without its automatic registration enabled.
+SDL's registration calls can still report permission warnings. Complete app/input inventory,
+Magic Remote key mapping, app switching and relaunch behavior remain under manual verification.
+The native LS2 caller must also be checked under a normal application-manager launch, because
+a root SSH invocation is not the app's normal sandbox/caller context.
 
 ## Weather and language
 

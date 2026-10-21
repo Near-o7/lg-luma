@@ -55,7 +55,19 @@ struct Options {
 impl Options {
     fn parse() -> Result<Self, String> {
         let mut result = Self::default();
-        let mut args = std::env::args().skip(1);
+        let mut args = std::env::args().skip(1).peekable();
+        // SAM/jailer puts native launch metadata (e.g. @system_native_app and
+        // nid) in argv[1]. It is not a Luma CLI option. Keep the original argv
+        // intact for SDL/libhelpers, which also read the process launch data.
+        if cfg!(feature = "webos")
+            && args.peek().is_some_and(|argument| {
+                serde_json::from_str::<serde_json::Value>(argument)
+                    .is_ok_and(|value| value.is_object())
+            })
+        {
+            args.next();
+            eprintln!("Luma webOS launch parameters accepted");
+        }
         while let Some(arg) = args.next() {
             if arg == "--help" {
                 println!(
