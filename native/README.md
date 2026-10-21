@@ -43,6 +43,12 @@ cropping, saturation, shading and tile gradients are prepared ahead of time from
 and UI/input icons reuse the web components at build time. No asset downloads occur.
 Regenerate assets after changing their sources.
 
+The renderer loads the common Inter 400 face initially, then loads other weights/optical sizes
+only when text uses them. CJK fallback faces are opened only when Inter lacks a character in the
+text being drawn. Fontdue builds outline geometry for every mapped glyph when a face is loaded;
+eagerly opening both roughly 10 MB CJK faces made even English startup unnecessarily expensive.
+Single-character rendering does not load unused GSUB substitution glyphs.
+
 ### HiDPI and 4K
 
 Text density is automatic: a 20px logical label uses a 40px glyph bitmap on a 2× drawable. The
@@ -55,6 +61,13 @@ Generate optional 3840×2160 wallpaper variants for higher-density surfaces:
 
 ```sh
 pnpm native:assets --4k
+```
+
+TV packaging defaults to 1080p artwork even if older `@2x` files remain in the asset cache. To
+include the optional high-resolution wallpapers in the IPK, also run:
+
+```sh
+pnpm native:package --4k
 ```
 
 The renderer selects these at densities above 1× when the GPU supports their texture size, and
@@ -227,6 +240,12 @@ build does not supply the TV's shell integration. TV builds also provide `getaux
 for the SDK's older libc by reading `/proc/self/auxv`; Rust startup and TLS CPU detection receive
 real kernel values.
 
+ARM code generation uses the NDK's Cortex-A9/VFP baseline, with NEON disabled for Rust code.
+It retains the soft-float **calling convention**, while allowing hardware floating-point
+instructions; the Rust target's default software floating-point codegen is unsuitable for the
+font-outline/layout workload. This is still `gnueabi`, never the incompatible `gnueabihf` ABI.
+The pinned Rust toolchain currently emits unstable-feature warnings for these target switches.
+
 Packaging bundles the verified SDL-webOS `libSDL2-2.0.so.0` and its license automatically. To override
 SDL or include other selected ARM webOS shared libraries, set `WEBOS_NATIVE_LIBS` to their directory
 before packaging. Include SDL under its runtime name, `libSDL2-2.0.so.0`. The packager rejects SDL
@@ -297,6 +316,13 @@ printf '\nExit status: %s\n' "$?"
 the pinned runtime. SDL video initialization errors include the compiled drivers and the
 `XDG_RUNTIME_DIR`/`WAYLAND_DISPLAY` values, distinguishing a display-session problem from a missing
 backend. An SSH shell can differ from the application manager's environment.
+
+TV builds print cumulative `Luma startup:` timings for asset metadata, workers, SDL, the GL
+context, renderer preparation and the first presented frame. `Luma font:` lines report each
+face's actual load/outline-preparation time. These start inside the executable and exclude
+the application manager's jailer/process-launch overhead. Use a jailed manual launch to measure
+the real TV path; package size is not a proxy for first-frame latency. The IPK is unpacked at
+installation, not at every app launch.
 
 **Hardware status:** desktop rendering/state checks and ARM cross-linking/IPK creation have passed
 on Apple Silicon macOS with the SDK above. The interface has appeared on a rooted webOS 26 TV

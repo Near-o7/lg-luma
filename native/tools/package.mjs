@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { prepareWebosRuntime, verifyWebosSdl } from './webos-runtime.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
+const highResolution = process.argv.includes('--4k');
 const version = JSON.parse(await fs.readFile(path.join(root, 'appinfo.json'), 'utf8')).version;
 const binary = path.join(root, 'native/target/armv7-unknown-linux-gnueabi/release/luma-native');
 const bytes = await fs.readFile(binary);
@@ -28,7 +29,8 @@ await fs.copyFile(binary, path.join(stage, 'luma-native'));
 await fs.chmod(path.join(stage, 'luma-native'), 0o755);
 await fs.cp(path.join(out, 'assets'), path.join(stage, 'assets'), {
   recursive: true,
-  filter: (source) => path.basename(source) !== '.DS_Store',
+  filter: (source) =>
+    path.basename(source) !== '.DS_Store' && (highResolution || !source.endsWith('@2x.jpg')),
 });
 await fs.copyFile(path.join(out, 'assets/app-icon.png'), path.join(stage, 'app-icon.png'));
 await fs.copyFile(path.join(root, 'license'), path.join(stage, 'LICENSE'));

@@ -341,8 +341,17 @@ fn scripted_click(
 }
 
 fn run() -> Result<(), String> {
+    let startup = Instant::now();
     let mut options = Options::parse()?;
     let webos = cfg!(feature = "webos");
+    let startup_stage = |stage: &str| {
+        if webos {
+            eprintln!(
+                "Luma startup: {stage} after {} ms",
+                startup.elapsed().as_millis()
+            );
+        }
+    };
     if !webos && std::path::Path::new("/etc/starfish-release").exists() {
         return Err("This desktop build cannot run on a TV. Build with --features webos.".into());
     }
@@ -366,6 +375,7 @@ fn run() -> Result<(), String> {
         }
     });
     let assets = view::Assets::load(root)?;
+    startup_stage("asset metadata");
     let preferences_path = options
         .preferences
         .clone()
@@ -393,6 +403,7 @@ fn run() -> Result<(), String> {
         &preferences_path,
         &weather_service,
     );
+    startup_stage("preferences and workers");
 
     let sdl = sdl2::init()?;
     let drivers: Vec<_> = sdl2::video::drivers().collect();
@@ -411,6 +422,7 @@ fn run() -> Result<(), String> {
         )
     })?;
     eprintln!("Luma SDL video driver: {}", video.current_video_driver());
+    startup_stage("SDL video");
     let attributes = video.gl_attr();
     if webos {
         attributes.set_context_profile(GLProfile::GLES);
@@ -440,10 +452,12 @@ fn run() -> Result<(), String> {
     let window = builder.build().map_err(|e| e.to_string())?;
     let _context = window.gl_create_context()?;
     gl::load_with(|name| video.gl_get_proc_address(name) as *const _);
+    startup_stage("window and GL context");
     if let Err(error) = video.gl_set_swap_interval(1) {
         eprintln!("VSync: {error}");
     }
     let mut renderer = renderer::Renderer::new(&assets.root.join("font.ttf"), webos)?;
+    startup_stage("renderer");
     let mut profile = diagnostics::Profile::default();
     let mut presented = 0usize;
     let mut captured = None;
@@ -783,6 +797,9 @@ fn run() -> Result<(), String> {
                 }
                 renderer.render(&scene.draw, width, height);
                 window.gl_swap_window();
+                if presented == 0 {
+                    startup_stage("first frame");
+                }
                 presented += 1;
                 if options.profile_frames.is_some() {
                     profile.record(

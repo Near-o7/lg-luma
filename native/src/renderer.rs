@@ -8,9 +8,9 @@ use fontdue::{Font, Metrics};
 use gl::types::*;
 use serde::Serialize;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ffi::{CStr, CString},
-    path::Path,
+    path::{Path, PathBuf},
     time::Instant,
 };
 
@@ -160,7 +160,9 @@ pub struct Renderer {
     vao: GLuint,
     white: Texture,
     atlases: Vec<GlyphAtlas>,
+    font_directory: PathBuf,
     fonts: HashMap<u16, Font>,
+    failed_fonts: HashSet<u16>,
     glyphs: HashMap<(char, u16, u16), Glyph>,
     textures: HashMap<String, Option<Texture>>,
     artwork_variants: HashMap<String, String>,
@@ -176,36 +178,10 @@ impl Renderer {
     pub fn new(font: &Path, gles: bool) -> Result<Self, String> {
         let directory = font.parent().ok_or("Invalid font path")?;
         let mut fonts = HashMap::new();
-        for weight in [350, 400, 450, 500, 550, 600, 650, 800] {
-            for display in [false, true] {
-                let path = directory.join(format!(
-                    "font-{}{weight}.ttf",
-                    if display { "display-" } else { "" }
-                ));
-                let bytes = std::fs::read(&path).map_err(|e| {
-                    format!("Font {}: {e}. Regenerate native assets.", path.display())
-                })?;
-                fonts.insert(
-                    weight + if display { 1000 } else { 0 },
-                    Font::from_bytes(bytes, fontdue::FontSettings::default())
-                        .map_err(str::to_string)?,
-                );
-            }
-        }
-        for weight in [400, 500] {
-            let path = directory.join(format!("font-cjk-{weight}.ttf"));
-            let bytes = std::fs::read(&path).map_err(|e| {
-                format!(
-                    "Chinese font {}: {e}. Regenerate native assets.",
-                    path.display()
-                )
-            })?;
-            fonts.insert(
-                weight + 2000,
-                Font::from_bytes(bytes, fontdue::FontSettings::default())
-                    .map_err(str::to_string)?,
-            );
-        }
+        // Fontdue prepares outlines for every mapped character on construction.
+        // In particular, parsing both full CJK faces before an English Home
+        // screen costs far more than reading their file bytes. Load on demand.
+        fonts.insert(400, load_font(directory, 400)?);
         let mut max_texture_size = 0;
         let mut max_viewport = [0; 2];
         let mut precision = 0;
@@ -265,7 +241,9 @@ impl Renderer {
             vao,
             white,
             atlases: Vec::new(),
+            font_directory: directory.into(),
             fonts,
+            failed_fonts: HashSet::new(),
             glyphs: HashMap::new(),
             textures: HashMap::new(),
             artwork_variants: HashMap::new(),
@@ -283,6 +261,26 @@ impl Renderer {
                 fragment_highp,
             },
         })
+    }
+
+    fn ensure_font(&mut self, id: u16) -> bool {
+        if self.fonts.contains_key(&id) {
+            return true;
+        }
+        if self.failed_fonts.contains(&id) {
+            return false;
+        }
+        match load_font(&self.font_directory, id) {
+            Ok(font) => {
+                self.fonts.insert(id, font);
+                true
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                self.failed_fonts.insert(id);
+                false
+            }
+        }
     }
 
     fn glyph(&mut self, c: char, size: u16, font: u16) -> Option<Glyph> {
@@ -481,9 +479,17 @@ impl Renderer {
             .max(f32::from(physical_size) / 4.);
         let font_id = style.weight + if style.size >= 32. { 1000 } else { 0 };
         let fallback_id = if style.weight >= 500 { 2500 } else { 2400 };
+        if !self.ensure_font(font_id) {
+            self.stats.glyph_failures += text.chars().count();
+            return;
+        }
+        let needs_fallback = text
+            .chars()
+            .any(|c| !c.is_ascii_control() && self.fonts[&font_id].lookup_glyph_index(c) == 0);
+        let fallback_ready = needs_fallback && self.ensure_font(fallback_id);
         let fonts = &self.fonts;
         let choose_font = |c| {
-            if fonts[&font_id].lookup_glyph_index(c) == 0 {
+            if fallback_ready && fonts[&font_id].lookup_glyph_index(c) == 0 {
                 fallback_id
             } else {
                 font_id
@@ -871,6 +877,36 @@ impl Renderer {
         }
         result.map(|_| stats)
     }
+}
+
+fn load_font(directory: &Path, id: u16) -> Result<Font, String> {
+    let name = if id >= 2000 {
+        format!("font-cjk-{}.ttf", id - 2000)
+    } else if id >= 1000 {
+        format!("font-display-{}.ttf", id - 1000)
+    } else {
+        format!("font-{id}.ttf")
+    };
+    let path = directory.join(&name);
+    let started = Instant::now();
+    let bytes = std::fs::read(&path)
+        .map_err(|e| format!("Font {}: {e}. Regenerate native assets.", path.display()))?;
+    let font = Font::from_bytes(
+        bytes,
+        fontdue::FontSettings {
+            // Only single-character rendering is used, never GSUB glyph indices.
+            load_substitutions: false,
+            ..Default::default()
+        },
+    )
+    .map_err(|e| format!("Font {}: {e}", path.display()))?;
+    if cfg!(feature = "webos") {
+        eprintln!(
+            "Luma font: {name} loaded in {} ms",
+            started.elapsed().as_millis()
+        );
+    }
+    Ok(font)
 }
 
 impl Drop for Renderer {
