@@ -9,12 +9,13 @@ description = "Experimental Rust/SDL2/GLES2 implementation of Luma"
 
 [features]
 default = []
-webos = []
+webos = ["dep:libc"]
 
 [dependencies]
 fontdue = "0.9"
 gl = "0.14"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+libc = { version = "0.2", optional = true }
 sdl2 = { version = "0.38", features = ["use-pkgconfig"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
