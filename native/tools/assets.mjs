@@ -10,6 +10,7 @@ import { tsImport } from 'tsx/esm/api';
 const root = path.resolve(import.meta.dirname, '../..');
 const source = path.join(root, 'public');
 const out = path.join(root, '.build/native/assets');
+const highResolution = process.argv.includes('--4k');
 for (const directory of [
   'wallpapers',
   'thumbnails',
@@ -47,43 +48,49 @@ for (const file of await fs.readdir(path.join(source, 'wallpapers'))) {
   if (!/\.(jpg|svg)$/.test(file)) continue;
   const id = path.parse(file).name;
   const input = path.join(source, 'wallpapers', file);
-  // Match background-size:cover and each CSS background-position exactly.
-  const photo = await sharp(input)
-    .resize(1920, 1080, { fit: 'outside' })
-    .png()
-    .toBuffer({ resolveWithObject: true });
-  const position = id === 'dunes' || id === 'summit' ? 0.4 : id === 'san-francisco' ? 0.42 : 0.45;
-  let image = sharp(photo.data).extract({
-    left: Math.round((photo.info.width - 1920) / 2),
-    top: Math.round((photo.info.height - 1080) * position),
-    width: 1920,
-    height: 1080,
-  });
-  const saturation =
-    id === 'san-francisco'
-      ? 0.75
-      : id === 'summit'
-        ? 0.7
-        : ['forest', 'yosemite', 'northern-lights'].includes(id)
-          ? 0.8
-          : 1;
-  const brightness = id === 'san-francisco' ? 0.82 : id === 'summit' ? 0.8 : 1;
-  if (saturation !== 1) {
-    const s = saturation;
-    image = image.recomb([
-      [0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s],
-      [0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s],
-      [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s],
-    ]);
-  }
-  const data = await image.linear(brightness).png().toBuffer();
-  const shaded = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><defs>
+  for (const scale of highResolution ? [1, 2] : [1]) {
+    const width = 1920 * scale;
+    const height = 1080 * scale;
+    // Match background-size:cover and each CSS background-position exactly.
+    const photo = await sharp(input, { density: 72 * scale })
+      .resize(width, height, { fit: 'outside' })
+      .png()
+      .toBuffer({ resolveWithObject: true });
+    const position = id === 'dunes' || id === 'summit' ? 0.4 : id === 'san-francisco' ? 0.42 : 0.45;
+    let image = sharp(photo.data).extract({
+      left: Math.round((photo.info.width - width) / 2),
+      top: Math.round((photo.info.height - height) * position),
+      width,
+      height,
+    });
+    const saturation =
+      id === 'san-francisco'
+        ? 0.75
+        : id === 'summit'
+          ? 0.7
+          : ['forest', 'yosemite', 'northern-lights'].includes(id)
+            ? 0.8
+            : 1;
+    const brightness = id === 'san-francisco' ? 0.82 : id === 'summit' ? 0.8 : 1;
+    if (saturation !== 1) {
+      const s = saturation;
+      image = image.recomb([
+        [0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s],
+        [0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s],
+        [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s],
+      ]);
+    }
+    const data = await image.linear(brightness).png().toBuffer();
+    const shaded = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 1920 1080"><defs>
     <linearGradient id="v" x2="0" y2="1"><stop stop-color="#0d1013" stop-opacity=".24"/><stop offset=".19" stop-color="#0e1115" stop-opacity=".08"/><stop offset=".35" stop-color="#0f1114" stop-opacity=".35"/><stop offset=".63" stop-color="#111317" stop-opacity=".86"/><stop offset=".85" stop-color="#17191d" stop-opacity=".92157"/><stop offset="1" stop-color="#17191d" stop-opacity=".96078"/></linearGradient>
     <linearGradient id="h"><stop stop-color="#111417" stop-opacity=".42"/><stop offset=".75" stop-color="#111417" stop-opacity="0"/></linearGradient></defs>
     <path fill="#17191c" d="M0 0h1920v1080H0z"/><image href="data:image/png;base64,${data.toString('base64')}" width="1920" height="1080" opacity=".92"/><path fill="url(#h)" d="M0 0h1920v1080H0z"/><path fill="url(#v)" d="M0 0h1920v1080H0z"/></svg>`;
-  await sharp(Buffer.from(shaded))
-    .jpeg({ quality: 96 })
-    .toFile(path.join(out, 'wallpapers', `${id}.jpg`));
+    // This generated SVG embeds a trusted bundled photograph; its data URL can
+    // exceed libxml's default 10 MiB attribute limit at 4K.
+    await sharp(Buffer.from(shaded), { unlimited: true })
+      .jpeg({ quality: 96 })
+      .toFile(path.join(out, 'wallpapers', `${id}${scale === 2 ? '@2x' : ''}.jpg`));
+  }
   await sharp(input)
     .resize(480, 270, { fit: 'cover' })
     .jpeg({ quality: 82 })

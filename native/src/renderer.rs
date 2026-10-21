@@ -1,13 +1,23 @@
 //! A small GLES2-compatible GPU painter. Rust owns the draw list and glyph atlas;
 //! SDL only supplies the context. No browser, LVGL, Qt or copied PlxNative code.
-use crate::state::Rect;
+use crate::{
+    raster::{Shelf, Size, Viewport, glyph_size, recyclable_page},
+    state::Rect,
+};
 use fontdue::{Font, Metrics};
 use gl::types::*;
-use std::{collections::HashMap, ffi::CString, path::Path};
+use serde::Serialize;
+use std::{
+    collections::HashMap,
+    ffi::{CStr, CString},
+    path::Path,
+    time::Instant,
+};
 
 pub type Color = [f32; 4];
 pub const WHITE: Color = [0.96, 0.96, 0.96, 1.];
-const ATLAS: usize = 2048;
+const ATLAS: usize = 1024;
+const CACHED_ATLASES: usize = 4;
 const TEXTURE_BUDGET: usize = 48 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug)]
@@ -76,6 +86,60 @@ impl Drop for Texture {
 struct Glyph {
     metrics: Metrics,
     uv: [f32; 4],
+    page: Option<usize>,
+}
+
+struct GlyphAtlas {
+    texture: Texture,
+    shelf: Shelf,
+    used: u64,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GraphicsInfo {
+    pub vendor: String,
+    pub renderer: String,
+    pub version: String,
+    pub max_texture_size: u32,
+    pub fragment_highp: bool,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RenderStats {
+    pub target: Size,
+    pub viewport: Viewport,
+    pub font_antialiasing: &'static str,
+    pub max_logical_font_px: f32,
+    pub max_physical_font_px: f32,
+    pub cached_glyphs: usize,
+    pub glyph_rasterizations: usize,
+    pub glyph_failures: usize,
+    pub glyph_atlas_pages: usize,
+    pub glyph_atlas_bytes: usize,
+    pub artwork_bytes: usize,
+    pub high_resolution_wallpaper: bool,
+    pub draw_calls: usize,
+    pub cpu_submission_ms: f64,
+}
+impl RenderStats {
+    fn new(target: Size) -> Self {
+        Self {
+            target,
+            viewport: Viewport::new(target),
+            font_antialiasing: "grayscale coverage",
+            max_logical_font_px: 0.,
+            max_physical_font_px: 0.,
+            cached_glyphs: 0,
+            glyph_rasterizations: 0,
+            glyph_failures: 0,
+            glyph_atlas_pages: 0,
+            glyph_atlas_bytes: 0,
+            artwork_bytes: 0,
+            high_resolution_wallpaper: false,
+            draw_calls: 0,
+            cpu_submission_ms: 0.,
+        }
+    }
 }
 
 struct Batch {
@@ -90,15 +154,17 @@ pub struct Renderer {
     buffer: GLuint,
     vao: GLuint,
     white: Texture,
-    atlas: Texture,
+    atlases: Vec<GlyphAtlas>,
     fonts: HashMap<u16, Font>,
     glyphs: HashMap<(char, u16, u16), Glyph>,
-    atlas_cursor: (usize, usize, usize),
     textures: HashMap<String, Option<Texture>>,
+    artwork_variants: HashMap<String, String>,
     vertices: Vec<f32>,
     batches: Vec<Batch>,
     clip: Option<Rect>,
     frame: u64,
+    stats: RenderStats,
+    pub info: GraphicsInfo,
 }
 
 impl Renderer {
@@ -121,14 +187,35 @@ impl Renderer {
                 );
             }
         }
-        let vertex = if gles {
-            "#version 100\n"
-        } else {
-            "#version 150\n#define attribute in\n#define varying out\n"
+        let mut max_texture_size = 0;
+        let mut precision = 0;
+        unsafe {
+            gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut max_texture_size);
+            if gles && gl::GetShaderPrecisionFormat::is_loaded() {
+                let mut range = [0; 2];
+                gl::GetShaderPrecisionFormat(
+                    gl::FRAGMENT_SHADER,
+                    gl::HIGH_FLOAT,
+                    range.as_mut_ptr(),
+                    &mut precision,
+                );
+            }
         }
-        .to_owned()
-            + include_str!("shaders/paint.vert");
-        let fragment = if gles { "#version 100\nprecision mediump float;\n" } else { "#version 150\n#define varying in\n#define texture2D texture\nout vec4 out_color;\n#define gl_FragColor out_color\n" }.to_owned() + include_str!("shaders/paint.frag");
+        let fragment_highp = !gles || precision > 0;
+        let qualifier = if fragment_highp { "highp" } else { "mediump" };
+        let vertex = if gles {
+            format!("#version 100\nprecision highp float;\n#define PAINT_PRECISION {qualifier}\n")
+        } else {
+            "#version 150\n#define attribute in\n#define varying out\n#define PAINT_PRECISION\n"
+                .into()
+        } + include_str!("shaders/paint.vert");
+        let fragment = if gles {
+            format!(
+                "#version 100\nprecision {qualifier} float;\n#define PAINT_PRECISION {qualifier}\n"
+            )
+        } else {
+            "#version 150\n#define varying in\n#define texture2D texture\nout vec4 out_color;\n#define gl_FragColor out_color\n#define PAINT_PRECISION\n".into()
+        } + include_str!("shaders/paint.frag");
         let program = link(&vertex, &fragment)?;
         let mut buffer = 0;
         let mut vao = 0;
@@ -151,45 +238,59 @@ impl Renderer {
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         }
         let white = texture(1, 1, &[255; 4]);
-        let atlas = texture(ATLAS as u32, ATLAS as u32, &vec![0; ATLAS * ATLAS * 4]);
         Ok(Self {
             program,
             buffer,
             vao,
             white,
-            atlas,
+            atlases: Vec::new(),
             fonts,
             glyphs: HashMap::new(),
-            atlas_cursor: (1, 1, 0),
             textures: HashMap::new(),
+            artwork_variants: HashMap::new(),
             vertices: Vec::with_capacity(65536),
             batches: Vec::new(),
             clip: None,
             frame: 0,
+            stats: RenderStats::new(Size::HD),
+            info: GraphicsInfo {
+                vendor: gl_string(gl::VENDOR),
+                renderer: gl_string(gl::RENDERER),
+                version: gl_string(gl::VERSION),
+                max_texture_size: max_texture_size.max(0) as u32,
+                fragment_highp,
+            },
         })
     }
 
     fn glyph(&mut self, c: char, size: u16, font: u16) -> Option<Glyph> {
         if let Some(glyph) = self.glyphs.get(&(c, size, font)) {
+            if let Some(page) = glyph.page {
+                self.atlases[page].used = self.frame;
+            }
             return Some(*glyph);
         }
         let (metrics, bitmap) = self.fonts[&font].rasterize(c, f32::from(size) / 4.);
-        let (mut x, mut y, mut row) = self.atlas_cursor;
-        if x + metrics.width + 1 >= ATLAS {
-            x = 1;
-            y += row + 2;
-            row = 0;
+        self.stats.glyph_rasterizations += 1;
+        if bitmap.is_empty() {
+            let glyph = Glyph {
+                metrics,
+                uv: [0.; 4],
+                page: None,
+            };
+            self.glyphs.insert((c, size, font), glyph);
+            return Some(glyph);
         }
-        if y + metrics.height + 1 >= ATLAS {
-            return None;
-        }
+        let (page, x, y) = self.reserve_glyph(metrics.width, metrics.height)?;
+        let atlas = &mut self.atlases[page];
+        atlas.used = self.frame;
         let pixels: Vec<u8> = bitmap
             .iter()
             .flat_map(|alpha| [255, 255, 255, *alpha])
             .collect();
         if !pixels.is_empty() {
             unsafe {
-                gl::BindTexture(gl::TEXTURE_2D, self.atlas.id);
+                gl::BindTexture(gl::TEXTURE_2D, atlas.texture.id);
                 gl::TexSubImage2D(
                     gl::TEXTURE_2D,
                     0,
@@ -205,16 +306,81 @@ impl Renderer {
         }
         let glyph = Glyph {
             metrics,
+            page: Some(page),
             uv: [
-                x as f32 / ATLAS as f32,
-                y as f32 / ATLAS as f32,
-                (x + metrics.width) as f32 / ATLAS as f32,
-                (y + metrics.height) as f32 / ATLAS as f32,
+                x as f32 / atlas.texture.width as f32,
+                y as f32 / atlas.texture.height as f32,
+                (x + metrics.width) as f32 / atlas.texture.width as f32,
+                (y + metrics.height) as f32 / atlas.texture.height as f32,
             ],
         };
-        self.atlas_cursor = (x + metrics.width + 2, y, row.max(metrics.height));
         self.glyphs.insert((c, size, font), glyph);
         Some(glyph)
+    }
+
+    fn reserve_glyph(&mut self, width: usize, height: usize) -> Option<(usize, usize, usize)> {
+        for (index, atlas) in self.atlases.iter_mut().enumerate() {
+            if let Some((x, y)) = atlas
+                .shelf
+                .reserve(width, height, atlas.texture.width as usize)
+            {
+                return Some((index, x, y));
+            }
+        }
+        let size = ATLAS
+            .min(self.info.max_texture_size as usize)
+            .max((width + 2).next_power_of_two())
+            .max((height + 2).next_power_of_two());
+        if size > self.info.max_texture_size as usize {
+            self.stats.glyph_failures += 1;
+            return None;
+        }
+        // Never recycle an atlas referenced by this frame's queued geometry.
+        let recycle = if self.atlases.len() >= CACHED_ATLASES {
+            recyclable_page(
+                self.atlases
+                    .iter()
+                    .enumerate()
+                    .map(|(index, page)| (index, page.used)),
+                self.frame,
+            )
+        } else {
+            None
+        };
+        let atlas = GlyphAtlas {
+            texture: glyph_texture(size),
+            shelf: Shelf::default(),
+            used: self.frame,
+        };
+        let index = if let Some(index) = recycle {
+            self.glyphs.retain(|_, glyph| glyph.page != Some(index));
+            self.atlases[index] = atlas;
+            index
+        } else {
+            self.atlases.push(atlas);
+            self.atlases.len() - 1
+        };
+        let (x, y) = self.atlases[index].shelf.reserve(width, height, size)?;
+        Some((index, x, y))
+    }
+
+    fn trim_atlases(&mut self) {
+        for index in (0..self.atlases.len()).rev() {
+            if self.atlases.len() <= CACHED_ATLASES {
+                break;
+            }
+            if self.atlases[index].used == self.frame {
+                continue;
+            }
+            let last = self.atlases.len() - 1;
+            self.glyphs.retain(|_, glyph| glyph.page != Some(index));
+            self.atlases.swap_remove(index);
+            for glyph in self.glyphs.values_mut() {
+                if glyph.page == Some(last) {
+                    glyph.page = Some(index);
+                }
+            }
+        }
     }
 
     fn quad(
@@ -283,6 +449,13 @@ impl Renderer {
     fn text(&mut self, text: &str, rect: Rect, style: TextStyle, color: Color, centered: bool) {
         let size = (style.size * 4.).round() as u16;
         let size_f = f32::from(size) / 4.;
+        let viewport = self.stats.viewport;
+        let physical_size = glyph_size(size_f, viewport.text_scale());
+        self.stats.max_logical_font_px = self.stats.max_logical_font_px.max(size_f);
+        self.stats.max_physical_font_px = self
+            .stats
+            .max_physical_font_px
+            .max(f32::from(physical_size) / 4.);
         let font_id = style.weight + if style.size >= 32. { 1000 } else { 0 };
         let font = &self.fonts[&font_id];
         let line_height = size_f * style.line_height;
@@ -364,31 +537,56 @@ impl Renderer {
             }
         }
         for (c, x, baseline) in placed {
-            if let Some(glyph) = self.glyph(c, size, font_id) {
+            if let Some(glyph) = self.glyph(c, physical_size, font_id)
+                && let Some(page) = glyph.page
+            {
                 let m = glyph.metrics;
                 self.quad(
-                    Rect::new(
-                        x + m.xmin as f32,
-                        baseline - (m.height as f32 + m.ymin as f32),
-                        m.width as f32,
-                        m.height as f32,
-                    ),
+                    viewport.glyph_rect(x, baseline, m),
                     glyph.uv,
-                    0.,
+                    -1., // Coverage is already antialiased; don't apply shape AA a second time.
                     0.,
                     color,
-                    self.atlas.id,
+                    self.atlases[page].texture.id,
                 );
             }
         }
     }
 
     fn image(&mut self, path: &str, mut rect: Rect, radius: f32, contain: bool, tint: Color) {
+        let path = if self.stats.viewport.scale > 1.
+            && self.info.max_texture_size >= 3840
+            && Path::new(path)
+                .parent()
+                .and_then(Path::file_name)
+                .is_some_and(|p| p == "wallpapers")
+        {
+            self.artwork_variants
+                .entry(path.into())
+                .or_insert_with(|| {
+                    let original = Path::new(path);
+                    let variant = original.with_file_name(format!(
+                        "{}@2x.jpg",
+                        original.file_stem().unwrap_or_default().to_string_lossy()
+                    ));
+                    if variant.is_file() {
+                        variant.to_string_lossy().into_owned()
+                    } else {
+                        path.into()
+                    }
+                })
+                .clone()
+        } else {
+            path.into()
+        };
+        if path.ends_with("@2x.jpg") {
+            self.stats.high_resolution_wallpaper = true;
+        }
         let frame = self.frame;
         let entry = self
             .textures
-            .entry(path.into())
-            .or_insert_with(|| match image::open(path) {
+            .entry(path.clone())
+            .or_insert_with(|| match image::open(&path) {
                 Ok(image) => {
                     let image = image.into_rgba8();
                     Some(texture(image.width(), image.height(), image.as_raw()))
@@ -413,6 +611,8 @@ impl Renderer {
     }
 
     pub fn render(&mut self, commands: &[Draw], width: u32, height: u32) {
+        let started = Instant::now();
+        self.stats = RenderStats::new(Size::new(width, height));
         self.frame += 1;
         self.vertices.clear();
         self.batches.clear();
@@ -455,11 +655,13 @@ impl Renderer {
                 Draw::Clip(clip) => self.clip = *clip,
             }
         }
-        let scale = (width as f32 / 1920.).min(height as f32 / 1080.);
-        let vw = (1920. * scale).round() as i32;
-        let vh = (1080. * scale).round() as i32;
-        let vx = (width as i32 - vw) / 2;
-        let vy = (height as i32 - vh) / 2;
+        let Viewport {
+            x: vx,
+            y: vy,
+            width: vw,
+            height: vh,
+            scale,
+        } = self.stats.viewport;
         unsafe {
             gl::Disable(gl::SCISSOR_TEST);
             gl::Viewport(0, 0, width as i32, height as i32);
@@ -503,10 +705,10 @@ impl Renderer {
                 if let Some(clip) = batch.clip {
                     gl::Enable(gl::SCISSOR_TEST);
                     gl::Scissor(
-                        vx + (clip.x * scale).round() as i32,
-                        vy + ((1080. - clip.y - clip.h) * scale).round() as i32,
-                        (clip.w * scale).round() as i32,
-                        (clip.h * scale).round() as i32,
+                        vx + (clip.x * vw as f32 / 1920.).round() as i32,
+                        vy + ((1080. - clip.y - clip.h) * vh as f32 / 1080.).round() as i32,
+                        (clip.w * vw as f32 / 1920.).round() as i32,
+                        (clip.h * vh as f32 / 1080.).round() as i32,
                     );
                 } else {
                     gl::Disable(gl::SCISSOR_TEST);
@@ -543,6 +745,21 @@ impl Renderer {
                 }
             }
         }
+        self.trim_atlases();
+        self.stats.cached_glyphs = self.glyphs.len();
+        self.stats.glyph_atlas_pages = self.atlases.len();
+        self.stats.glyph_atlas_bytes = self
+            .atlases
+            .iter()
+            .map(|page| page.texture.width as usize * page.texture.height as usize * 4)
+            .sum();
+        self.stats.artwork_bytes = bytes;
+        self.stats.draw_calls = self.batches.len();
+        self.stats.cpu_submission_ms = started.elapsed().as_secs_f64() * 1000.;
+    }
+
+    pub fn stats(&self) -> &RenderStats {
+        &self.stats
     }
 
     pub fn screenshot(&self, path: &Path, width: u32, height: u32) -> Result<(), String> {
@@ -565,8 +782,19 @@ impl Renderer {
     }
 
     /// Capture the authored TV surface, independent of desktop HiDPI/window limits.
-    pub fn capture(&mut self, commands: &[Draw], path: &Path) -> Result<(), String> {
-        let image = texture(1920, 1080, &vec![0; 1920 * 1080 * 4]);
+    pub fn capture(
+        &mut self,
+        commands: &[Draw],
+        path: &Path,
+        size: Size,
+    ) -> Result<RenderStats, String> {
+        if size.width > self.info.max_texture_size || size.height > self.info.max_texture_size {
+            return Err(format!(
+                "Capture {}x{} exceeds the GPU's {}px texture limit",
+                size.width, size.height, self.info.max_texture_size
+            ));
+        }
+        let image = texture(size.width, size.height, &[]);
         let mut framebuffer = 0;
         unsafe {
             gl::GenFramebuffers(1, &mut framebuffer);
@@ -584,13 +812,14 @@ impl Renderer {
                 return Err("Screenshot framebuffer is incomplete".into());
             }
         }
-        self.render(commands, 1920, 1080);
-        let result = self.screenshot(path, 1920, 1080);
+        self.render(commands, size.width, size.height);
+        let stats = self.stats.clone();
+        let result = self.screenshot(path, size.width, size.height);
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::DeleteFramebuffers(1, &framebuffer);
         }
-        result
+        result.map(|_| stats)
     }
 }
 
@@ -624,7 +853,11 @@ fn texture(width: u32, height: u32, pixels: &[u8]) -> Texture {
             0,
             gl::RGBA,
             gl::UNSIGNED_BYTE,
-            pixels.as_ptr().cast(),
+            if pixels.is_empty() {
+                std::ptr::null()
+            } else {
+                pixels.as_ptr().cast()
+            },
         );
     }
     Texture {
@@ -632,6 +865,24 @@ fn texture(width: u32, height: u32, pixels: &[u8]) -> Texture {
         width,
         height,
         frame: 0,
+    }
+}
+
+fn glyph_texture(size: usize) -> Texture {
+    // White RGB in transparent gutters prevents dark fringes under linear
+    // filtering. Only alpha encodes grayscale glyph coverage.
+    let pixels: Vec<u8> = [255, 255, 255, 0].repeat(size * size);
+    texture(size as u32, size as u32, &pixels)
+}
+
+fn gl_string(name: GLenum) -> String {
+    unsafe {
+        let value = gl::GetString(name);
+        if value.is_null() {
+            "unknown".into()
+        } else {
+            CStr::from_ptr(value.cast()).to_string_lossy().into_owned()
+        }
     }
 }
 

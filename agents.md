@@ -38,6 +38,10 @@ the ARMv7 soft-float target. The external webOS NDK is still required for TV cro
 Native preferences and app ID
 are separate from the web app. TV builds use the `webos` feature and must never fall back to demo
 inventory. Keep platform work off the SDL thread and pointer focus free of scrolling side effects.
+Native text uses drawable-aware grayscale glyphs; layout stays in 1920×1080 logical coordinates.
+`--capture-scale 2` exercises a separate 4K framebuffer. `--resolution 4k` is an experimental
+surface request; use `--diagnostics PATH` to distinguish actual drawable size from capture size.
+Use `--profile-frames N` for presentation pacing; `--frames N` counts event-loop iterations.
 
 ## Collecting app icons from a webOS TV
 

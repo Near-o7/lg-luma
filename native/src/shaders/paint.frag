@@ -1,10 +1,14 @@
 uniform sampler2D u_texture;
 uniform float u_aa;
-varying vec2 v_uv;
-varying vec4 v_color;
-varying vec4 v_shape;
-varying vec2 v_params;
+varying PAINT_PRECISION vec2 v_uv;
+varying PAINT_PRECISION vec4 v_color;
+varying PAINT_PRECISION vec4 v_shape;
+varying PAINT_PRECISION vec2 v_params;
 void main() {
+    if (v_params.x < 0.0) {
+        gl_FragColor = texture2D(u_texture, v_uv) * v_color;
+        return;
+    }
     float blur = max(-v_params.y, 0.0);
     vec2 half_size = v_shape.zw - vec2(blur);
     float radius = min(v_params.x, min(half_size.x, half_size.y));

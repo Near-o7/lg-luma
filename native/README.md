@@ -28,8 +28,10 @@ nix develop --command sh -c 'pnpm native:assets && pnpm native:dev'
 ```
 
 The preview opens a resizable 1280×720 window, letterboxing the same 1920×1080 layout used on TV.
-HiDPI framebuffer scaling and pointer coordinates are handled independently. `--fullscreen` opens
-a fullscreen preview. Rust changes use incremental compilation and a relaunch.
+HiDPI framebuffer scaling and pointer coordinates are handled independently. Fonts are rasterized
+at the drawable's physical density, with grayscale coverage antialiasing and pixel-aligned glyph
+origins/baselines; text layout and kerning stay in 1920×1080 logical coordinates. `--fullscreen`
+opens a fullscreen preview. Rust changes use incremental compilation and a relaunch.
 
 Assets are prepared under `.build/native/assets` from the existing wallpapers, SVG logos, collected
 app artwork and Inter font. The font is decompressed to TTF and the SVGs are rasterized at build
@@ -37,6 +39,58 @@ time. The variable font is instantiated at the web UI's weights and optical size
 cropping, saturation, shading and tile gradients are prepared ahead of time from the web design,
 and UI/input icons reuse the web components at build time. No asset downloads occur.
 Regenerate assets after changing their sources.
+
+### HiDPI and 4K
+
+Text density is automatic: a 20px logical label uses a 40px glyph bitmap on a 2× drawable. The
+glyph cache keys include physical raster size and use separate atlas pages, so resizing and
+switching capture density cannot reuse undersized bitmaps. Grayscale coverage is applied once;
+transparent white atlas gutters prevent dark filtering fringes. There is no RGB subpixel AA or
+MSAA dependency for text.
+
+Generate optional 3840×2160 wallpaper variants for higher-density surfaces:
+
+```sh
+pnpm native:assets --4k
+```
+
+The renderer selects these at densities above 1× when the GPU supports their texture size, and
+otherwise uses the 1080p assets. SVG backgrounds are rasterized at the higher resolution;
+photographic detail remains limited by the bundled source photographs. Regenerate and restart
+the preview after changing assets. Logos and UI icons already have oversized backing images.
+
+A 4K offscreen capture works independently of the desktop window's size:
+
+```sh
+pnpm native:dev --script 'home,down' --frames 90 \
+  --capture-scale 2 --screenshot .build/native/home-4k.png \
+  --diagnostics .build/native/render.json
+```
+
+`--capture-scale 1` is the default 1920×1080 comparison surface; `2` renders at 3840×2160 with
+fresh, density-appropriate glyphs. It does not enlarge a 1080p screenshot or force the TV's output.
+
+To request a larger actual window/surface and collect presentation timings:
+
+```sh
+pnpm native:dev --resolution 4k --profile-frames 180 \
+  --diagnostics .build/native/4k-profile.json
+```
+
+`--resolution` accepts `1080p`, `4k`, or `WIDTHxHEIGHT`. An explicit TV request uses a borderless
+window, rather than SDL's desktop-fullscreen flag that overrides requested dimensions. This is
+experimental on webOS: the compositor can constrain or rescale the surface. Package metadata
+still defaults to 1080p. Inspect `drawable`, `drawable_is_4k`, and `last_presented` in the JSON;
+`capture` describes the separate offscreen target. A 4K drawable alone does not prove 1:1 panel
+presentation. TV compositor behavior and hardware performance need on-device validation.
+
+Profiling forces redraws and measures swap-to-swap pacing after ten warmup presentations. Hidden
+window pauses and the final screenshot stall are excluded. `cpu_submission` includes CPU work and
+driver waits, not a GPU timestamp. The ordinary `--frames` option counts event-loop iterations and
+must not be interpreted as a frame-rate measurement. The report also includes GPU/texture limits,
+font density, glyph failures, atlas/image byte estimates and draw calls. Larger framebuffers have
+four times the pixel area at 2× density; compare the requested modes on the TV before choosing a
+default.
 
 ### Controls
 
@@ -74,8 +128,9 @@ nix develop --command sh -c 'pnpm native:check && pnpm native:smoke'
 `native:check` runs rustfmt, Clippy (including the webOS feature) and behavior tests.
 `native:smoke` needs a desktop display: it opens SDL windows, exercises navigation and persistence,
 and reads actual OpenGL framebuffers into `.build/native/*.png`. Captures use an offscreen
-1920×1080 framebuffer, independent of the desktop window's HiDPI scale. It also checks alpha
-compositing, nested settings, and real SDL pointer events. On Linux it can run under Xvfb
+1920×1080 framebuffer (or a separate 3840×2160 density check), independent of the desktop window's
+HiDPI scale. It also checks alpha compositing, nested settings, real SDL pointer events,
+density-appropriate glyph rasterization and forced presentation profiling. On Linux it can run under Xvfb
 with Mesa software rendering. It does not measure TV performance.
 The separate Native prototype GitHub workflow runs these checks on Linux and uploads its screenshots.
 
@@ -179,7 +234,10 @@ the bundled font currently covers Latin characters. The custom renderer batches 
 draws, caches glyphs and images, evicts old artwork above a 48 MiB image budget, and repaints only
 when the scene changes or the small pill/panel/wallpaper animations run. Reduced motion disables
 these transitions. Text is CPU-rasterized once per cached
-glyph; UI compositing uses the GPU. No TV frame-rate or memory advantage is claimed yet.
+glyph and physical raster size; UI compositing uses the GPU. Glyph atlases normally retain at most
+four 1024×1024 RGBA pages (16 MiB). A larger single-frame working set can temporarily require more;
+unused overflow pages are trimmed and pages referenced by queued text are never recycled.
+No TV frame-rate or memory advantage is claimed yet.
 
 ## Code map
 
@@ -187,6 +245,8 @@ glyph; UI compositing uses the GPU. No TV frame-rate or memory advantage is clai
 - `src/state.rs`: focus/navigation, page/modal state and effects.
 - `src/view.rs`: screen composition, draw commands and hit regions.
 - `src/renderer.rs`, `src/shaders/`: GPU painter, clipping, glyph atlas and artwork cache.
+- `src/raster.rs`: density, pixel alignment and atlas packing/recycling policy.
+- `src/diagnostics.rs`: warmup-aware presentation/CPU timing summaries.
 - `src/platform.rs`: asynchronous TV/desktop adapter and inventory validation.
 - `src/storage.rs`: preference persistence.
 - `src/main.rs`: SDL lifecycle, input capture, hold detection and frame scheduling.

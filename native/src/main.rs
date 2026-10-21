@@ -1,5 +1,7 @@
+mod diagnostics;
 mod model;
 mod platform;
+mod raster;
 mod renderer;
 mod state;
 mod storage;
@@ -9,6 +11,7 @@ mod view;
 mod tests;
 
 use platform::{Platform, Request, Response};
+use raster::Size;
 use sdl2::{
     event::{Event, WindowEvent},
     keyboard::Keycode,
@@ -33,6 +36,10 @@ struct Options {
     script: VecDeque<String>,
     fullscreen: bool,
     time: Option<OffsetDateTime>,
+    resolution: Option<Size>,
+    capture_size: Option<Size>,
+    diagnostics: Option<PathBuf>,
+    profile_frames: Option<usize>,
 }
 
 impl Options {
@@ -42,7 +49,7 @@ impl Options {
         while let Some(arg) = args.next() {
             if arg == "--help" {
                 println!(
-                    "Luma native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --frames N          Exit after N event-loop frames\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/click:X:Y/wait\n  --time RFC3339      Fix the preview's clock and date\n  --screenshot PATH   Save a 1920x1080 PNG\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
+                    "Luma native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --resolution SIZE   Request 1080p, 4k, or WIDTHxHEIGHT; verify actual drawable\n  --frames N          Exit after N event-loop frames\n  --profile-frames N  Force N presentations (20+) and report pacing after warmup\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/click:X:Y/wait\n  --time RFC3339      Fix the preview's clock and date\n  --screenshot PATH   Save an offscreen PNG\n  --capture-scale N   Capture at 1x/1080p (default) or 2x/4k\n  --diagnostics PATH  Save actual drawable, GPU, font-cache and timing information\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
                 );
                 std::process::exit(0);
             }
@@ -58,6 +65,24 @@ impl Options {
                 "--preferences" => result.preferences = Some(value.into()),
                 "--screenshot" => result.screenshot = Some(value.into()),
                 "--dump-state" => result.dump = Some(value.into()),
+                "--resolution" => result.resolution = Some(value.parse()?),
+                "--capture-scale" => {
+                    result.capture_size = Some(match value.as_str() {
+                        "1" => Size::HD,
+                        "2" => Size::UHD,
+                        _ => return Err("--capture-scale must be 1 or 2".into()),
+                    })
+                }
+                "--diagnostics" => result.diagnostics = Some(value.into()),
+                "--profile-frames" => {
+                    result.profile_frames = Some(
+                        value
+                            .parse::<usize>()
+                            .ok()
+                            .filter(|n| (20..=1000000).contains(n))
+                            .ok_or("--profile-frames must be between 20 and 1000000")?,
+                    )
+                }
                 "--time" => {
                     result.time = Some(
                         OffsetDateTime::parse(
@@ -80,7 +105,8 @@ impl Options {
                 _ => return Err(format!("Unknown option: {arg}")),
             }
         }
-        if result.screenshot.is_some() && result.frames.is_none() {
+        if result.screenshot.is_some() && result.frames.is_none() && result.profile_frames.is_none()
+        {
             result.frames = Some(90);
         }
         Ok(result)
@@ -93,6 +119,8 @@ struct Press {
     held: bool,
     pointer: bool,
 }
+
+const SCRIPT_POINTER: u32 = u32::MAX - 1;
 
 fn effects(
     effects: Vec<Effect>,
@@ -226,7 +254,7 @@ fn scripted_click(
         Event::MouseButtonDown {
             timestamp: 0,
             window_id: window.id(),
-            which: 0,
+            which: SCRIPT_POINTER,
             mouse_btn: MouseButton::Left,
             clicks: 1,
             x,
@@ -235,7 +263,7 @@ fn scripted_click(
         Event::MouseButtonUp {
             timestamp: 0,
             window_id: window.id(),
-            which: 0,
+            which: SCRIPT_POINTER,
             mouse_btn: MouseButton::Left,
             clicks: 1,
             x,
@@ -294,14 +322,19 @@ fn run() -> Result<(), String> {
     }
     attributes.set_double_buffer(true);
     attributes.set_alpha_size(8);
-    let mut builder = video.window(
-        "Luma Native",
-        if webos { 1920 } else { 1280 },
-        if webos { 1080 } else { 720 },
-    );
+    let requested = options.resolution.unwrap_or(if webos {
+        Size::HD
+    } else {
+        Size::new(1280, 720)
+    });
+    let mut builder = video.window("Luma Native", requested.width, requested.height);
     builder.opengl().allow_highdpi().position_centered();
-    if webos || options.fullscreen {
+    if options.fullscreen || (webos && options.resolution.is_none()) {
         builder.fullscreen_desktop();
+    } else if webos {
+        // fullscreen_desktop overrides the requested dimensions. An explicit
+        // experimental TV size asks for a borderless surface instead.
+        builder.borderless();
     } else {
         builder.resizable();
     }
@@ -312,6 +345,10 @@ fn run() -> Result<(), String> {
         eprintln!("VSync: {error}");
     }
     let mut renderer = renderer::Renderer::new(&assets.root.join("font.ttf"), webos)?;
+    let mut profile = diagnostics::Profile::default();
+    let mut presented = 0usize;
+    let mut captured = None;
+    let mut last_drawable = None;
     let mut events = sdl.event_pump()?;
     let mut press: Option<Press> = None;
     let mut pill = view::pill_target(0);
@@ -324,6 +361,7 @@ fn run() -> Result<(), String> {
     let mut queued_event = None;
     let mut text_active = false;
     let mut initial_focus = options.script.is_empty();
+    let scripted_input = !options.script.is_empty();
     let mut scene = compose(
         &mut state,
         &assets,
@@ -378,6 +416,16 @@ fn run() -> Result<(), String> {
             scene = compose(&mut state, &assets, pill, pill_width, now);
         }
         for event in queued_event.take().into_iter().chain(events.poll_iter()) {
+            // Window-entry pointer events can arrive after a slow first upload.
+            // Bounded scripted captures own input until their final frame; only
+            // their explicitly injected SDL clicks may alter pointer focus.
+            let script_owns_input = scripted_input && (options.frames.is_some() || options.profile_frames.is_some() || !options.script.is_empty());
+            let external_input = match &event {
+                Event::MouseButtonDown { which, .. } | Event::MouseButtonUp { which, .. } => *which != SCRIPT_POINTER,
+                Event::MouseMotion { .. } | Event::MouseWheel { .. } | Event::KeyDown { .. } | Event::KeyUp { .. } | Event::TextInput { .. } => true,
+                _ => false,
+            };
+            if script_owns_input && external_input { continue; }
             let mut pending = vec![];
             match event {
                 Event::Quit { .. } => running = false,
@@ -385,6 +433,7 @@ fn run() -> Result<(), String> {
                     WindowEvent::Hidden | WindowEvent::Minimized => {
                         visible = false;
                         press = None;
+                        profile.pause();
                     }
                     WindowEvent::FocusLost => press = None,
                     WindowEvent::Shown | WindowEvent::Restored | WindowEvent::FocusGained => {
@@ -583,16 +632,45 @@ fn run() -> Result<(), String> {
             pill_width += (target_width - pill_width) * (1. - (-20. * dt).exp());
             state.dirty = true;
         }
-        let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit);
-        if (state.dirty && visible) || final_frame {
+        let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
+            || (visible
+                && options
+                    .profile_frames
+                    .is_some_and(|limit| presented + 1 >= limit));
+        if ((state.dirty || options.profile_frames.is_some()) && visible) || final_frame {
             scene = compose(&mut state, &assets, pill, pill_width, now);
             let (width, height) = window.drawable_size();
             if width > 0 && height > 0 {
                 if final_frame && let Some(path) = &options.screenshot {
-                    renderer.capture(&scene.draw, path)?;
+                    captured = Some(renderer.capture(
+                        &scene.draw,
+                        path,
+                        options.capture_size.unwrap_or(Size::HD),
+                    )?);
                 }
                 renderer.render(&scene.draw, width, height);
                 window.gl_swap_window();
+                presented += 1;
+                if options.profile_frames.is_some() {
+                    profile.record(
+                        Instant::now(),
+                        renderer.stats().cpu_submission_ms,
+                        final_frame && options.screenshot.is_some(),
+                    );
+                }
+                let drawable = Size::new(width, height);
+                if last_drawable != Some(drawable) {
+                    if options.diagnostics.is_some() || options.resolution.is_some() {
+                        eprintln!(
+                            "Luma drawable: {}x{}, density {:.3}x, 4K buffer: {}",
+                            width,
+                            height,
+                            drawable.scale(),
+                            drawable.is_4k()
+                        );
+                    }
+                    last_drawable = Some(drawable);
+                }
             }
             state.dirty = false;
         }
@@ -604,7 +682,11 @@ fn run() -> Result<(), String> {
         // VSync paces animation; holds and scripted checks need short timed wakes.
         let timeout = if !visible {
             250
-        } else if pill != target || pill_width != target_width || state.animating() {
+        } else if pill != target
+            || pill_width != target_width
+            || state.animating()
+            || options.profile_frames.is_some()
+        {
             0
         } else if press.is_some() || options.frames.is_some() {
             8
@@ -623,6 +705,22 @@ fn run() -> Result<(), String> {
         std::fs::write(
             path,
             serde_json::to_vec_pretty(&state).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(path) = options.diagnostics {
+        let (width, height) = window.size();
+        let (dw, dh) = window.drawable_size();
+        let report = serde_json::json!({
+            "logical_layout": Size::HD, "requested_window": requested,
+            "window": Size::new(width, height), "drawable": Size::new(dw, dh),
+            "drawable_is_4k": Size::new(dw, dh).is_4k(), "presented_frames": presented,
+            "graphics": renderer.info, "last_presented": renderer.stats(), "capture": captured,
+            "profile": options.profile_frames.map(|_| profile.summary()),
+        });
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
     }
