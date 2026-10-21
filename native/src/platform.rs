@@ -1,15 +1,9 @@
 //! Blocking platform work runs on one worker, never in the SDL/UI thread.
-//! The prototype uses webOS's installed Luna CLI with the app's caller identity.
+//! TV calls originate from this native executable's LS2 connection, not a CLI
+//! process trying to impersonate its application identity.
 use crate::model::{App, Input, Inventory, demo_inventory, valid_app_id};
 use serde_json::{Value, json};
-use std::{
-    collections::HashSet,
-    io::Read,
-    process::{Command, Stdio},
-    sync::mpsc,
-    thread,
-    time::{Duration, Instant},
-};
+use std::{collections::HashSet, sync::mpsc, thread};
 
 pub const APP_ID: &str = "com.luma.launcher.native";
 pub enum Request {
@@ -71,69 +65,18 @@ impl Platform {
 }
 
 fn call(uri: &str, payload: Value) -> Result<Value, String> {
-    let mut child = Command::new("/usr/bin/luna-send-pub")
-        .args([
-            "-a",
-            APP_ID,
-            "-n",
-            "1",
-            "-w",
-            "6500",
-            uri,
-            &payload.to_string(),
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("Luna service bridge unavailable: {e}"))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("Luna response stream unavailable")?;
-    // Drain concurrently so an inventory larger than a pipe buffer cannot deadlock.
-    let reader = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        stdout
-            .take(2 * 1024 * 1024 + 1)
-            .read_to_end(&mut bytes)
-            .map(|_| bytes)
-    });
-    let start = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                let bytes = reader
-                    .join()
-                    .map_err(|_| "Luna reader failed")?
-                    .map_err(|e| e.to_string())?;
-                if !status.success() {
-                    return Err("The TV denied the Luna request".into());
-                }
-                if bytes.len() > 2 * 1024 * 1024 {
-                    return Err("TV response is too large".into());
-                }
-                // -t variants may append timing text; only a complete JSON line is accepted.
-                let value = String::from_utf8_lossy(&bytes)
-                    .lines()
-                    .find_map(|line| serde_json::from_str::<Value>(line).ok())
-                    .ok_or("The TV returned an unreadable response")?;
-                return checked_response(value);
-            }
-            Ok(None) if start.elapsed() < Duration::from_secs(8) => {
-                thread::sleep(Duration::from_millis(10))
-            }
-            result => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let _ = reader.join();
-                return Err(match result {
-                    Err(e) => e.to_string(),
-                    _ => "The TV service timed out".into(),
-                });
-            }
-        }
-    }
+    #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+    let response = crate::luna::call(uri, &payload);
+    #[cfg(not(all(feature = "webos", target_os = "linux", target_arch = "arm")))]
+    let response: Result<Value, String> = {
+        let _ = payload;
+        Err("Native Luna services are only available in an ARM webOS build".into())
+    };
+    response.and_then(checked_response).map_err(|error| {
+        let error = format!("{uri}: {error}");
+        eprintln!("Luma TV service: {error}");
+        error
+    })
 }
 
 fn checked_response(value: Value) -> Result<Value, String> {

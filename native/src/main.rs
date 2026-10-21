@@ -1,5 +1,7 @@
 mod diagnostics;
 mod i18n;
+#[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+mod luna;
 mod model;
 mod platform;
 mod raster;

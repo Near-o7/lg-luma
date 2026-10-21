@@ -247,10 +247,18 @@ Only builds compiled with `--features webos` use TV services; a desktop build re
 TV. Inventory never falls back to demo data in a TV build. One worker handles blocking platform
 requests, leaving input and rendering on the SDL thread. Refreshes and launches are deduplicated.
 
-The initial adapter invokes `/usr/bin/luna-send-pub -a com.luma.launcher.native` for app-identity
-Luna calls. App launches use the application manager. Fixed inventory commands go through
-Homebrew Channel's elevated `exec`, following the web launcher's permission model. Requests have
-bounded response sizes and timeouts. Input-read failures retain the last good inputs. The manifest
+The adapter registers a native LS2 connection from the installed executable and sends requests
+with `LSCallOneReply`. It does not use `luna-send-pub -a`: that invokes `LSCallFromApplication`,
+which requires a separate impersonation privilege and was rejected on webOS 26 even from a root
+SSH shell. Connections use anonymous service names to avoid colliding with SDL's registration;
+the hub still authenticates the native executable and applies its installed role/permissions.
+Each request uses a private GLib context on the platform worker, a 6.5-second response budget,
+and a 2 MiB reply limit. Cancellation and unregistration preserve callback storage until it can
+no longer be used. Errors include the service URI and the bus's actual refusal.
+
+App launches use the application manager. Fixed inventory commands still go through Homebrew
+Channel's elevated `exec`, following the web launcher's permission model. Input-read failures
+retain the last good inputs. The manifest
 declares `application.launcher`, `application.query` and `lunabus.query`; Homebrew Channel must
 provide that permission mapping for the native app ID too.
 
@@ -276,8 +284,8 @@ backend. An SSH shell can differ from the application manager's environment.
 **Hardware status:** desktop rendering/state checks and ARM cross-linking/IPK creation have passed
 on Apple Silicon macOS with the SDK above. Native caller permissions, the TV SDL/Wayland backend,
 Magic Remote key mapping, app switching and relaunch behavior still require verification on the
-actual TV. The CLI adapter can later be
-replaced behind `platform.rs` with direct LS2 integration if the native sandbox requires it.
+actual TV. In particular, the native LS2 caller must be checked under a normal application-manager
+launch, because a root SSH invocation is not the app's normal sandbox/caller context.
 
 ## Weather and language
 
@@ -334,6 +342,7 @@ No TV frame-rate or memory advantage is claimed yet.
 - `src/raster.rs`: density, pixel alignment and atlas packing/recycling policy.
 - `src/diagnostics.rs`: warmup-aware presentation/CPU timing summaries.
 - `src/platform.rs`: asynchronous TV/desktop adapter and inventory validation.
+- `src/luna.rs`: native LS2 registration, bounded requests and private GLib dispatch on the TV worker.
 - `src/i18n.rs`, `../src/messages.json`: shared translations and native locale formatting.
 - `src/weather.rs`, `src/weather-service.rs`: validated weather state, HTTPS workers and cache.
 - `src/storage.rs`: preference persistence.
