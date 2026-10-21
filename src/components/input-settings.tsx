@@ -1,5 +1,6 @@
 import { Check, ChevronRight, RefreshCw } from 'lucide-react';
 import { ConnectionIcon } from './connection-icon';
+import { InputStatus } from './input-status';
 import { getInputVisibility, inputVisibilityModes } from '../inputs';
 import { useTranslation } from '../i18n';
 import type { InputVisibility, Preferences, TVInput } from '../types';
@@ -59,16 +60,9 @@ export function InputSettings({
             >
               <ConnectionIcon input={input} />
               <span>
-                <strong>{input.title}</strong>
+                <strong>{input.port}</strong>
                 <small>
-                  {input.port} ·{' '}
-                  {t(
-                    input.connected === true
-                      ? 'connected'
-                      : input.connected === false
-                        ? 'noDevice'
-                        : 'externalInput',
-                  )}
+                  <InputStatus input={input} />
                 </small>
               </span>
               <span className="setting-value">
@@ -115,7 +109,7 @@ export function InputVisibilitySettings({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="settings-subpage-options" role="listbox" aria-label={input.title}>
+    <div className="settings-subpage-options" role="listbox" aria-label={input.port}>
       {inputVisibilityModes.map((mode, index) => (
         <button
           key={mode}

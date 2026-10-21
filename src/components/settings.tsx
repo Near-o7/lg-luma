@@ -66,7 +66,7 @@ export function Settings({
   const selectedInput = inputs.find((input) => input.id === selectedInputId);
   const subpageTitle =
     subpage === 'input-visibility'
-      ? (selectedInput?.title ?? t('inputs'))
+      ? (selectedInput?.port ?? t('inputs'))
       : subpage
         ? t(subpageTitles[subpage])
         : '';
