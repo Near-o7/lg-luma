@@ -29,7 +29,10 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   });
   await page.goto('/');
   expect(forecasts).toBe(0);
-  await page.getByRole('button', { name: 'Set weather location', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await page.locator('[data-focusable="setting-weather-location"]').focus();
+  await page.keyboard.press('ArrowRight');
   await page.getByRole('searchbox', { name: 'City or postcode' }).fill('Vienna');
   await page.getByRole('button', { name: 'Search locations', exact: true }).click();
   await page.locator('.location-results button').click();
@@ -51,6 +54,8 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   await expect(page.getByRole('button', { name: 'Open Netflix', exact: true })).toBeFocused();
   expect(forecasts).toBe(1);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await page.locator('[data-focusable="setting-weather-location"]').press('ArrowRight');
   const clearLocation = page.getByRole('button', { name: 'Remove weather location' });
   await clearLocation.focus();
   await page.keyboard.press('ArrowRight');
@@ -73,13 +78,10 @@ test('choose a city, show its weather, reuse cached data, and disable weather', 
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Search locations', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(
-    page.getByRole('button', { name: 'Set weather location', exact: true }),
-  ).toBeVisible();
+  await expect(page.locator('[data-focusable="setting-weather-location"]')).toBeFocused();
+  await expect(page.locator('[data-focusable="setting-weather-location"]')).toContainText('Vienna');
   await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'Set weather location', exact: true }),
-  ).toBeVisible();
+  await expect(page.locator('[data-focusable="setting-weather-location"]')).toBeFocused();
   expect(forecasts).toBe(1);
 });
 
@@ -104,23 +106,19 @@ test('temperature units persist, work with the remote, and convert cached readin
   await page.goto('/');
   await expect(page.locator('.weather-temperature')).toHaveText('14°C');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const celsius = page.getByRole('button', { name: 'Celsius', exact: true });
-  const fahrenheit = page.getByRole('button', { name: 'Fahrenheit', exact: true });
-  await expect(celsius).toHaveAttribute('aria-pressed', 'true');
-  const visibility = page.getByRole('switch', { name: 'Show widget', exact: true });
-  await visibility.focus();
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await page.locator('[data-focusable="setting-temperature"]').press('ArrowRight');
+  const celsius = page.locator('[data-focusable="temperature-option-celsius"]');
+  const fahrenheit = page.locator('[data-focusable="temperature-option-fahrenheit"]');
+  await expect(celsius).toHaveAttribute('aria-selected', 'true');
+  await celsius.focus();
   await page.keyboard.press('ArrowDown');
-  await expect(celsius).toBeFocused();
-  await page.keyboard.press('ArrowRight');
   await expect(fahrenheit).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(fahrenheit).toHaveAttribute('aria-pressed', 'true');
-  await expect(celsius).toHaveAttribute('aria-pressed', 'false');
-  await page.keyboard.press('ArrowUp');
-  await expect(visibility).toBeFocused();
-  await page.keyboard.press('ArrowDown');
-  await expect(fahrenheit).toBeFocused();
+  await expect(fahrenheit).toHaveAttribute('aria-selected', 'true');
+  await expect(celsius).toHaveAttribute('aria-selected', 'false');
   await page.keyboard.press('Escape');
+  await expect(page.locator('[data-focusable="setting-temperature"]')).toBeFocused();
   await expect(page.locator('.weather-temperature')).toHaveText('58°F');
   await page.reload();
   await expect(page.locator('.weather-temperature')).toHaveText('58°F');
@@ -128,7 +126,8 @@ test('temperature units persist, work with the remote, and convert cached readin
   await expect(page.locator('.ambient-hint .weather-temperature')).toHaveText('58°F');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(fahrenheit).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await expect(fahrenheit).toHaveAttribute('aria-selected', 'true');
   await fahrenheit.focus();
   await page.keyboard.press('ArrowLeft');
   await expect(celsius).toBeFocused();
@@ -196,6 +195,12 @@ test('location search handles no matches and can be retried', async ({ page }) =
   });
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await page.locator('[data-focusable="setting-temperature"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.locator('[data-focusable="temperature-option-celsius"]').focus();
+  await page.keyboard.press('Escape');
+  await page.locator('[data-focusable="setting-weather-location"]').press('ArrowRight');
   await page.getByRole('searchbox', { name: 'City or postcode' }).fill('xx');
   await page.getByRole('button', { name: 'Search locations', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('No locations found');
@@ -224,13 +229,10 @@ test('weather visibility preserves the city and prevents requests when the widge
   await expect(page.locator('.weather-summary')).toHaveCount(0);
   expect(requests).toBe(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const interfaceHeading = await page
-    .getByRole('heading', { name: 'Interface', exact: true })
-    .boundingBox();
-  const weatherHeading = await page
-    .getByRole('heading', { name: 'Weather', exact: true })
-    .boundingBox();
-  expect(interfaceHeading!.y).toBeLessThan(weatherHeading!.y);
+  await expect(page.locator('.settings-sidebar')).toContainText('Interface');
+  await expect(page.getByRole('switch', { name: 'Show widget', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await expect(page.getByRole('switch', { name: /Show widget/ })).toBeVisible();
   const toggle = page.getByRole('switch', { name: 'Show widget', exact: true });
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.saved-location')).toContainText('Vienna');
@@ -239,6 +241,7 @@ test('weather visibility preserves the city and prevents requests when the widge
   await expect(page.locator('.weather-summary')).toContainText('12°C');
   expect(requests).toBe(1);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
   await toggle.click();
   await page.keyboard.press('Escape');
   await page.reload();
@@ -254,6 +257,8 @@ test('Back exits city editing before leaving Settings, including the TV Back key
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Weather', exact: true }).click();
+  await page.locator('[data-focusable="setting-weather-location"]').press('ArrowRight');
   const field = page.getByRole('searchbox', { name: 'City or postcode' });
   const search = page.getByRole('button', { name: 'Search locations', exact: true });
   await field.fill('Berlin');

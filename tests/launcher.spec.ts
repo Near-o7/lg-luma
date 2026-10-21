@@ -73,7 +73,7 @@ test('hold OK opens options, favorites persist and hidden apps can be restored',
   await expect(netflix).toBeVisible();
 });
 
-test('full-page settings support remote navigation, Back, and persistent preferences', async ({
+test('Settings sidebar and content support remote navigation and persistent preferences', async ({
   page,
 }, info) => {
   await page.goto('/');
@@ -82,33 +82,44 @@ test('full-page settings support remote navigation, Back, and persistent prefere
   await expect(page.getByRole('region', { name: 'Luma settings', exact: true })).toBeVisible();
   await expect(settings).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.locator('[data-focusable="settings-section-interface"]').focus();
+  await expect(page.getByRole('button', { name: 'Interface', exact: true })).toBeFocused();
+  await expect(page.locator('.settings-sidebar')).toContainText('Interface');
   await page.keyboard.press('ArrowDown');
+  await expect(page.locator('[data-focusable="settings-section-background"]')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('[data-focusable="setting-home-app-names"]')).toBeFocused();
+  await page.locator('[data-focusable="settings-section-background"]').click();
+  await expect(page.locator('[data-focusable="wallpaper-dunes"]')).toBeVisible();
+  await page.locator('[data-focusable="settings-section-weather"]').click();
+  await expect(page.locator('[data-focusable="setting-show-weather"]')).toBeVisible();
+  await expect(page.getByRole('switch', { name: /Show widget/ })).toBeVisible();
+  await page.locator('[data-focusable="settings-section-interface"]').click();
+  await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('[data-focusable="setting-home-app-names"]')).toBeFocused();
+  await page.locator('[data-focusable="setting-home-app-names"]').focus();
+  await page.keyboard.press('ArrowDown');
+  await page.locator('[data-focusable="setting-clock-format"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('[data-focusable="clock-format-option-12"]')).toBeFocused();
+  await page.locator('[data-focusable="clock-format-option-24"]').click();
+  await expect(page.locator('[data-focusable="setting-clock-format"]')).toContainText('24-hour');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('[data-focusable="settings-section-weather"]')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('[data-focusable="settings-section-interface"]')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
   await expect(
     page.getByRole('switch', { name: 'Show app names on Home', exact: true }),
   ).toBeFocused();
-  await page.keyboard.press('ArrowUp');
-  await expect(settings).toBeFocused();
-  for (const id of [
-    'setting-home-app-names',
-    'setting-clock',
-    'setting-motion',
-    'setting-language',
-  ]) {
-    await page.keyboard.press('ArrowDown');
-    await expect(page.locator(':focus')).toHaveAttribute('data-focusable', id);
-  }
-  await page.keyboard.press('ArrowDown');
-  await expect(page.locator('[data-focusable="language-option-en"]')).toBeFocused();
-  await page.keyboard.press('Escape');
-  await page.locator('[data-focusable="setting-refresh"]').focus();
-  await page.keyboard.press('ArrowUp');
-  await expect(page.locator(':focus')).toHaveAttribute('data-focusable', 'setting-language');
-  await page.locator('[data-focusable="setting-refresh"]').focus();
-  await expect(page.locator(':focus')).toHaveAttribute('data-focusable', 'setting-refresh');
-  await page.keyboard.press('ArrowDown');
-  await expect(page.locator(':focus')).toHaveAttribute('data-focusable', 'setting-show-weather');
   await page.getByRole('button', { name: 'Summit', exact: true }).click();
-  await page.getByRole('switch', { name: '24-hour clock', exact: false }).click();
+  await page.locator('[data-focusable="setting-clock-format"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.locator('[data-focusable="clock-format-option-24"]').click();
   await page.getByRole('switch', { name: 'Reduced motion', exact: false }).click();
   await page.screenshot({ path: info.outputPath('luma-settings.png') });
   await page.keyboard.press('Escape');
@@ -119,13 +130,13 @@ test('full-page settings support remote navigation, Back, and persistent prefere
   await expect(page.locator('.luma')).toHaveClass(/reduce-motion/);
 });
 
-test('display language menu supports vertical remote navigation and persists', async ({ page }) => {
+test('nested language menu supports remote navigation and persists', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const trigger = page.getByRole('button', { name: 'Display language: English' });
+  await page.getByRole('button', { name: 'Interface', exact: true }).click();
+  const trigger = page.getByRole('button', { name: /Display language/ });
   await expect(trigger).toBeVisible();
-  await trigger.focus();
-  await page.keyboard.press('ArrowDown');
+  await trigger.press('ArrowRight');
   await expect(page.locator('[data-focusable="language-option-en"]')).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('[data-focusable="language-option-de"]')).toBeFocused();
@@ -133,12 +144,12 @@ test('display language menu supports vertical remote navigation and persists', a
   await expect(page.locator('html')).toHaveAttribute('lang', 'de-DE');
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Luma-Einstellungen', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Oberfläche', exact: true })).toBeVisible();
+  await expect(page.locator('.settings-sidebar')).toContainText('Oberfläche');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click();
-  await page.getByRole('button', { name: 'Anzeigesprache: Deutsch' }).focus();
-  await page.keyboard.press('ArrowDown');
+  await page.getByRole('button', { name: 'Oberfläche', exact: true }).click();
+  await page.getByRole('button', { name: /Anzeigesprache/ }).press('ArrowRight');
   await expect(page.locator('[data-focusable="language-option-de"]')).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
@@ -152,6 +163,9 @@ test('Interface D-pad moves down to the language selector and up from refresh', 
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Interface', exact: true }).click();
+  await page.locator('[data-focusable="settings-section-interface"]').focus();
+  await page.keyboard.press('ArrowRight');
   await page.locator('[data-focusable="setting-motion"]').focus();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('[data-focusable="setting-language"]')).toBeFocused();
@@ -165,11 +179,13 @@ test('Settings panels fit within the content width at desktop and compact sizes'
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  for (const width of [1920, 1280, 1024, 768]) {
+  for (const width of [1920, 1280, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     const overflow = await page.evaluate(() => {
       const main = document.querySelector('main')!;
-      const panels = [...document.querySelectorAll<HTMLElement>('.settings-layout > *')];
+      const panels = [
+        ...document.querySelectorAll<HTMLElement>('.settings-sidebar, .settings-pane'),
+      ];
       const mainBox = main.getBoundingClientRect();
       return {
         documentOverflow: document.documentElement.scrollWidth > window.innerWidth,
@@ -182,6 +198,27 @@ test('Settings panels fit within the content width at desktop and compact sizes'
     expect(overflow.documentOverflow).toBe(false);
     expect(overflow.panelOutside).toBe(false);
   }
+});
+
+test('Settings sidebar uses plain labels and an Apple TV-style focus highlight', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const interfaceSection = page.getByRole('button', { name: 'Interface', exact: true });
+  await expect(page.locator('.settings-sidebar-index')).toHaveCount(0);
+  await expect(interfaceSection).toBeFocused();
+  const focusStyle = await interfaceSection.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      radius: style.borderRadius,
+      outline: style.outlineStyle,
+    };
+  });
+  expect(focusStyle.background).not.toBe('rgba(0, 0, 0, 0)');
+  expect(focusStyle.radius).not.toBe('0px');
+  expect(focusStyle.outline).toBe('none');
 });
 
 test('search, category filtering, empty results and Back work', async ({ page }) => {
@@ -246,8 +283,21 @@ test('the packaged file app loads offline with CSP, local fonts, no module fetch
       }),
     ),
   );
-  expect(thumbnails).toHaveLength(9);
-  const photos = thumbnails.filter((image) => image.src.endsWith('.jpg'));
+  expect(thumbnails).toHaveLength(0);
+  await page.getByRole('button', { name: 'Background', exact: true }).click();
+  const backgroundThumbnails = await page
+    .locator('.wallpaper-thumbnail > img')
+    .evaluateAll((nodes) =>
+      Promise.all(
+        nodes.map(async (node) => {
+          const image = node as HTMLImageElement;
+          await image.decode();
+          return { src: image.src, width: image.naturalWidth, height: image.naturalHeight };
+        }),
+      ),
+    );
+  expect(backgroundThumbnails).toHaveLength(9);
+  const photos = backgroundThumbnails.filter((image) => image.src.endsWith('.jpg'));
   expect(photos).toHaveLength(6);
   for (const photo of photos) {
     expect(photo.src).toContain('/wallpaper-thumbnails/');

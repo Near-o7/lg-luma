@@ -1,41 +1,246 @@
 .settings-page {
   position: relative;
-  padding-top: 3.5rem;
+  padding-top: 2.5rem;
   padding-bottom: 2.2rem;
 }
 .settings-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
-  gap: clamp(1rem, 2vw, 2.25rem);
-  align-items: start;
+  grid-template-columns: minmax(13rem, 0.72fr) minmax(0, 2fr);
+  gap: clamp(1.25rem, 3vw, 3rem);
+  align-items: stretch;
+  min-height: min(62vh, 42rem);
 }
-.settings-layout > * {
+.settings-sidebar,
+.settings-pane {
   min-width: 0;
 }
-.settings-panel {
-  min-width: 0;
-  padding: 1.6rem;
-  background: linear-gradient(140deg, #20262cd6, #181e25d9);
-  border: 1px solid #ffffff14;
-  border-radius: 1.2rem;
-}
-.settings-controls {
+.settings-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  min-width: 0;
-  width: 100%;
+  gap: 0.65rem;
+  padding: 0.55rem 0;
+  background: transparent;
 }
-.settings-controls > .settings-panel {
-  min-width: 0;
+.settings-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
   width: 100%;
+  min-height: 4.6rem;
+  padding: 0.85rem 1.15rem;
+  border-radius: 2.4rem;
+  color: #f4f4f5d1;
+  text-align: left;
+  transition:
+    background-color 100ms ease,
+    color 100ms ease,
+    transform 100ms ease;
+  background: #252a30d9;
+  box-shadow: inset 0 0 0 1px #ffffff0a;
+}
+.settings-sidebar-item:hover:not(:focus-visible) {
+  background: #30363d;
+}
+.settings-sidebar-item:focus,
+.settings-sidebar-item:focus-visible {
+  outline: none;
+  background: #f4f4f5;
+  color: #18191b;
+  transform: scale(1.015);
+  box-shadow: 0 3px 12px #0005;
+}
+.settings-sidebar-item.selected:not(:focus-visible) {
+  background: #292e34d9;
+  color: #f4f4f5d1;
+  box-shadow: inset 0 0 0 1px #ffffff0b;
+  transform: none;
+}
+.settings-sidebar-item > span {
+  min-width: 0;
+  flex: 1;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+.settings-sidebar-item > svg {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  color: #e8e9eb69;
+}
+.settings-sidebar-item:focus-visible > svg {
+  color: #18191b99;
+}
+.settings-pane {
+  min-width: 0;
+  padding: 0.9rem 0 1rem 1rem;
+}
+.settings-content {
+  min-width: 0;
+  max-width: 62rem;
+}
+.settings-content > .settings-group {
+  margin-bottom: 1.2rem;
+}
+.settings-content > .settings-group + .settings-group {
+  margin-top: 1rem;
+}
+.settings-list-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 4.6rem;
+  padding: 0.8rem 1.25rem;
+  border-radius: 2.6rem;
+  color: #f3f3f4e8;
+  background: #343b42e0;
+  box-shadow: inset 0 0 0 1px #ffffff0b;
+  text-align: left;
+  transition:
+    background-color 100ms ease,
+    color 100ms ease,
+    transform 100ms ease;
+}
+.settings-list-item:hover:not(:focus-visible) {
+  background: #414950;
+}
+.settings-list-item:focus,
+.settings-list-item:focus-visible,
+.settings-list-item[aria-selected='true']:not(:focus-visible) {
+  outline: none;
+  color: #18191b;
+  background: #f4f4f5;
+  transform: scale(1.01);
+  box-shadow: 0 3px 12px #0005;
+}
+.settings-list-item[aria-selected='true']:focus-visible {
+  background: #f4f4f5;
+}
+.settings-list-item > svg {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #e8e9eb84;
+}
+.settings-list-item > svg:last-child {
+  width: 1.65rem;
+  height: 1.65rem;
+  stroke-width: 1.6;
+  margin-left: 0.15rem;
+}
+.settings-list-item:focus > svg,
+.settings-list-item:focus-visible > svg,
+.settings-list-item[aria-selected='true']:not(:focus-visible) > svg {
+  color: #34363a;
+}
+.settings-list-item > span {
+  flex: 1;
+  min-width: 0;
+}
+.settings-list-item > .setting-value {
+  flex: 0 0 auto;
+  color: #eceef080;
+  font-size: 0.96rem;
+  text-align: right;
+}
+.settings-list-item:focus > .setting-value,
+.settings-list-item:focus-visible > .setting-value {
+  color: #35373caa;
+}
+.settings-list-item:focus > .setting-value,
+.settings-list-item:focus-visible > .setting-value {
+  color: #33353a9c;
+}
+.settings-list-item strong {
+  display: block;
+  font-size: 1.02rem;
+  font-weight: 500;
+}
+.settings-list-item small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #e8e9eb8c;
+  font-size: 0.83rem;
+}
+.settings-list-item:focus small,
+.settings-list-item:focus-visible small,
+.settings-list-item[aria-selected='true']:not(:focus-visible) small {
+  color: #414348b0;
+}
+.settings-subpage {
+  min-width: 0;
+  animation: settings-subpage-in 170ms ease-out both;
+}
+.settings-subpage-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.8rem;
+  margin-bottom: 1.4rem;
+  padding: 0.6rem 1rem;
+  border-radius: 2rem;
+  color: #eeeeeea8;
+  background: #343b42d9;
+}
+.settings-subpage-back:focus,
+.settings-subpage-back:focus-visible {
+  outline: none;
+  background: #f4f4f5;
+  color: #18191b;
+  box-shadow: 0 3px 12px #0005;
+}
+.settings-subpage-back:focus svg,
+.settings-subpage-back:focus-visible svg {
+  color: #34363a;
+}
+.settings-subpage-back svg {
+  width: 1rem;
+  height: 1rem;
+}
+.settings-subpage-options {
+  display: grid;
+  gap: 1rem;
+  padding: 0.2rem 0.1rem 0.8rem;
+}
+.settings-subpage .settings-weather-subpage {
+  display: grid;
+  gap: 1rem;
+}
+.settings-weather-subpage .saved-location,
+.settings-weather-subpage .location-search,
+.settings-weather-subpage .location-message,
+.settings-weather-subpage .location-results {
+  margin-top: 0.8rem;
+}
+.settings-weather-subpage .saved-location,
+.settings-weather-subpage .location-results,
+.settings-weather-subpage .location-results .setting-row {
+  border-radius: 1.3rem;
+}
+.settings-weather-subpage .weather-settings {
+  max-width: 100%;
+}
+.settings-weather-subpage .saved-location,
+.settings-weather-subpage .location-search,
+.settings-weather-subpage .location-results {
+  margin-top: 0.65rem;
+}
+@keyframes settings-subpage-in {
+  from {
+    opacity: 0.55;
+    transform: translateX(1.1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .settings-page .settings-section-title {
   font-size: 1.3rem;
   font-weight: 550;
   color: #f0f0f0de;
   letter-spacing: -0.025em;
-  margin-bottom: 1.3rem;
+  margin-bottom: 1.05rem;
 }
 .settings-page .wallpaper-options {
   gap: 1.2rem;
@@ -75,10 +280,38 @@
   margin: 0;
 }
 .settings-page .setting-row {
-  padding: 0.9rem 0.85rem;
-  min-height: 3.9rem;
+  padding: 0.8rem 1.1rem;
+  min-height: 4.4rem;
   min-width: 0;
-  gap: 0.8rem;
+  gap: 1rem;
+  border-radius: 2.2rem;
+  background: #343b42e0;
+  box-shadow: inset 0 0 0 1px #ffffff0b;
+  transition:
+    background-color 100ms ease,
+    color 100ms ease,
+    transform 100ms ease;
+}
+.settings-page .setting-row:hover:not(:focus-visible) {
+  background: #414950;
+}
+.settings-page .setting-row:focus,
+.settings-page .setting-row:focus-visible {
+  outline: none;
+  color: #18191b;
+  background: #f4f4f5;
+  transform: scale(1.01);
+  box-shadow: 0 3px 12px #0005;
+}
+.settings-page .setting-row:focus > svg,
+.settings-page .setting-row:focus-visible > svg {
+  color: #34363a;
+}
+.settings-page .settings-content > .settings-group {
+  margin-bottom: 1.2rem;
+}
+.settings-page .settings-group + .settings-group {
+  margin-top: 1rem;
 }
 .settings-page .setting-row > span:not(.toggle) {
   flex: 1 1 auto;
@@ -91,11 +324,39 @@
 .settings-page .setting-row strong {
   font-size: 1.08rem;
 }
+.settings-page .setting-state {
+  flex: 0 0 auto;
+  min-width: 3.2rem;
+  color: #f4f4f58c;
+  font-size: 0.95rem;
+  font-weight: 450;
+  text-align: right;
+}
+.settings-page .setting-value {
+  flex: 0 0 auto;
+  color: #eceef080;
+  font-size: 0.96rem;
+  text-align: right;
+}
+.settings-page .setting-row:focus .setting-state,
+.settings-page .setting-row:focus-visible .setting-state {
+  color: #34363a;
+}
+.settings-page .setting-row:focus .setting-value,
+.settings-page .setting-row:focus-visible .setting-value {
+  color: #34363a;
+}
 .settings-page .setting-row small {
   font-size: 0.82rem;
 }
 .settings-page .language-option {
   cursor: default;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 0.7rem;
+}
+.settings-page .language-option:hover:not(:focus-visible) {
+  background: transparent;
 }
 .settings-page .language-trigger {
   display: flex;
@@ -161,37 +422,72 @@
 .language-menu-option[aria-selected='true'] {
   background: #ffffff14;
 }
+.settings-page [data-focusable]:focus-visible {
+  scroll-margin-block: 1.5rem;
+}
 .settings-version {
   font-size: 0.78rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .settings-layout {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
+    grid-template-columns: minmax(10rem, 0.68fr) minmax(0, 1.5fr);
+    gap: 1rem;
+    min-height: 58vh;
   }
-  .settings-controls {
-    display: flex;
-    flex-direction: column;
+  .settings-sidebar {
+    padding: 0.55rem;
+  }
+  .settings-sidebar-item {
+    gap: 0.5rem;
+    padding-inline: 0.65rem;
+  }
+  .settings-pane {
+    padding: 0.8rem 0 0.8rem 0.6rem;
   }
 }
 @media (max-width: 600px) {
   .settings-page {
-    padding-top: 2rem;
+    padding-top: 1.5rem;
   }
   .settings-layout {
-    gap: 1.25rem;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    gap: 0.7rem;
+    min-height: 65vh;
   }
-  .settings-panel {
-    padding: 1.25rem;
+  .settings-sidebar {
+    padding: 0.35rem;
   }
-  .settings-controls {
-    display: flex;
+  .settings-sidebar-item {
+    min-height: 3.9rem;
+    gap: 0.3rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: 1.8rem;
+  }
+  .settings-sidebar-item > span {
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+  }
+  .settings-pane {
+    padding: 0.6rem 0 0.8rem 0.4rem;
+  }
+  .settings-list-item {
+    min-height: 4rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 1.7rem;
   }
   .settings-page .wallpaper-options {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
+    gap: 0.75rem;
+  }
+  .settings-page .setting-row {
+    padding-inline: 0.5rem;
+    gap: 0.45rem;
+  }
+  .settings-page .language-trigger {
+    flex-basis: 45%;
+    padding-inline: 0.55rem;
   }
   .settings-page .settings-section-title {
     font-size: 1.15rem;

@@ -198,6 +198,12 @@ function Launcher({
     setCategory(null);
     setShowHidden(false);
     document.querySelector('main')?.scrollTo({ top: 0 });
+    if (next === 'settings')
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>('[data-focusable="settings-section-interface"]')
+          ?.focus({ preventScroll: true }),
+      );
   }, []);
 
   const onLaunch = useCallback(
@@ -274,6 +280,20 @@ function Launcher({
         if (optionsApp) {
           setOptionsApp(null);
           return;
+        }
+        if (page === 'settings') {
+          const backTarget = document.activeElement as HTMLElement | null;
+          if (backTarget?.dataset.focusable?.startsWith('settings-subpage-back-')) {
+            backTarget.click();
+            return;
+          }
+          const subpageBack = document.querySelector<HTMLElement>(
+            '[data-settings-subpage] [data-focusable^="settings-subpage-back-"]:focus',
+          );
+          if (subpageBack) {
+            subpageBack.click();
+            return;
+          }
         }
         if (query) {
           setQuery('');
@@ -453,18 +473,7 @@ function Launcher({
         </button>
       ) : (
         <div className="shell">
-          <header
-            className="header"
-            data-focus-down={
-              page === 'settings'
-                ? document.activeElement
-                    ?.getAttribute('data-focusable')
-                    ?.startsWith('language-option-')
-                  ? undefined
-                  : 'setting-home-app-names'
-                : undefined
-            }
-          >
+          <header className="header" data-focus-down={undefined}>
             <Clock clock24={preferences.clock24} language={language} />
             <Navigation page={page} onChange={openPage} />
             <div className="header-right">
@@ -499,11 +508,25 @@ function Launcher({
                         onConfigure={() => {
                           openPage('settings');
                           requestAnimationFrame(() => {
-                            const field = document.querySelector<HTMLElement>(
-                              '[data-focusable="weather-location-query"]',
+                            const section = document.querySelector<HTMLElement>(
+                              '[data-focusable="settings-section-weather"]',
                             );
-                            field?.focus({ preventScroll: true });
-                            field?.scrollIntoView({ block: 'nearest' });
+                            section?.focus({ preventScroll: true });
+                            section?.click();
+                            requestAnimationFrame(() => {
+                              const location = document.querySelector<HTMLElement>(
+                                '[data-focusable="setting-weather-location"]',
+                              );
+                              location?.focus({ preventScroll: true });
+                              location?.click();
+                              requestAnimationFrame(() => {
+                                const field = document.querySelector<HTMLElement>(
+                                  '[data-focusable="weather-location-query"]',
+                                );
+                                field?.focus({ preventScroll: true });
+                                field?.scrollIntoView({ block: 'nearest' });
+                              });
+                            });
                           });
                         }}
                       />
