@@ -25,7 +25,13 @@
     "format:check": "oxfmt --check .",
     "screenshots": "pnpm build && node tools/screenshots.mjs",
     "benchmark": "pnpm build && node tools/benchmark.mjs",
-    "assets": "node tools/assets.mjs"
+    "assets": "node tools/assets.mjs",
+    "native:assets": "node native/tools/assets.mjs",
+    "native:dev": "cargo run --manifest-path native/Cargo.toml --",
+    "native:check": "cargo fmt --manifest-path native/Cargo.toml -- --check && cargo clippy --locked --manifest-path native/Cargo.toml --all-targets --all-features -- -D warnings && cargo test --locked --manifest-path native/Cargo.toml",
+    "native:smoke": "node native/tools/smoke.mjs",
+    "native:build": "sh native/tools/build-webos.sh",
+    "native:package": "node native/tools/package.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

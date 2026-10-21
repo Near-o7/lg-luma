@@ -23,6 +23,16 @@ Build before running browser tests so packaged `file://` tests exercise the curr
 
 Project filenames use lowercase kebab-case, including React components (for example, `app-tile.tsx`). Keep `package.json` and `appinfo.json` versions synchronized; change the version only when requested.
 
+## Native prototype
+
+`native/` is an experimental Rust/SDL2/GLES2 launcher with independent UI, platform and persistence
+layers. See `native/README.md`. Run `pnpm native:check` for Rust changes and `pnpm native:smoke`
+after generating native assets to exercise desktop OpenGL screenshots and interaction/persistence.
+These commands need Rust, pkg-config and SDL2; asset generation also needs woff2_decompress. When
+missing, use `nix-shell -p pkg-config SDL2 woff2 --run '<command>'`. Native preferences and app ID
+are separate from the web app. TV builds use the `webos` feature and must never fall back to demo
+inventory. Keep platform work off the SDL thread and pointer focus free of scrolling side effects.
+
 ## Collecting app icons from a webOS TV
 
 The optional installed-app artwork prototype can collect icons from a developer's own rooted TV over SSH. Set `TV_IP` to the TV's address and run these commands from the repository root:

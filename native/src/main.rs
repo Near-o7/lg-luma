@@ -1,0 +1,537 @@
+mod model;
+mod platform;
+mod renderer;
+mod state;
+mod storage;
+mod view;
+
+#[cfg(test)]
+mod tests;
+
+use platform::{Platform, Request, Response};
+use sdl2::{
+    event::{Event, WindowEvent},
+    keyboard::Keycode,
+    mouse::MouseButton,
+    video::GLProfile,
+};
+use state::{Direction, Effect, Overlay, State, Target};
+use std::{
+    collections::VecDeque,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
+use time::OffsetDateTime;
+
+#[derive(Default)]
+struct Options {
+    assets: Option<PathBuf>,
+    preferences: Option<PathBuf>,
+    screenshot: Option<PathBuf>,
+    dump: Option<PathBuf>,
+    frames: Option<u64>,
+    script: VecDeque<String>,
+    fullscreen: bool,
+}
+
+impl Options {
+    fn parse() -> Result<Self, String> {
+        let mut result = Self::default();
+        let mut args = std::env::args().skip(1);
+        while let Some(arg) = args.next() {
+            if arg == "--help" {
+                println!(
+                    "Luma native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --frames N          Exit after N event-loop frames\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/wait\n  --screenshot PATH   Save final framebuffer as PNG\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
+                );
+                std::process::exit(0);
+            }
+            if arg == "--fullscreen" {
+                result.fullscreen = true;
+                continue;
+            }
+            let value = args
+                .next()
+                .ok_or_else(|| format!("Missing value for {arg}"))?;
+            match arg.as_str() {
+                "--assets" => result.assets = Some(value.into()),
+                "--preferences" => result.preferences = Some(value.into()),
+                "--screenshot" => result.screenshot = Some(value.into()),
+                "--dump-state" => result.dump = Some(value.into()),
+                "--frames" => {
+                    result.frames = Some(
+                        value
+                            .parse::<u64>()
+                            .ok()
+                            .filter(|n| *n > 0)
+                            .ok_or("--frames must be positive")?,
+                    )
+                }
+                "--script" => result.script = value.split(',').map(str::to_owned).collect(),
+                _ => return Err(format!("Unknown option: {arg}")),
+            }
+        }
+        if result.screenshot.is_some() && result.frames.is_none() {
+            result.frames = Some(90);
+        }
+        Ok(result)
+    }
+}
+
+struct Press {
+    target: Target,
+    start: Instant,
+    held: bool,
+    pointer: bool,
+}
+
+fn effects(
+    effects: Vec<Effect>,
+    state: &mut State,
+    platform: &Platform,
+    preferences: &std::path::Path,
+) -> bool {
+    for effect in effects {
+        match effect {
+            Effect::Save => {
+                if let Err(error) = storage::save(preferences, &state.preferences) {
+                    state.notify(error);
+                }
+            }
+            Effect::Refresh => {
+                if !state.loading {
+                    state.loading = true;
+                    state.dirty = true;
+                    platform.send(Request::Refresh);
+                }
+            }
+            Effect::Launch(id) => {
+                if !state.launching {
+                    if platform.webos {
+                        state.launching = true;
+                        state.notify("Opening…");
+                        platform.send(Request::Launch(id));
+                    } else {
+                        let title = state
+                            .inventory
+                            .apps
+                            .iter()
+                            .find(|a| a.id == id)
+                            .map_or(id.as_str(), |app| app.title.as_str());
+                        state.notify(format!("Desktop preview: open {title}"));
+                    }
+                }
+            }
+            Effect::Quit => return false,
+        }
+    }
+    true
+}
+
+fn script(
+    action: &str,
+    state: &mut State,
+    controls: &[state::Control],
+) -> Result<Vec<Effect>, String> {
+    Ok(match action {
+        "home" => {
+            state.open(0);
+            vec![]
+        }
+        "apps" => {
+            state.open(1);
+            vec![]
+        }
+        "settings" => {
+            state.open(2);
+            vec![]
+        }
+        "up" => state.direction(Direction::Up, controls),
+        "down" => state.direction(Direction::Down, controls),
+        "left" => state.direction(Direction::Left, controls),
+        "right" => state.direction(Direction::Right, controls),
+        "enter" => state.activate(),
+        "back" => state.back(),
+        "menu" => {
+            state.options();
+            vec![]
+        }
+        "hold" => {
+            state.hold();
+            vec![]
+        }
+        "wait" => vec![],
+        action if action.starts_with("type:") => {
+            state.overlay = Some(Overlay::Keyboard);
+            state.text(&action[5..]);
+            vec![]
+        }
+        _ => return Err(format!("Unknown scripted action: {action}")),
+    })
+}
+
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("Luma native: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), String> {
+    let mut options = Options::parse()?;
+    let webos = cfg!(feature = "webos");
+    if !webos && std::path::Path::new("/etc/starfish-release").exists() {
+        return Err("This desktop build cannot run on a TV. Build with --features webos.".into());
+    }
+    let root = options.assets.clone().unwrap_or_else(|| {
+        if webos {
+            std::env::current_exe()
+                .unwrap_or_default()
+                .with_file_name("assets")
+        } else {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.build/native/assets")
+        }
+    });
+    let assets = view::Assets::load(root)?;
+    let preferences_path = options
+        .preferences
+        .clone()
+        .map(Ok)
+        .unwrap_or_else(|| storage::default_path(webos))?;
+    let mut state = State::new(storage::load(&preferences_path)?);
+    // Some libc/time combinations cannot discover the offset after threads start.
+    let local_offset = OffsetDateTime::now_local()
+        .map(|now| now.offset())
+        .unwrap_or(time::UtcOffset::UTC);
+    let platform = Platform::new(webos);
+    effects(
+        vec![Effect::Refresh],
+        &mut state,
+        &platform,
+        &preferences_path,
+    );
+
+    let sdl = sdl2::init()?;
+    let video = sdl.video()?;
+    sdl2::hint::set("SDL_VIDEO_WAYLAND_WMCLASS", platform::APP_ID);
+    let attributes = video.gl_attr();
+    if webos {
+        attributes.set_context_profile(GLProfile::GLES);
+        attributes.set_context_version(2, 0);
+    } else {
+        attributes.set_context_profile(GLProfile::Core);
+        attributes.set_context_version(3, 2);
+    }
+    attributes.set_double_buffer(true);
+    attributes.set_alpha_size(8);
+    let mut builder = video.window(
+        "Luma Native",
+        if webos { 1920 } else { 1280 },
+        if webos { 1080 } else { 720 },
+    );
+    builder.opengl().allow_highdpi().position_centered();
+    if webos || options.fullscreen {
+        builder.fullscreen_desktop();
+    } else {
+        builder.resizable();
+    }
+    let window = builder.build().map_err(|e| e.to_string())?;
+    let _context = window.gl_create_context()?;
+    gl::load_with(|name| video.gl_get_proc_address(name) as *const _);
+    if let Err(error) = video.gl_set_swap_interval(1) {
+        eprintln!("VSync: {error}");
+    }
+    let mut renderer = renderer::Renderer::new(&assets.root.join("font.ttf"), webos)?;
+    let mut events = sdl.event_pump()?;
+    let mut press: Option<Press> = None;
+    let mut pill = view::pill_target(0);
+    let mut last_frame = Instant::now();
+    let mut last_minute = None;
+    let mut frame = 0u64;
+    let mut visible = true;
+    let mut running = true;
+    let mut queued_event = None;
+    let mut text_active = false;
+    let mut scene = view::scene(&state, &assets, pill, OffsetDateTime::now_utc(), !webos);
+    while running {
+        let now = OffsetDateTime::now_utc().to_offset(local_offset);
+        if last_minute != Some(now.unix_timestamp() / 60) {
+            last_minute = Some(now.unix_timestamp() / 60);
+            state.dirty = true;
+        }
+        state.tick();
+        while let Ok(response) = platform.receiver.try_recv() {
+            match response {
+                Response::Inventory(Ok((inventory, warning))) => {
+                    state.set_inventory(inventory, warning)
+                }
+                Response::Inventory(Err(error)) => {
+                    state.loading = false;
+                    state.error = Some(error);
+                    state.dirty = true;
+                }
+                Response::Launched(result) => {
+                    state.launching = false;
+                    match result {
+                        Err(error) => state.notify(error),
+                        Ok(()) => {
+                            state.notice = None;
+                            state.dirty = true;
+                        }
+                    }
+                }
+            }
+        }
+        // Rebuild hit regions before input whenever inventory/layout changed.
+        if state.dirty {
+            scene = view::scene(&state, &assets, pill, now, !webos);
+        }
+        for event in queued_event.take().into_iter().chain(events.poll_iter()) {
+            let mut pending = vec![];
+            match event {
+                Event::Quit { .. } => running = false,
+                Event::Window { win_event, .. } => match win_event {
+                    WindowEvent::Hidden | WindowEvent::Minimized => {
+                        visible = false;
+                        press = None;
+                    }
+                    WindowEvent::FocusLost => press = None,
+                    WindowEvent::Shown | WindowEvent::Restored | WindowEvent::FocusGained => {
+                        visible = true;
+                        state.dirty = true;
+                        if webos {
+                            pending.push(Effect::Refresh);
+                        }
+                    }
+                    WindowEvent::Resized(..)
+                    | WindowEvent::SizeChanged(..)
+                    | WindowEvent::Exposed => state.dirty = true,
+                    _ => {}
+                },
+                Event::TextInput { text, .. } => state.text(&text),
+                Event::KeyDown {
+                    keycode: Some(key),
+                    repeat,
+                    ..
+                } => match key {
+                    Keycode::Up => pending = state.direction(Direction::Up, &scene.controls),
+                    Keycode::Down => pending = state.direction(Direction::Down, &scene.controls),
+                    Keycode::Left => pending = state.direction(Direction::Left, &scene.controls),
+                    Keycode::Right => pending = state.direction(Direction::Right, &scene.controls),
+                    Keycode::Return | Keycode::KpEnter if !repeat => {
+                        press = Some(Press {
+                            target: state.focus.clone(),
+                            start: Instant::now(),
+                            held: false,
+                            pointer: false,
+                        });
+                    }
+                    Keycode::Escape | Keycode::AcBack if !repeat => {
+                        press = None;
+                        pending = state.back();
+                    }
+                    Keycode::Backspace if matches!(state.overlay, Some(Overlay::Keyboard)) => {
+                        state.delete()
+                    }
+                    Keycode::M | Keycode::Menu if !repeat && state.overlay.is_none() => {
+                        press = None;
+                        state.options();
+                    }
+                    Keycode::F5 if !repeat => pending.push(Effect::Refresh),
+                    key if i32::from(key) == 461 && !repeat => {
+                        press = None;
+                        pending = state.back();
+                    }
+                    _ => {}
+                },
+                Event::KeyUp {
+                    keycode: Some(Keycode::Return | Keycode::KpEnter),
+                    ..
+                } => {
+                    if let Some(held) = press.take()
+                        && !held.pointer
+                        && !held.held
+                        && held.target == state.focus
+                    {
+                        pending = state.activate();
+                    }
+                }
+                Event::MouseMotion { x, y, .. } if state.moving.is_none() => {
+                    let hovered = hit(&scene.controls, &window, x, y, &state);
+                    if let Some(target) = hovered.clone() {
+                        state.pointer_focus(target);
+                    }
+                    if press
+                        .as_ref()
+                        .is_some_and(|p| p.pointer && hovered.as_ref() != Some(&p.target))
+                    {
+                        press = None;
+                    }
+                }
+                Event::MouseButtonDown {
+                    mouse_btn, x, y, ..
+                } => {
+                    if let Some(target) = hit(&scene.controls, &window, x, y, &state)
+                        && state.moving.is_none()
+                    {
+                        // Pointer-down must not normalize scroll and move the clicked control.
+                        state.pointer_focus(target);
+                        if mouse_btn == MouseButton::Right {
+                            state.options();
+                            press = None;
+                        } else if mouse_btn == MouseButton::Left {
+                            press = Some(Press {
+                                target: state.focus.clone(),
+                                start: Instant::now(),
+                                held: false,
+                                pointer: true,
+                            });
+                        }
+                    }
+                }
+                Event::MouseButtonUp {
+                    mouse_btn: MouseButton::Left,
+                    x,
+                    y,
+                    ..
+                } => {
+                    if let Some(held) = press.take()
+                        && held.pointer
+                        && !held.held
+                        && hit(&scene.controls, &window, x, y, &state).as_ref()
+                            == Some(&held.target)
+                    {
+                        pending = state.activate();
+                    }
+                }
+                Event::MouseWheel { y, .. } if state.overlay.is_none() => {
+                    let max = scene
+                        .controls
+                        .iter()
+                        .filter(|c| c.scrollable)
+                        .map(|c| c.rect.y + c.rect.h + state.scroll - 965.)
+                        .fold(0., f32::max);
+                    state.scroll = (state.scroll - y as f32 * 90.).clamp(0., max.max(0.));
+                    state.dirty = true;
+                }
+                _ => {}
+            }
+            running &= effects(pending, &mut state, &platform, &preferences_path);
+            if press
+                .as_ref()
+                .is_some_and(|p| !p.held && p.target != state.focus)
+            {
+                press = None;
+            }
+            // SDL may deliver several navigation events in a single poll.
+            if state.dirty {
+                scene = view::scene(&state, &assets, pill, now, !webos);
+            }
+        }
+        if let Some(held) = &mut press
+            && !held.held
+            && held.start.elapsed() >= Duration::from_millis(600)
+        {
+            held.held = true;
+            state.hold();
+        }
+        if !state.loading
+            && frame.is_multiple_of(3)
+            && let Some(action) = options.script.pop_front()
+        {
+            let pending = script(&action, &mut state, &scene.controls)?;
+            running &= effects(pending, &mut state, &platform, &preferences_path);
+        }
+        let keyboard = matches!(state.overlay, Some(Overlay::Keyboard));
+        if keyboard != text_active {
+            if keyboard {
+                video.text_input().start();
+            } else {
+                video.text_input().stop();
+            }
+            text_active = keyboard;
+        }
+        let dt = last_frame.elapsed().as_secs_f32().min(0.1);
+        last_frame = Instant::now();
+        let target = view::pill_target(state.page_index());
+        if state.preferences.reduced_motion || (pill - target).abs() < 0.2 {
+            pill = target;
+        } else {
+            pill += (target - pill) * (1. - (-20. * dt).exp());
+            state.dirty = true;
+        }
+        let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit);
+        if (state.dirty && visible) || final_frame {
+            scene = view::scene(&state, &assets, pill, now, !webos);
+            let (width, height) = window.drawable_size();
+            if width > 0 && height > 0 {
+                renderer.render(&scene.draw, width, height);
+                if final_frame && let Some(path) = &options.screenshot {
+                    renderer.screenshot(path, width, height)?;
+                }
+                window.gl_swap_window();
+            }
+            state.dirty = false;
+        }
+        frame += 1;
+        if final_frame {
+            running = false;
+        }
+        // Block until input instead of polling at frame rate on idle screens.
+        // VSync paces animation; holds and scripted checks need short timed wakes.
+        let timeout = if !visible {
+            250
+        } else if pill != target {
+            0
+        } else if press.is_some() || options.frames.is_some() {
+            8
+        } else {
+            100
+        };
+        queued_event = events.wait_event_timeout(timeout);
+    }
+    if !options.script.is_empty() {
+        return Err("Frame budget ended before the input script completed".into());
+    }
+    if let Some(path) = options.dump {
+        let state = serde_json::json!({ "page": state.page, "focus": state.focus, "query": state.query,
+            "filter": state.filter, "preferences": state.preferences, "apps": state.apps().iter().map(|a| &a.id).collect::<Vec<_>>(),
+            "error": state.error, "scroll": state.scroll });
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(&state).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn hit(
+    controls: &[state::Control],
+    window: &sdl2::video::Window,
+    x: i32,
+    y: i32,
+    state: &State,
+) -> Option<Target> {
+    let (width, height) = window.size();
+    let scale = (width as f32 / 1920.).min(height as f32 / 1080.);
+    if scale <= 0. {
+        return None;
+    }
+    let x = (x as f32 - (width as f32 - 1920. * scale) / 2.) / scale;
+    let y = (y as f32 - (height as f32 - 1080. * scale) / 2.) / scale;
+    controls
+        .iter()
+        .rev()
+        .find(|control| {
+            control.rect.contains(x, y)
+                && (!control.scrollable
+                    || (y
+                        >= match state.page {
+                            state::Page::Apps => 352.,
+                            state::Page::Settings => 275.,
+                            state::Page::Home => 190.,
+                        }
+                        && y < 986.))
+        })
+        .map(|control| control.target.clone())
+}

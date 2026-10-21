@@ -136,6 +136,13 @@ pnpm dev
 
 Open **http://127.0.0.1:5173**. The browser preview uses sample apps and inputs; TV actions show a preview message. On a TV, Luma loads the actual inventory.
 
+### Experimental native launcher
+
+A Rust/SDL2/OpenGL prototype lives in [`native/`](native/README.md), including a native desktop
+preview, remote navigation, app/input browsing, favorites and settings. See its README for setup,
+screenshots, checks and webOS cross-compilation. The prototype's TV integration needs on-device
+validation.
+
 ### Build a package
 
 ```sh
