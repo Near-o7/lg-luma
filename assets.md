@@ -8,6 +8,10 @@
 - `public/wallpapers/yosemite.jpg`: [Tunnel View, Yosemite Valley, Yosemite NP](https://commons.wikimedia.org/wiki/File:Tunnel_View,_Yosemite_Valley,_Yosemite_NP_-_Diliff.jpg) by David Iliff (Diliff), [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Resized to a 2560px-wide JPEG; the image retains its CC BY-SA 3.0 license.
 - `public/wallpapers/northern-lights.jpg`: Unsplash photo `1531366936337-7c912a4589a7`, https://images.unsplash.com/photo-1531366936337-7c912a4589a7. Bundled under the [Unsplash License](https://unsplash.com/license).
 - Inter variable font: Rasmus Andersson, SIL Open Font License 1.1. License bundled at `public/fonts/ofl.txt`.
+- Native Chinese fallback: Noto Sans SC, copyright 2014–2021 Adobe, SIL Open Font License 1.1.
+  The pinned source and license are in `native/assets/fonts/`; `native/tools/font-assets.mjs`
+  records its Google Fonts revision and SHA-256 checksums. Asset preparation produces renamed
+  Luma CJK regular/medium subsets for native rendering and includes the license with the package.
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
 

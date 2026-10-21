@@ -116,6 +116,7 @@ pub struct RenderStats {
     pub glyph_rasterizations: usize,
     pub glyph_failures: usize,
     pub missing_glyphs: usize,
+    pub missing_images: usize,
     pub glyph_atlas_pages: usize,
     pub glyph_atlas_bytes: usize,
     pub artwork_bytes: usize,
@@ -135,6 +136,7 @@ impl RenderStats {
             glyph_rasterizations: 0,
             glyph_failures: 0,
             missing_glyphs: 0,
+            missing_images: 0,
             glyph_atlas_pages: 0,
             glyph_atlas_bytes: 0,
             artwork_bytes: 0,
@@ -640,6 +642,7 @@ impl Renderer {
                 }
             });
         let Some(texture) = entry else {
+            self.stats.missing_images += 1;
             return;
         };
         texture.frame = frame;

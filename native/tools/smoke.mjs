@@ -49,6 +49,8 @@ try {
     );
     assert.equal(render.last_presented.glyph_failures, 0);
     assert.equal(render.capture.font_antialiasing, 'grayscale coverage');
+    assert.equal(render.capture.missing_glyphs, 0);
+    assert.equal(render.capture.missing_images, 0);
     state.render = render;
     assert.equal(state.error, null);
     const stats = await sharp(screenshot).stats();

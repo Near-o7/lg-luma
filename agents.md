@@ -42,6 +42,11 @@ Native text uses drawable-aware grayscale glyphs; layout stays in 1920×1080 log
 `--capture-scale 2` exercises a separate 4K framebuffer. `--resolution 4k` is an experimental
 surface request; use `--diagnostics PATH` to distinguish actual drawable size from capture size.
 Use `--profile-frames N` for presentation pacing; `--frames N` counts event-loop iterations.
+Native and web UI strings share `src/messages.json`. Native language preferences are `en`, `de`,
+and `zh`; CJK fallback fonts are generated from the bundled, licensed Noto Sans SC source.
+Native weather uses ureq/rustls background workers and a separate Celsius cache. The native smoke
+suite includes mocked weather HTTP, language persistence, localized geocoding, and CJK/4K renders.
+No test should contact real weather APIs or a TV. Match the web UI without on-screen weather credits.
 
 ## Collecting app icons from a webOS TV
 

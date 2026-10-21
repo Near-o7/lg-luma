@@ -35,7 +35,10 @@ opens a fullscreen preview. Rust changes use incremental compilation and a relau
 
 Assets are prepared under `.build/native/assets` from the existing wallpapers, SVG logos, collected
 app artwork and Inter font. The font is decompressed to TTF and the SVGs are rasterized at build
-time. The variable font is instantiated at the web UI's weights and optical sizes. Wallpaper
+time. The variable font is instantiated at the web UI's weights and optical sizes. A bundled
+Noto Sans SC source produces regular/medium Luma CJK fallback subsets for Chinese labels and
+common CJK app/location names. No system font is required. `pnpm native:font-assets` can restore
+the checksum-pinned source font if deliberately removed. Wallpaper
 cropping, saturation, shading and tile gradients are prepared ahead of time from the web design,
 and UI/input icons reuse the web components at build time. No asset downloads occur.
 Regenerate assets after changing their sources.
@@ -134,6 +137,10 @@ density-appropriate glyph rasterization and forced presentation profiling. On Li
 with Mesa software rendering. It does not measure TV performance.
 The separate Native prototype GitHub workflow runs these checks on Linux and uploads its screenshots.
 
+`pnpm native:weather:smoke` runs just the mocked HTTP/weather scenarios.
+`pnpm native:translations:smoke` checks language selection/persistence, rendered labels, CJK glyph
+coverage, localized geocoding, and Chinese 4K captures. Both are included in `native:smoke`.
+
 For a specific screen:
 
 ```sh
@@ -143,8 +150,9 @@ pnpm native:dev --preferences .build/native/demo.json \
 ```
 
 Scripts support `home`, `apps`, `settings`, `up`, `down`, `left`, `right`, `enter`, `back`, `menu`,
-`hold`, `type:TEXT`, and `wait`. Screenshots are taken before the final buffer swap. The state dump
-provides machine-readable focus, filtering and preferences. The scripts drive the same state
+`hold`, `type:TEXT`, `await-search`, `await-weather`, and `wait`. `type:` edits the app search or
+location field according to the current panel. Screenshots are taken before the final buffer swap.
+The state dump provides machine-readable focus, filtering, preferences and rendered UI text. The scripts drive the same state
 transitions as the interactive UI.
 
 `--time 2026-10-21T20:41:00+02:00` fixes the clock/date for reproducible previews. Scripted
@@ -164,9 +172,9 @@ the browser-install command is needed on macOS. For headless native rendering on
 `xvfb-run -a pnpm native:smoke`.
 
 The comparison command builds the web app and captures both renderers with the same inventory,
-preferences, time and canvas size. Weather and translation controls are omitted from the web
-references. It covers Home (with/without captions and empty), Apps, options, Music, Hidden,
-search/empty results, General, clock choices, Background, Inputs and input choices.
+preferences, time and canvas size. It covers Home (with/without captions, weather and empty),
+Apps, options, Music, Hidden, search/empty results, General, clock choices, Background, Weather,
+Inputs and input choices.
 
 `.build/native/comparison/*-side-by-side.png` shows **web on the left, native on the right**.
 Web layout/font measurements and an informational image-difference report are stored alongside
@@ -223,16 +231,44 @@ native caller permissions, the TV SDL/Wayland backend, Magic Remote key mapping,
 and relaunch behavior still require verification on the actual TV. The CLI adapter can later be
 replaced behind `platform.rs` with direct LS2 integration if the native sandbox requires it.
 
+## Weather and language
+
+**Settings → Weather → Location** opens city/postcode search. Type with the native on-screen
+keyboard or a physical keyboard, close editing with Done/Back, select Search, and choose a result.
+**Show widget** hides the Home summary while retaining the city. **Temperature** selects °C/°F
+and converts the cached Celsius value immediately. Removing a city clears its cached reading.
+No browser geolocation or IP-based location lookup is used.
+
+Location search uses `geocoding-api.open-meteo.com`; forecast requests use `api.open-meteo.com`.
+The ureq/rustls client ships its certificate roots and enforces timeouts, response limits and no
+redirects. HTTP requests run on dedicated background workers; accepted cache writes are ordered
+off-thread and flushed at shutdown. Native cache files are beside the preference file, with a
+`.weather.json` suffix, storing a location key, Unix-seconds timestamp and unrounded Celsius data.
+Fresh readings are reused for 15 minutes. Home refreshes while visible; a failure can show a valid
+reading up to six hours old, labeled as saved, and retries after five minutes. Hidden widgets or
+non-Home views start no new forecast requests. Old searches/forecasts cannot replace newer state.
+
+Native weather tests use `--weather-test-server http://127.0.0.1:PORT`, which accepts only literal
+loopback origins and is rejected by TV builds. They do not contact live APIs or a television.
+Weather data attribution: [Open-Meteo](https://open-meteo.com/) /
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+**Settings → General → Language** selects English, Deutsch or 简体中文. It takes effect immediately
+and is saved independently of the clock/temperature choices. Web and native share
+`src/messages.json`, including weather conditions, notifications and device-connection labels.
+Dates/time use the selected locale, and geocoding uses its language code. Installed app/device
+names and an already-saved city name remain the data supplied by the TV/API. Translations and font
+fallback stay local; no translation/font service is contacted at runtime.
+
 ## Current scope
 
-Implemented: Home, Apps, General/Background/Inputs settings, favorites/reordering, hide/restore,
+Implemented: Home, Apps, General/Background/Weather/Inputs settings, favorites/reordering, hide/restore,
 search, pointer/remote controls, local persistence, platform worker, native build/package tooling,
 and screenshot/state automation. Layout, typography, branded cards, input artwork, navigation pill,
 focus treatments, menus, footers and settings follow the web implementation's 1920×1080 geometry.
 
-Weather, localization, web-preference migration, audio guidance, native OS virtual-keyboard
-integration and automatic boot/Home-button routing are not ported. Native UI text is English;
-the bundled font currently covers Latin characters. The custom renderer batches consecutive
+Web-preference migration, audio guidance, native OS virtual-keyboard integration and automatic
+boot/Home-button routing are not ported. The custom renderer batches consecutive
 draws, caches glyphs and images, evicts old artwork above a 48 MiB image budget, and repaints only
 when the scene changes or the small pill/panel/wallpaper animations run. Reduced motion disables
 these transitions. Text is CPU-rasterized once per cached
@@ -250,6 +286,8 @@ No TV frame-rate or memory advantage is claimed yet.
 - `src/raster.rs`: density, pixel alignment and atlas packing/recycling policy.
 - `src/diagnostics.rs`: warmup-aware presentation/CPU timing summaries.
 - `src/platform.rs`: asynchronous TV/desktop adapter and inventory validation.
+- `src/i18n.rs`, `../src/messages.json`: shared translations and native locale formatting.
+- `src/weather.rs`, `src/weather-service.rs`: validated weather state, HTTPS workers and cache.
 - `src/storage.rs`: preference persistence.
 - `src/main.rs`: SDL lifecycle, input capture, hold detection and frame scheduling.
 - `tools/`: asset preparation, ARM cross-build, IPK staging and desktop smoke checks.
