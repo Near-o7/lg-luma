@@ -13,6 +13,8 @@
   records its Google Fonts revision and SHA-256 checksums. Asset preparation produces renamed
   Luma CJK regular/medium subsets for native rendering and includes the license with the package.
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
+- Native TV packages bundle the webOS SDK's SDL2 shared library, zlib license. Its notice is in
+  `native/assets/licenses/sdl2.txt` and included in the IPK's `licenses/` directory.
 - Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
 
 Luma's logo is a folded-light **L**: an icy-blue ribbon turns into a cyan-and-indigo base. The browser mark and TV app icon share the same vector geometry, sized for a clear silhouette at small icon sizes.

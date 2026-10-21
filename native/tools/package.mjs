@@ -25,23 +25,44 @@ await fs.cp(path.join(out, 'assets'), path.join(stage, 'assets'), { recursive: t
 await fs.copyFile(path.join(out, 'assets/app-icon.png'), path.join(stage, 'app-icon.png'));
 await fs.copyFile(path.join(root, 'license'), path.join(stage, 'LICENSE'));
 await fs.copyFile(path.join(root, 'assets.md'), path.join(stage, 'ASSETS.md'));
-// Optional explicitly selected webOS SDL/shared-library builds. Never host libraries.
+await fs.mkdir(path.join(stage, 'lib'));
+async function copyLibrary(directory, name) {
+  const library = await fs.readFile(path.join(directory, name));
+  if (
+    library.length < 52 ||
+    library.subarray(0, 4).toString('hex') !== '7f454c46' ||
+    library[4] !== 1 ||
+    library[5] !== 1 ||
+    library.readUInt16LE(18) !== 40 ||
+    (library.readUInt32LE(36) & 0x400) !== 0
+  ) {
+    throw new Error(`Not an ARM soft-float webOS library: ${name}`);
+  }
+  await fs.writeFile(path.join(stage, 'lib', name), library);
+}
+// Explicitly selected ARM libraries can override the SDK's SDL. Never host libraries.
 if (process.env.WEBOS_NATIVE_LIBS) {
   const directory = path.resolve(process.env.WEBOS_NATIVE_LIBS);
-  await fs.mkdir(path.join(stage, 'lib'));
   for (const name of await fs.readdir(directory)) {
     if (!/\.so(?:\.[0-9]+)*$/.test(name)) continue;
-    const library = await fs.readFile(path.join(directory, name));
-    if (
-      library.subarray(0, 4).toString('hex') !== '7f454c46' ||
-      library[4] !== 1 ||
-      library.readUInt16LE(18) !== 40
-    ) {
-      throw new Error(`Not an ARM webOS library: ${name}`);
-    }
-    await fs.copyFile(path.join(directory, name), path.join(stage, 'lib', name));
+    await copyLibrary(directory, name);
   }
 }
+const sdlName = 'libSDL2-2.0.so.0';
+if (!(await fs.readdir(path.join(stage, 'lib'))).includes(sdlName)) {
+  if (!process.env.WEBOS_NDK) {
+    throw new Error('Set WEBOS_NDK to bundle SDK SDL2, or provide it through WEBOS_NATIVE_LIBS.');
+  }
+  await copyLibrary(
+    path.join(path.resolve(process.env.WEBOS_NDK), 'arm-webos-linux-gnueabi/sysroot/usr/lib'),
+    sdlName,
+  );
+}
+await fs.mkdir(path.join(stage, 'licenses'));
+await fs.copyFile(
+  path.join(root, 'native/assets/licenses/sdl2.txt'),
+  path.join(stage, 'licenses/sdl2.txt'),
+);
 await fs.writeFile(
   path.join(stage, 'appinfo.json'),
   `${JSON.stringify(
