@@ -984,9 +984,18 @@ fn weather_summary_layout(state: &State, assets: &Assets) -> WeatherSummary {
     let mut rows: Vec<Vec<WeatherPart>> = vec![Vec::new()];
     let mut used = 0.;
     for (label, style, color) in parts {
-        let width = assets.width(&label, style).min(1714.4);
-        let height =
-            assets.lines(&label, style, width.max(1.)) as f32 * style.size * style.line_height;
+        let measured_width = assets.width(&label, style);
+        let width = measured_width.min(1714.4);
+        // Use the same extra pixel as the rendered text rectangle. Counting
+        // lines at the exact advance width can round into a phantom second
+        // line even though the renderer displays the label on one line.
+        let text_width = width + 1.;
+        let lines = if measured_width <= text_width && !label.contains('\n') {
+            1
+        } else {
+            assets.lines(&label, style, text_width)
+        };
+        let height = lines as f32 * style.size * style.line_height;
         if used > 0. && used + 11.2 + width > 1714.4 {
             rows.push(Vec::new());
             used = 0.;
