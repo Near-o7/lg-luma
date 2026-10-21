@@ -5,7 +5,28 @@ A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity
 > [!NOTE]
 > Tested on **LG OLED55C57** running **webOS 26**.
 
-![Luma home screen, desktop preview](docs/home.png)
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Home</strong><br>
+      <img src="docs/home.png" alt="Luma Home screen, desktop preview">
+    </td>
+    <td width="50%" align="center">
+      <strong>Apps</strong><br>
+      <img src="docs/apps.png" alt="Luma Apps library, desktop preview">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Settings</strong><br>
+      <img src="docs/settings.png" alt="Luma Settings, desktop preview">
+    </td>
+    <td width="50%" align="center">
+      <strong>Inputs</strong><br>
+      <img src="docs/inputs.png" alt="Luma input settings, desktop preview">
+    </td>
+  </tr>
+</table>
 
 ## Install
 
