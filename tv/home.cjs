@@ -4,6 +4,7 @@
 var fs = require('fs');
 var path = require('path');
 var execFileSync = require('child_process').execFileSync;
+var spawnSync = require('child_process').spawnSync;
 var APP = 'com.ecklf.luma';
 var HOME = 'com.webos.app.home';
 var STATE = '/var/lib/luma-home';
@@ -43,19 +44,65 @@ function pause() {
   run('/bin/sleep', ['1']);
 }
 
+function excerpt(output) {
+  return (
+    String(output || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 480) || '<empty>'
+  );
+}
+
 function luna(method, payload) {
-  // As in the existing boot hook, newer root-shell clients use -t.
-  var release = read('/etc/starfish-release');
-  var mode = /release\s+(10|11)\./.test(release) ? '-t' : '-n';
-  var output = run('/usr/bin/luna-send', [
-    mode,
-    '1',
-    '-w',
-    '4000',
-    'luna://com.webos.applicationManager/' + method,
-    JSON.stringify(payload)
-  ]);
-  return JSON.parse(output.slice(output.indexOf('{')));
+  // -n prints one JSON reply to stdout. -t is timing mode and logs the
+  // payload to stderr instead, leaving timing summaries on stdout.
+  var result = spawnSync(
+    '/usr/bin/luna-send',
+    [
+      '-n',
+      '1',
+      '-w',
+      '4000',
+      'luna://com.webos.applicationManager/' + method,
+      JSON.stringify(payload)
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 8000,
+      maxBuffer: 2 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }
+  );
+  var stdout = String(result.stdout || '').trim();
+  var diagnostics = '; stdout: ' + excerpt(stdout) + '; stderr: ' + excerpt(result.stderr);
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      'Luna ' +
+        method +
+        ' failed (' +
+        (result.error
+          ? result.error.message
+          : 'exit ' + result.status + ', signal ' + result.signal) +
+        ')' +
+        diagnostics
+    );
+  }
+  if (!stdout) throw new Error('No Luna JSON reply from ' + method + diagnostics);
+  var reply;
+  try {
+    reply = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error('Invalid Luna JSON reply from ' + method + ': ' + error.message + diagnostics);
+  }
+  if (
+    !reply ||
+    typeof reply !== 'object' ||
+    Array.isArray(reply) ||
+    typeof reply.returnValue !== 'boolean'
+  ) {
+    throw new Error('Invalid Luna response from ' + method + diagnostics);
+  }
+  return reply;
 }
 
 function accepted(reply, action) {

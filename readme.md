@@ -67,7 +67,7 @@ Use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/) fo
 routing. Configure its Execute action with this one-line command:
 
 ```sh
-/usr/bin/luna-send -t 1 -w 5000 luna://com.webos.service.applicationmanager/launch '{"id":"com.ecklf.luma"}'
+/usr/bin/luna-send -n 1 -w 5000 luna://com.webos.service.applicationmanager/launch '{"id":"com.ecklf.luma"}'
 ```
 
 Test on a spare button first. Disable the mapping in Input Hook to restore normal Home behavior.

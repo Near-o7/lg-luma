@@ -198,6 +198,10 @@ bind-mounts it over `/usr/palm/applications/com.webos.app.home`. SAM rereads tha
 the TV schema requires it. The script verifies the reported manifest before stopping the previous
 Home process. It attempts to restore LG Home if applying the mount or refreshing SAM fails.
 
+Root-shell calls use `luna-send -n 1` on both firmware versions, with bounded stdout/stderr
+capture and operation-specific diagnostics for empty or invalid replies. `-t 1` is timing mode:
+it logs the payload to stderr and writes timing summaries to stdout, not a JSON response.
+
 The `enable` shell entry point prints the change summary and requires a `y`/`n` confirmation
 before creating the state directory, acquiring the lock or invoking the installer. Only `y`/`Y`
 proceeds. `n`/`N` or end-of-input cancels, and other input repeats the prompt. The boot hook and
