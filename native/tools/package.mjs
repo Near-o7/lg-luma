@@ -21,6 +21,38 @@ if (
   );
 }
 const out = path.join(root, '.build/native');
+let vectorManifest;
+try {
+  vectorManifest = JSON.parse(
+    await fs.readFile(path.join(out, 'assets/vector-artwork.json'), 'utf8'),
+  );
+} catch (error) {
+  throw new Error('Prepare vector artwork with pnpm native:vector-assets before packaging.', {
+    cause: error,
+  });
+}
+if (
+  vectorManifest.version !== 1 ||
+  !Array.isArray(vectorManifest.assets) ||
+  vectorManifest.assets.length === 0
+) {
+  throw new Error('Invalid native vector artwork manifest. Regenerate native assets.');
+}
+for (const file of vectorManifest.assets) {
+  if (typeof file !== 'string' || !/^(logos|ui-icons)\/[a-z0-9-]+\.lvec$/.test(file)) {
+    throw new Error('Invalid native vector artwork path.');
+  }
+  const mesh = await fs.readFile(path.join(out, 'assets', file));
+  if (
+    mesh.length < 20 ||
+    mesh.subarray(0, 8).toString() !== 'LUMAVEC1' ||
+    mesh.readUInt32LE(16) === 0 ||
+    mesh.readUInt32LE(16) % 3 !== 0 ||
+    mesh.length !== 20 + mesh.readUInt32LE(16) * 36
+  ) {
+    throw new Error(`Invalid native vector geometry: ${file}`);
+  }
+}
 const stage = path.join(out, 'package');
 await fs.rm(stage, { recursive: true, force: true });
 await fs.mkdir(stage, { recursive: true });
@@ -30,7 +62,11 @@ await fs.chmod(path.join(stage, 'luma-native'), 0o755);
 await fs.cp(path.join(out, 'assets'), path.join(stage, 'assets'), {
   recursive: true,
   filter: (source) =>
-    path.basename(source) !== '.DS_Store' && (highResolution || !source.endsWith('@2x.jpg')),
+    path.basename(source) !== '.DS_Store' &&
+    (highResolution || !source.endsWith('@2x.jpg')) &&
+    !(
+      source.endsWith('.png') && ['logos', 'ui-icons'].includes(path.basename(path.dirname(source)))
+    ),
 });
 await fs.copyFile(path.join(out, 'assets/app-icon.png'), path.join(stage, 'app-icon.png'));
 await fs.copyFile(path.join(root, 'license'), path.join(stage, 'LICENSE'));

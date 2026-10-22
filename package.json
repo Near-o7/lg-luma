@@ -27,6 +27,7 @@
     "benchmark": "pnpm build && node tools/benchmark.mjs",
     "assets": "node tools/assets.mjs",
     "native:assets": "node native/tools/assets.mjs",
+    "native:vector-assets": "node native/tools/vector-assets.mjs",
     "native:font-assets": "node native/tools/font-assets.mjs",
     "native:runtime": "node native/tools/webos-runtime.mjs",
     "native:dev": "cargo run --manifest-path native/Cargo.toml --",

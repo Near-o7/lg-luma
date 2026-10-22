@@ -2,10 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import * as lucide from 'lucide-react';
-import { tsImport } from 'tsx/esm/api';
+import { generateVectorAssets } from './vector-assets.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const source = path.join(root, 'public');
@@ -110,26 +107,6 @@ for (const file of await fs.readdir(path.join(source, 'wallpapers'))) {
     .jpeg({ quality: 82 })
     .toFile(path.join(out, 'thumbnails', `${id}.jpg`));
 }
-for (const file of await fs.readdir(path.join(source, 'logos'))) {
-  if (!file.endsWith('.svg')) continue;
-  const name = path.parse(file).name;
-  const { data, info } = await sharp(path.join(source, 'logos', file), { density: 192 })
-    .resize({ width: 720, height: 360, fit: 'inside' })
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  // Match the white-logo CSS treatment while preserving the SVG's alpha channel.
-  if (['apple-tv', 'disney-plus', 'prime-video', 'das-erste'].includes(name)) {
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = 255;
-      data[i + 1] = 255;
-      data[i + 2] = 255;
-    }
-  }
-  await sharp(data, { raw: info })
-    .png()
-    .toFile(path.join(out, 'logos', `${name}.png`));
-}
 const icons = {};
 const map = JSON.parse(await fs.readFile(path.join(root, 'src/app-icons.json'), 'utf8'));
 for (const [id, relative] of Object.entries(map)) {
@@ -156,81 +133,6 @@ await fs.writeFile(
   JSON.parse(await fs.readFile(path.join(root, 'appinfo.json'), 'utf8')).version,
 );
 
-// Reuse the actual web icon components. This is build-time SVG rasterization;
-// the native application has no React/JavaScript runtime.
-const { ConnectionIcon } = await tsImport(
-  '../../src/components/connection-icon.tsx',
-  import.meta.url,
-);
-const uiIcons = {
-  settings: 'Settings2',
-  search: 'Search',
-  close: 'X',
-  check: 'Check',
-  heart: 'Heart',
-  'eye-off': 'EyeOff',
-  eye: 'Eye',
-  type: 'Type',
-  clock: 'Clock3',
-  motion: 'Accessibility',
-  refresh: 'RefreshCw',
-  right: 'ChevronRight',
-  left: 'ArrowLeft',
-  arrow: 'ArrowRight',
-  more: 'MoreHorizontal',
-  grid: 'Grid2X2',
-  alert: 'CircleAlert',
-  sparkles: 'Sparkles',
-  tv: 'Tv',
-  coffee: 'Coffee',
-  globe: 'Globe',
-  moonlight: 'MonitorPlay',
-  gaming: 'Gamepad2',
-  generic: 'AppWindow',
-  language: 'Languages',
-  location: 'MapPin',
-  thermometer: 'Thermometer',
-  'weather-sun': 'Sun',
-  'weather-moon': 'Moon',
-  'weather-partly-cloudy': 'CloudSun',
-  'weather-cloud': 'Cloud',
-  'weather-fog': 'CloudFog',
-  'weather-drizzle': 'CloudDrizzle',
-  'weather-rain': 'CloudRain',
-  'weather-snow': 'CloudSnow',
-  'weather-storm': 'CloudLightning',
-};
-async function rasterIcon(name, element) {
-  let svg = renderToStaticMarkup(element);
-  svg = svg.replace(
-    /<svg[^>]*>/,
-    (tag) =>
-      `${tag.replace(/\s(?:width|height|color|xmlns)="[^"]*"/g, '').slice(0, -1)} xmlns="http://www.w3.org/2000/svg" width="128" height="128" color="#fff">`,
-  );
-  await sharp(Buffer.from(svg))
-    .png()
-    .toFile(path.join(out, 'ui-icons', `${name}.png`));
-}
-for (const [name, component] of Object.entries(uiIcons)) {
-  await rasterIcon(name, createElement(lucide[component], { strokeWidth: 1.65 }));
-}
-await rasterIcon('heart-filled', createElement(lucide.Heart, { fill: '#fff', strokeWidth: 0 }));
-for (const [name, title] of Object.entries({
-  playstation: 'PlayStation 5',
-  'apple-tv': 'Apple TV',
-  usb: 'USB',
-  hdmi: 'HDMI 1',
-  console: 'Xbox',
-  computer: 'PC',
-  streamer: 'Roku',
-})) {
-  await rasterIcon(
-    `input-${name}`,
-    createElement(ConnectionIcon, {
-      input: { title, id: 'com.webos.app.hdmi1', port: 'HDMI 1', kind: name },
-    }),
-  );
-}
 const surfaces = {
   generic: ['#4e5c6b', '#243c4e'],
   netflix: ['#141414', '#141414'],
@@ -263,20 +165,7 @@ for (const [brand, [top, bottom]] of Object.entries(surfaces)) {
     .png()
     .toFile(path.join(out, 'surfaces', `${brand}.png`));
 }
-await sharp(
-  Buffer.from(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="white"/><g fill="none" stroke="#15271c" stroke-linecap="round"><path d="M11 18q15-6 27 2" stroke-width="4"/><path d="M13 25q13-5 23 2" stroke-width="3.5"/><path d="M15 32q10-4 18 1" stroke-width="3"/></g></svg>',
-  ),
-)
-  .png()
-  .toFile(path.join(out, 'ui-icons/spotify.png'));
-await sharp(
-  Buffer.from(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 48 48"><g fill="white" transform="translate(24 24) rotate(45)"><rect x="-19" y="-19" width="15" height="15"/><rect x="4" y="-19" width="15" height="15"/><rect x="-19" y="4" width="15" height="15"/><rect x="4" y="4" width="15" height="15"/></g></svg>',
-  ),
-)
-  .png()
-  .toFile(path.join(out, 'ui-icons/kodi.png'));
+await generateVectorAssets();
 await sharp(path.join(source, 'app-icon.svg'))
   .resize(130, 130)
   .png()

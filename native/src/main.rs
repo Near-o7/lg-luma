@@ -8,6 +8,7 @@ mod raster;
 mod renderer;
 mod state;
 mod storage;
+mod vector;
 mod view;
 mod weather;
 #[path = "weather-service.rs"]

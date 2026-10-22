@@ -3,6 +3,7 @@
 use crate::{
     raster::{Shelf, Size, Viewport, glyph_size, recyclable_page},
     state::Rect,
+    vector,
 };
 use fontdue::{Font, Metrics};
 use gl::types::*;
@@ -120,6 +121,9 @@ pub struct RenderStats {
     pub glyph_atlas_pages: usize,
     pub glyph_atlas_bytes: usize,
     pub artwork_bytes: usize,
+    pub vector_meshes: usize,
+    pub vector_bytes: usize,
+    pub vector_triangles: usize,
     pub high_resolution_wallpaper: bool,
     pub draw_calls: usize,
     pub cpu_submission_ms: f64,
@@ -140,6 +144,9 @@ impl RenderStats {
             glyph_atlas_pages: 0,
             glyph_atlas_bytes: 0,
             artwork_bytes: 0,
+            vector_meshes: 0,
+            vector_bytes: 0,
+            vector_triangles: 0,
             high_resolution_wallpaper: false,
             draw_calls: 0,
             cpu_submission_ms: 0.,
@@ -147,15 +154,27 @@ impl RenderStats {
     }
 }
 
+enum BatchKind {
+    Paint {
+        texture: GLuint,
+        start: usize,
+        count: usize,
+    },
+    Vector {
+        path: String,
+        rect: Rect,
+        tint: Color,
+    },
+}
+
 struct Batch {
-    texture: GLuint,
-    start: usize,
-    count: usize,
+    kind: BatchKind,
     clip: Option<Rect>,
 }
 
 pub struct Renderer {
     program: GLuint,
+    vector_program: GLuint,
     buffer: GLuint,
     vao: GLuint,
     white: Texture,
@@ -165,6 +184,7 @@ pub struct Renderer {
     failed_fonts: HashSet<u16>,
     glyphs: HashMap<(char, u16, u16), Glyph>,
     textures: HashMap<String, Option<Texture>>,
+    vectors: HashMap<String, Option<vector::Mesh>>,
     artwork_variants: HashMap<String, String>,
     vertices: Vec<f32>,
     batches: Vec<Batch>,
@@ -200,20 +220,35 @@ impl Renderer {
         }
         let fragment_highp = !gles || precision > 0;
         let qualifier = if fragment_highp { "highp" } else { "mediump" };
-        let vertex = if gles {
+        let vertex_prefix = if gles {
             format!("#version 100\nprecision highp float;\n#define PAINT_PRECISION {qualifier}\n")
         } else {
             "#version 150\n#define attribute in\n#define varying out\n#define PAINT_PRECISION\n"
                 .into()
-        } + include_str!("shaders/paint.vert");
-        let fragment = if gles {
+        };
+        let fragment_prefix = if gles {
             format!(
                 "#version 100\nprecision {qualifier} float;\n#define PAINT_PRECISION {qualifier}\n"
             )
         } else {
             "#version 150\n#define varying in\n#define texture2D texture\nout vec4 out_color;\n#define gl_FragColor out_color\n#define PAINT_PRECISION\n".into()
-        } + include_str!("shaders/paint.frag");
-        let program = link(&vertex, &fragment)?;
+        };
+        let program = link(
+            &(vertex_prefix.clone() + include_str!("shaders/paint.vert")),
+            &(fragment_prefix.clone() + include_str!("shaders/paint.frag")),
+            &[c"a_position", c"a_uv", c"a_color", c"a_shape", c"a_params"],
+        )?;
+        let vector_program = match link(
+            &(vertex_prefix + include_str!("shaders/vector.vert")),
+            &(fragment_prefix + include_str!("shaders/vector.frag")),
+            &[c"a_position", c"a_offset", c"a_color", c"a_coverage"],
+        ) {
+            Ok(program) => program,
+            Err(error) => {
+                unsafe { gl::DeleteProgram(program) };
+                return Err(error);
+            }
+        };
         let mut buffer = 0;
         let mut vao = 0;
         unsafe {
@@ -237,6 +272,7 @@ impl Renderer {
         let white = texture(1, 1, &[255; 4]);
         Ok(Self {
             program,
+            vector_program,
             buffer,
             vao,
             white,
@@ -246,6 +282,7 @@ impl Renderer {
             failed_fonts: HashSet::new(),
             glyphs: HashMap::new(),
             textures: HashMap::new(),
+            vectors: HashMap::new(),
             artwork_variants: HashMap::new(),
             vertices: Vec::with_capacity(65536),
             batches: Vec::new(),
@@ -453,15 +490,24 @@ impl Renderer {
                 (Some(a), Some(b)) => a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h,
                 _ => false,
             };
-            if batch.texture == texture && same_clip {
-                batch.count += 6;
+            if same_clip
+                && let BatchKind::Paint {
+                    texture: previous,
+                    count,
+                    ..
+                } = &mut batch.kind
+                && *previous == texture
+            {
+                *count += 6;
                 return;
             }
         }
         self.batches.push(Batch {
-            texture,
-            start,
-            count: 6,
+            kind: BatchKind::Paint {
+                texture,
+                start,
+                count: 6,
+            },
             clip: self.clip,
         });
     }
@@ -605,6 +651,10 @@ impl Renderer {
     }
 
     fn image(&mut self, path: &str, mut rect: Rect, radius: f32, contain: bool, tint: Color) {
+        if path.ends_with(".lvec") {
+            self.vector_image(path, rect, contain, tint);
+            return;
+        }
         let path = if self.stats.viewport.scale > 1.
             && self.info.max_texture_size >= 3840
             && Path::new(path)
@@ -660,6 +710,60 @@ impl Renderer {
             rect = Rect::new(rect.x + (rect.w - w) / 2., rect.y + (rect.h - h) / 2., w, h);
         }
         self.quad(rect, [0., 0., 1., 1.], radius, 0., tint, id);
+    }
+
+    fn vector_image(&mut self, path: &str, mut rect: Rect, contain: bool, tint: Color) {
+        if rect.w <= 0. || rect.h <= 0. {
+            return;
+        }
+        let mesh = self.vectors.entry(path.into()).or_insert_with(|| {
+            match vector::Mesh::load(Path::new(path)) {
+                Ok(mesh) => Some(mesh),
+                Err(error) => {
+                    eprintln!("{error}");
+                    None
+                }
+            }
+        });
+        let Some(mesh) = mesh else {
+            self.stats.missing_images += 1;
+            return;
+        };
+        if contain {
+            let scale = (rect.w / mesh.width).min(rect.h / mesh.height);
+            let width = mesh.width * scale;
+            let height = mesh.height * scale;
+            rect = Rect::new(
+                rect.x + (rect.w - width) / 2.,
+                rect.y + (rect.h - height) / 2.,
+                width,
+                height,
+            );
+        }
+        let clip = if let Some(clip) = self.clip {
+            let x = rect.x.max(clip.x);
+            let y = rect.y.max(clip.y);
+            Rect::new(
+                x,
+                y,
+                (rect.x + rect.w).min(clip.x + clip.w).max(x) - x,
+                (rect.y + rect.h).min(clip.y + clip.h).max(y) - y,
+            )
+        } else {
+            rect
+        };
+        if clip.w <= 0. || clip.h <= 0. {
+            return;
+        }
+        self.stats.vector_triangles += mesh.vertices as usize / 3;
+        self.batches.push(Batch {
+            kind: BatchKind::Vector {
+                path: path.into(),
+                rect,
+                tint,
+            },
+            clip: Some(clip),
+        });
     }
 
     pub fn render(&mut self, commands: &[Draw], width: u32, height: u32) {
@@ -720,7 +824,6 @@ impl Renderer {
             gl::ClearColor(0.04, 0.04, 0.05, 1.);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::Viewport(vx, vy, vw, vh);
-            gl::UseProgram(self.program);
             if self.vao != 0 {
                 gl::BindVertexArray(self.vao);
             }
@@ -731,19 +834,7 @@ impl Renderer {
                 self.vertices.as_ptr().cast(),
                 gl::DYNAMIC_DRAW,
             );
-            let mut offset = 0;
-            for (index, size) in [2, 2, 4, 4, 2].into_iter().enumerate() {
-                gl::EnableVertexAttribArray(index as u32);
-                gl::VertexAttribPointer(
-                    index as u32,
-                    size,
-                    gl::FLOAT,
-                    gl::FALSE,
-                    56,
-                    (offset * size_of::<f32>()) as *const _,
-                );
-                offset += size as usize;
-            }
+            gl::UseProgram(self.program);
             gl::Uniform1f(
                 gl::GetUniformLocation(self.program, c"u_aa".as_ptr()),
                 0.85 / scale.max(0.01),
@@ -753,6 +844,7 @@ impl Renderer {
                 0,
             );
             gl::ActiveTexture(gl::TEXTURE0);
+            let mut paint_bound = false;
             for batch in &self.batches {
                 if let Some(clip) = batch.clip {
                     gl::Enable(gl::SCISSOR_TEST);
@@ -765,8 +857,76 @@ impl Renderer {
                 } else {
                     gl::Disable(gl::SCISSOR_TEST);
                 }
-                gl::BindTexture(gl::TEXTURE_2D, batch.texture);
-                gl::DrawArrays(gl::TRIANGLES, batch.start as i32, batch.count as i32);
+                match &batch.kind {
+                    BatchKind::Paint {
+                        texture,
+                        start,
+                        count,
+                    } => {
+                        if !paint_bound {
+                            gl::UseProgram(self.program);
+                            gl::BindBuffer(gl::ARRAY_BUFFER, self.buffer);
+                            let mut offset = 0;
+                            for (index, size) in [2, 2, 4, 4, 2].into_iter().enumerate() {
+                                gl::EnableVertexAttribArray(index as u32);
+                                gl::VertexAttribPointer(
+                                    index as u32,
+                                    size,
+                                    gl::FLOAT,
+                                    gl::FALSE,
+                                    56,
+                                    (offset * size_of::<f32>()) as *const _,
+                                );
+                                offset += size as usize;
+                            }
+                            paint_bound = true;
+                        }
+                        gl::BindTexture(gl::TEXTURE_2D, *texture);
+                        gl::DrawArrays(gl::TRIANGLES, *start as i32, *count as i32);
+                    }
+                    BatchKind::Vector { path, rect, tint } => {
+                        let Some(mesh) = self.vectors.get(path).and_then(Option::as_ref) else {
+                            continue;
+                        };
+                        gl::UseProgram(self.vector_program);
+                        gl::BindBuffer(gl::ARRAY_BUFFER, mesh.buffer);
+                        gl::DisableVertexAttribArray(4);
+                        let mut offset = 0;
+                        for (index, size) in [2, 2, 4, 1].into_iter().enumerate() {
+                            gl::EnableVertexAttribArray(index as u32);
+                            gl::VertexAttribPointer(
+                                index as u32,
+                                size,
+                                gl::FLOAT,
+                                gl::FALSE,
+                                36,
+                                (offset * size_of::<f32>()) as *const _,
+                            );
+                            offset += size as usize;
+                        }
+                        gl::Uniform4f(
+                            gl::GetUniformLocation(self.vector_program, c"u_transform".as_ptr()),
+                            rect.w / mesh.width,
+                            rect.h / mesh.height,
+                            rect.x,
+                            rect.y,
+                        );
+                        gl::Uniform2f(
+                            gl::GetUniformLocation(self.vector_program, c"u_pixel_scale".as_ptr()),
+                            vw as f32 / 1920.,
+                            vh as f32 / 1080.,
+                        );
+                        gl::Uniform4f(
+                            gl::GetUniformLocation(self.vector_program, c"u_tint".as_ptr()),
+                            tint[0],
+                            tint[1],
+                            tint[2],
+                            tint[3],
+                        );
+                        gl::DrawArrays(gl::TRIANGLES, 0, mesh.vertices);
+                        paint_bound = false;
+                    }
+                }
             }
             gl::Disable(gl::SCISSOR_TEST);
         }
@@ -805,7 +965,9 @@ impl Renderer {
             .iter()
             .map(|page| page.texture.width as usize * page.texture.height as usize * 4)
             .sum();
-        self.stats.artwork_bytes = bytes;
+        self.stats.vector_meshes = self.vectors.values().flatten().count();
+        self.stats.vector_bytes = self.vectors.values().flatten().map(|mesh| mesh.bytes).sum();
+        self.stats.artwork_bytes = bytes + self.stats.vector_bytes;
         self.stats.draw_calls = self.batches.len();
         self.stats.cpu_submission_ms = started.elapsed().as_secs_f64() * 1000.;
     }
@@ -914,6 +1076,7 @@ impl Drop for Renderer {
         unsafe {
             gl::DeleteBuffers(1, &self.buffer);
             gl::DeleteProgram(self.program);
+            gl::DeleteProgram(self.vector_program);
             if self.vao != 0 {
                 gl::DeleteVertexArrays(1, &self.vao);
             }
@@ -994,7 +1157,7 @@ fn compile(kind: GLenum, source: &str) -> Result<GLuint, String> {
     }
 }
 
-fn link(vertex: &str, fragment: &str) -> Result<GLuint, String> {
+fn link(vertex: &str, fragment: &str, attributes: &[&CStr]) -> Result<GLuint, String> {
     let vertex = compile(gl::VERTEX_SHADER, vertex)?;
     let fragment = match compile(gl::FRAGMENT_SHADER, fragment) {
         Ok(fragment) => fragment,
@@ -1009,10 +1172,7 @@ fn link(vertex: &str, fragment: &str) -> Result<GLuint, String> {
         let program = gl::CreateProgram();
         gl::AttachShader(program, vertex);
         gl::AttachShader(program, fragment);
-        for (index, name) in [c"a_position", c"a_uv", c"a_color", c"a_shape", c"a_params"]
-            .iter()
-            .enumerate()
-        {
+        for (index, name) in attributes.iter().enumerate() {
             gl::BindAttribLocation(program, index as u32, name.as_ptr());
         }
         gl::LinkProgram(program);

@@ -156,7 +156,7 @@ impl Scene {
     }
     fn icon(&mut self, assets: &Assets, name: &str, rect: Rect, color: Color) {
         self.draw.push(Draw::TintedImage(
-            assets.path(format!("ui-icons/{name}.png")),
+            assets.path(format!("ui-icons/{name}.lvec")),
             rect,
             0.,
             true,
@@ -525,7 +525,7 @@ fn tile(
             88.
         };
         out.image(
-            assets.path(format!("logos/{}.png", app.brand)),
+            assets.path(format!("logos/{}.lvec", app.brand)),
             Rect::new(
                 rect.x + rect.w * (1. - ratio) / 2.,
                 rect.y + (rect.h - h) / 2.,

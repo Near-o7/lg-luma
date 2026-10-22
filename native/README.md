@@ -34,14 +34,42 @@ origins/baselines; text layout and kerning stay in 1920×1080 logical coordinate
 opens a fullscreen preview. Rust changes use incremental compilation and a relaunch.
 
 Assets are prepared under `.build/native/assets` from the existing wallpapers, SVG logos, collected
-app artwork and Inter font. The font is decompressed to TTF and the SVGs are rasterized at build
-time. The variable font is instantiated at the web UI's weights and optical sizes. A bundled
+app artwork and Inter font. The font is decompressed to TTF, and bundled SVG icons/logos are
+compiled into vector triangle meshes at build time. The variable font is instantiated at the web
+UI's weights and optical sizes. A bundled
 Noto Sans SC source produces regular/medium Luma CJK fallback subsets for Chinese labels and
 common CJK app/location names. No system font is required. `pnpm native:font-assets` can restore
 the checksum-pinned source font if deliberately removed. Wallpaper
 cropping, saturation, shading and tile gradients are prepared ahead of time from the web design,
 and UI/input icons reuse the web components at build time. No asset downloads occur.
 Regenerate assets after changing their sources.
+
+### Vector icons and logos
+
+Bundled SVG logos, Lucide controls and input marks use `.lvec` geometry, not PNG textures.
+`native/tools/vector-assets/` is a host-only Rust compiler using usvg, tiny-skia-path's stroke
+outlines and lyon tessellation. It resolves transforms, fill rules/holes, round strokes and the
+bundled linear/radial gradients. Antialiasing geometry is attached only to actual path boundaries;
+its fringe stays one physical pixel wide as the drawable density changes. Gradient colors are
+adaptively sampled into vertex colors at build time. Original SVGs remain the editable sources.
+
+The TV lazily loads each mesh into a static GPU vertex buffer once. A GLES2 shader applies
+placement, scale, tint and edge coverage; it uses no icon texture, SVG parser, tessellator or image
+decoder. Text still uses the separate grayscale glyph atlas. The geometry compiler is not linked
+into the TV executable. All geometry is generated for the bundled TV artwork sizes, including
+high-density rendering, rather than retessellated every frame.
+
+`pnpm native:assets` includes this step. To rebuild just the vector artwork:
+
+```sh
+nix develop --command pnpm native:vector-assets
+```
+
+The packager requires `assets/vector-artwork.json` and valid meshes, and excludes stale generated
+icon/logo PNGs. Collected app artwork stays PNG/JPEG, wallpapers and prepared tile backgrounds
+remain raster images, and the webOS installation icon remains PNG. These assets do not have SVG
+icon/logo rendering work on the TV. Diagnostics report cached vector meshes, GPU bytes and the
+number of vector triangles submitted in the frame.
 
 The renderer loads the common Inter 400 face initially, then loads other weights/optical sizes
 only when text uses them. CJK fallback faces are opened only when Inter lacks a character in the
@@ -73,7 +101,7 @@ pnpm native:package --4k
 The renderer selects these at densities above 1× when the GPU supports their texture size, and
 otherwise uses the 1080p assets. SVG backgrounds are rasterized at the higher resolution;
 photographic detail remains limited by the bundled source photographs. Regenerate and restart
-the preview after changing assets. Logos and UI icons already have oversized backing images.
+the preview after changing assets. Logos and UI icons use vector geometry at either density.
 
 A 4K offscreen capture works independently of the desktop window's size:
 

@@ -13,6 +13,9 @@
   records its Google Fonts revision and SHA-256 checksums. Asset preparation produces renamed
   Luma CJK regular/medium subsets for native rendering and includes the license with the package.
 - Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
+- Native bundled logos and interface/input icons are derived `.lvec` triangle geometry compiled
+  from these same SVG sources; their source licenses and attributions still apply. Source artwork
+  and the existing monochrome/color treatments are preserved by `native/tools/vector-assets.mjs`.
 - Native TV packages bundle [SDL-webOS](https://github.com/webosbrew/SDL-webOS) 2.30.12
   (`release-2.30.12-webos.5`, standard SDL ABI), zlib license. `native/tools/webos-runtime.mjs`
   records the release and archive/library SHA-256 checksums. Its notice is in
