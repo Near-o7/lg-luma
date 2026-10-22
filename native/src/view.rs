@@ -5,6 +5,7 @@ use crate::{
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
         Control, KEYS, Overlay, Page, Rect, State, Subpage, Target, TextField, WEATHER_SECTION,
+        HOME_TILE_PITCH, HOME_TILE_WIDTH,
     },
     weather::{self, Unit},
 };
@@ -458,7 +459,9 @@ fn tile(
         Rect::new(rect.x, rect.y, rect.w, rect.h + label_height),
         true,
     );
-    if rect.y + rect.h + label_height < MAIN_TOP || rect.y > 1054. {
+    if rect.y + rect.h + label_height < MAIN_TOP || rect.y > 1054.
+        || rect.x + rect.w + 40. < 64. || rect.x - 40. > 1856.
+    {
         return;
     }
     let start = out.draw.len();
@@ -812,30 +815,15 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         );
         grid_height = 247.5;
     }
-    let mut y = 544.8;
-    for row in apps.chunks(6) {
-        let row_height = FACE_HEIGHT
-            + if names {
-                18.4 + row
-                    .iter()
-                    .map(|app| caption_height(state, assets, app, 270.))
-                    .fold(49.28, f32::max)
-            } else {
-                0.
-            };
-        for (column, app) in row.iter().enumerate() {
-            tile(
-                out,
-                state,
-                assets,
-                app,
-                Rect::new(84. + column as f32 * GRID_PITCH, y - s, 270., FACE_HEIGHT),
-                names,
-                false,
-            );
-        }
-        grid_height = y + row_height - 544.8;
-        y += row_height + 32.;
+    if !apps.is_empty() {
+        grid_height = FACE_HEIGHT + if names {
+            18.4 + apps.iter().map(|app| caption_height(state, assets, app, HOME_TILE_WIDTH)).fold(49.28, f32::max)
+        } else { 0. };
+    }
+    for (index, app) in apps.iter().enumerate() {
+        tile(out, state, assets, app,
+            Rect::new(84. + index as f32 * HOME_TILE_PITCH - state.home_scroll, 544.8 - s, HOME_TILE_WIDTH, FACE_HEIGHT),
+            names, false);
     }
     let input_y = 544.8 + grid_height + 41.6 - s;
     let inputs: Vec<_> = state

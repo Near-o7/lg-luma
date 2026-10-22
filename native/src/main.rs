@@ -739,8 +739,16 @@ fn run() -> Result<(), String> {
                     }
                     _ => {}
                 },
-                Event::MouseWheel { y, .. } if state.overlay.is_none() => {
-                    let max = scene
+                Event::MouseWheel { x, y, mouse_x, mouse_y, .. } if state.overlay.is_none() => {
+                    let over_favorites = state.page == state::Page::Home
+                        && pointer_position(&window, mouse_x, mouse_y).is_some_and(|(x, y)| {
+                            (64. ..1856.).contains(&x) && scene.controls.iter().any(|control| matches!(control.target, Target::App(_)) && control.rect.contains(x, y))
+                        });
+                    if state.page == state::Page::Home && (x != 0 || over_favorites) {
+                        state.scroll_favorites((if x != 0 { x } else { -y }) as f32 * state::HOME_TILE_PITCH);
+                        press = None;
+                    } else {
+                        let max = scene
                         .controls
                         .iter()
                         .filter(|c| c.scrollable)
@@ -753,7 +761,8 @@ fn run() -> Result<(), String> {
                                 }
                         })
                         .fold(0., f32::max);
-                    state.scroll = (state.scroll - y as f32 * 90.).clamp(0., max.max(0.));
+                        state.scroll = (state.scroll - y as f32 * 90.).clamp(0., max.max(0.));
+                    }
                     state.pointer = true;
                     state.dirty = true;
                 }
@@ -930,7 +939,7 @@ fn run() -> Result<(), String> {
     if let Some(path) = options.dump {
         let state = serde_json::json!({ "page": state.page, "focus": state.focus, "query": state.query,
             "filter": state.filter, "preferences": state.preferences, "apps": state.apps().iter().map(|a| &a.id).collect::<Vec<_>>(),
-            "error": state.error, "scroll": state.scroll, "subpage": state.subpage, "modal": state.overlay.is_some(), "weather": state.weather,
+            "error": state.error, "scroll": state.scroll, "home_scroll": state.home_scroll, "subpage": state.subpage, "modal": state.overlay.is_some(), "weather": state.weather,
             "ui_text": scene.draw.iter().filter_map(|draw| match draw { renderer::Draw::Text(value, ..) => Some(value), _ => None }).collect::<Vec<_>>() });
         std::fs::write(
             path,
@@ -986,7 +995,7 @@ fn hit(
         .find(|control| {
             control.rect.contains(x, y)
                 && (!control.scrollable
-                    || (y >= 108.8
+                    || (x >= 64. && x < 1856. && y >= 108.8
                         && y < if state.page == state::Page::Home && state.moving.is_none() {
                             1053.6
                         } else {

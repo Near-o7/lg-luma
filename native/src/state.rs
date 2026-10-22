@@ -7,6 +7,10 @@ use std::time::{Duration, Instant};
 pub const WEATHER_SECTION: usize = 2;
 pub const INPUTS_SECTION: usize = 3;
 pub const SECTION_COUNT: usize = 4;
+pub const HOME_STRIP_LEFT: f32 = 84.;
+pub const HOME_STRIP_RIGHT: f32 = 1836.;
+pub const HOME_TILE_WIDTH: f32 = 270.;
+pub const HOME_TILE_PITCH: f32 = 296.4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum Page {
@@ -130,6 +134,7 @@ pub struct State {
     pub section: usize,
     pub subpage: Option<Subpage>,
     pub scroll: f32,
+    pub home_scroll: f32,
     pub overlay: Option<Overlay>,
     pub moving: Option<String>,
     pub loading: bool,
@@ -157,6 +162,7 @@ impl State {
             section: 0,
             subpage: None,
             scroll: 0.,
+            home_scroll: 0.,
             overlay: None,
             moving: None,
             loading: false,
@@ -238,6 +244,7 @@ impl State {
         };
         self.focus = Target::Nav(self.page_index());
         self.scroll = 0.;
+        if self.page == Page::Home { self.scroll_favorites(0.); }
         self.query.clear();
         self.filter = 0;
         self.overlay = None;
@@ -282,6 +289,16 @@ impl State {
         apps
     }
 
+    pub fn scroll_favorites(&mut self, delta: f32) {
+        let count = self.preferences.favorites(&self.inventory.apps).iter()
+            .filter(|id| !self.preferences.hidden.contains(id)
+                && self.inventory.apps.iter().any(|app| &app.id == *id)).count();
+        let content = if count == 0 { 0. } else { (count - 1) as f32 * HOME_TILE_PITCH + HOME_TILE_WIDTH };
+        let max = (content - (HOME_STRIP_RIGHT - HOME_STRIP_LEFT)).max(0.);
+        let next = (self.home_scroll + delta).clamp(0., max);
+        if next != self.home_scroll { self.home_scroll = next; self.dirty = true; }
+    }
+
     pub fn set_inventory(&mut self, next: Inventory, warning: Option<String>) {
         self.inventory.apps = next.apps;
         if let Some(warning) = warning {
@@ -296,6 +313,7 @@ impl State {
     }
 
     pub fn reconcile_focus(&mut self) {
+        if self.page == Page::Home { self.scroll_favorites(0.); }
         if let Target::App(id) = &self.focus
             && !self.apps().iter().any(|app| &app.id == id)
         {
@@ -316,7 +334,7 @@ impl State {
         match self.page {
             Page::Home => self
                 .apps()
-                .first()
+                .get(((self.home_scroll - 0.01).max(0.) / HOME_TILE_PITCH).ceil() as usize)
                 .map(|app| Target::App(app.id.clone()))
                 .unwrap_or(if self.error.is_some() {
                     Target::Retry
@@ -350,7 +368,15 @@ impl State {
     /// Pointer paths deliberately do not call this method.
     pub fn reveal_focus(&mut self, controls: &[Control]) -> bool {
         let previous = self.scroll;
+        let previous_home = self.home_scroll;
         if let Some(control) = controls.iter().find(|c| c.target == self.focus) {
+            if self.page == Page::Home && matches!(self.focus, Target::App(_)) {
+                if control.rect.x < HOME_STRIP_LEFT {
+                    self.home_scroll += control.rect.x - HOME_STRIP_LEFT;
+                } else if control.rect.x + control.rect.w > HOME_STRIP_RIGHT {
+                    self.home_scroll += control.rect.x + control.rect.w - HOME_STRIP_RIGHT;
+                }
+            }
             if matches!(
                 self.focus,
                 Target::Nav(_)
@@ -362,7 +388,7 @@ impl State {
             ) {
                 self.scroll = 0.;
             } else if control.scrollable {
-                let top = 120.8;
+                let top = if self.page == Page::Apps { 164.8 } else { 120.8 };
                 if control.rect.y < top {
                     self.scroll = (self.scroll + control.rect.y - top).max(0.);
                 }
@@ -376,10 +402,11 @@ impl State {
                 }
             }
         }
-        if self.scroll != previous {
+        if self.page == Page::Home { self.scroll_favorites(0.); }
+        if self.scroll != previous || self.home_scroll != previous_home {
             self.dirty = true;
         }
-        self.scroll != previous
+        self.scroll != previous || self.home_scroll != previous_home
     }
 
     /// Hover and pointer-down must not move the control before pointer-up.
@@ -481,6 +508,31 @@ impl State {
             return vec![];
         }
         if self.overlay.is_none() {
+            if self.page == Page::Home
+                && let Target::App(id) = &self.focus
+            {
+                let apps = self.apps();
+                if let Some(index) = apps.iter().position(|app| &app.id == id) {
+                    match direction {
+                        Direction::Left | Direction::Right => {
+                            let next = if matches!(direction, Direction::Left) { index.saturating_sub(1) } else { (index + 1).min(apps.len() - 1) };
+                            let id = apps[next].id.clone();
+                            self.focus(Target::App(id), controls);
+                        }
+                        Direction::Up => self.focus(Target::Nav(0), controls),
+                        Direction::Down => {
+                            let x = controls.iter().find(|control| control.target == self.focus).map_or(960., |control| control.rect.center().0);
+                            let top = controls.iter().filter(|control| matches!(control.target, Target::Input(_)))
+                                .map(|control| control.rect.y).fold(f32::INFINITY, f32::min);
+                            let next = controls.iter().filter(|control| matches!(control.target, Target::Input(_)) && (control.rect.y - top).abs() < 1.)
+                                .min_by(|a, b| (a.rect.center().0 - x).abs().total_cmp(&(b.rect.center().0 - x).abs()))
+                                .map(|control| control.target.clone());
+                            if let Some(next) = next { self.focus(next, controls); }
+                        }
+                    }
+                    return vec![];
+                }
+            }
             if let Target::Choice(index) = self.focus {
                 let count = if matches!(self.subpage, Some(Subpage::Clock | Subpage::Temperature)) {
                     2
@@ -704,6 +756,8 @@ impl State {
         let next = controls
             .iter()
             .filter(|candidate| candidate.target != self.focus)
+            .filter(|candidate| self.page != Page::Home || !matches!(candidate.target, Target::App(_))
+                || (candidate.rect.x >= HOME_STRIP_LEFT - 0.1 && candidate.rect.x + candidate.rect.w <= HOME_STRIP_RIGHT + 0.1))
             .filter_map(|candidate| {
                 // Header controls never steal an Up route from the active tab.
                 if self.overlay.is_none()
