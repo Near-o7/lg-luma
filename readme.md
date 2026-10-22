@@ -54,7 +54,8 @@ luna-send -i luna://com.webos.appInstallService/dev/install \
 ### Takeover Method
 
 > [!WARNING]
-> Home replacement is experimental. Confirmed working on **webOS 26**.
+> Home replacement is experimental.\
+> Confirmed working on **webOS 26**.\
 > Ensure to disable takeover before uninstalling Luma.
 
 Install Luma and verify that it opens normally. Disable any Home mapping e.g.
