@@ -1,310 +1,512 @@
 {
-  "home": { "en": "Home", "de": "Start", "zh": "主页" },
-  "apps": { "en": "Apps", "de": "Apps", "zh": "应用" },
-  "inputs": { "en": "Inputs", "de": "Eingänge", "zh": "输入源" },
-  "settings": { "en": "Settings", "de": "Einstellungen", "zh": "设置" },
-  "settingsRegion": { "en": "Luma settings", "de": "Luma-Einstellungen", "zh": "Luma 设置" },
-  "mainNavigation": { "en": "Main navigation", "de": "Hauptnavigation", "zh": "主导航" },
-  "settingsSections": { "en": "Settings sections", "de": "Einstellungsbereiche", "zh": "设置分类" },
-  "stateOn": { "en": "On", "de": "Ein", "zh": "开" },
-  "stateOff": { "en": "Off", "de": "Aus", "zh": "关" },
-  "stateAuto": { "en": "Auto", "de": "Automatisch", "zh": "自动" },
-  "inputAlways": { "en": "Always show", "de": "Immer anzeigen", "zh": "始终显示" },
-  "inputNever": { "en": "Never show", "de": "Nie anzeigen", "zh": "从不显示" },
+  "home": { "en": "Home", "de": "Start", "es": "Inicio", "zh": "主页" },
+  "apps": { "en": "Apps", "de": "Apps", "es": "Aplicaciones", "zh": "应用" },
+  "inputs": { "en": "Inputs", "de": "Eingänge", "es": "Entradas", "zh": "输入源" },
+  "settings": { "en": "Settings", "de": "Einstellungen", "es": "Ajustes", "zh": "设置" },
+  "settingsRegion": {
+    "en": "Luma settings",
+    "de": "Luma-Einstellungen",
+    "es": "Ajustes de Luma",
+    "zh": "Luma 设置"
+  },
+  "mainNavigation": {
+    "en": "Main navigation",
+    "de": "Hauptnavigation",
+    "es": "Navegación principal",
+    "zh": "主导航"
+  },
+  "settingsSections": {
+    "en": "Settings sections",
+    "de": "Einstellungsbereiche",
+    "es": "Secciones de ajustes",
+    "zh": "设置分类"
+  },
+  "stateOn": { "en": "On", "de": "Ein", "es": "Activado", "zh": "开" },
+  "stateOff": { "en": "Off", "de": "Aus", "es": "Desactivado", "zh": "关" },
+  "stateAuto": { "en": "Auto", "de": "Automatisch", "es": "Automático", "zh": "自动" },
+  "inputAlways": {
+    "en": "Always show",
+    "de": "Immer anzeigen",
+    "es": "Mostrar siempre",
+    "zh": "始终显示"
+  },
+  "inputNever": {
+    "en": "Never show",
+    "de": "Nie anzeigen",
+    "es": "No mostrar nunca",
+    "zh": "从不显示"
+  },
   "inputWhenConnected": {
     "en": "Only show when connected",
     "de": "Nur anzeigen, wenn verbunden",
+    "es": "Mostrar solo cuando esté conectada",
     "zh": "仅在连接时显示"
   },
-  "back": { "en": "Back", "de": "Zurück", "zh": "返回" },
-  "background": { "en": "Background", "de": "Hintergrund", "zh": "背景" },
-  "interface": { "en": "General", "de": "Allgemein", "zh": "通用" },
-  "favorites": { "en": "Favorites", "de": "Favoriten", "zh": "收藏" },
-  "weather": { "en": "Weather", "de": "Wetter", "zh": "天气" },
-  "location": { "en": "Location", "de": "Standort", "zh": "地点" },
+  "back": { "en": "Back", "de": "Zurück", "es": "Atrás", "zh": "返回" },
+  "background": { "en": "Background", "de": "Hintergrund", "es": "Fondo", "zh": "背景" },
+  "interface": { "en": "General", "de": "Allgemein", "es": "General", "zh": "通用" },
+  "favorites": { "en": "Favorites", "de": "Favoriten", "es": "Favoritos", "zh": "收藏" },
+  "weather": { "en": "Weather", "de": "Wetter", "es": "Tiempo", "zh": "天气" },
+  "location": { "en": "Location", "de": "Standort", "es": "Ubicación", "zh": "地点" },
   "manageWeatherLocation": {
     "en": "Set up location",
     "de": "Standort einrichten",
+    "es": "Configurar ubicación",
     "zh": "设置地点"
   },
-  "locationResults": { "en": "Location results", "de": "Suchergebnisse", "zh": "地点搜索结果" },
+  "locationResults": {
+    "en": "Location results",
+    "de": "Suchergebnisse",
+    "es": "Resultados",
+    "zh": "地点搜索结果"
+  },
   "showAppNames": {
     "en": "Show app names",
     "de": "App-Namen auf dem Startbildschirm anzeigen",
+    "es": "Mostrar nombres de apps",
     "zh": "在主页显示应用名称"
   },
-  "clock24": { "en": "24-hour clock", "de": "24-Stunden-Uhr", "zh": "24 小时制" },
-  "clockFormat": { "en": "Clock format", "de": "Uhrzeitformat", "zh": "时钟格式" },
-  "hour12": { "en": "12-hour", "de": "12 Stunden", "zh": "12 小时制" },
-  "hour24": { "en": "24-hour", "de": "24 Stunden", "zh": "24 小时制" },
-  "reducedMotion": { "en": "Reduced motion", "de": "Bewegungen reduzieren", "zh": "减少动态效果" },
+  "clock24": {
+    "en": "24-hour clock",
+    "de": "24-Stunden-Uhr",
+    "es": "Reloj de 24 horas",
+    "zh": "24 小时制"
+  },
+  "clockFormat": {
+    "en": "Clock format",
+    "de": "Uhrzeitformat",
+    "es": "Formato de hora",
+    "zh": "时钟格式"
+  },
+  "hour12": { "en": "12-hour", "de": "12 Stunden", "es": "12 horas", "zh": "12 小时制" },
+  "hour24": { "en": "24-hour", "de": "24 Stunden", "es": "24 horas", "zh": "24 小时制" },
+  "reducedMotion": {
+    "en": "Reduced motion",
+    "de": "Bewegungen reduzieren",
+    "es": "Reducir movimiento",
+    "zh": "减少动态效果"
+  },
   "refreshApps": {
     "en": "Refresh apps & inputs",
     "de": "Apps und Eingänge aktualisieren",
+    "es": "Actualizar apps y entradas",
     "zh": "刷新应用和输入源"
   },
-  "quitApp": { "en": "Quit app", "de": "App beenden", "zh": "退出应用" },
-  "language": { "en": "Language", "de": "Anzeigesprache", "zh": "显示语言" },
-  "english": { "en": "English", "de": "English", "zh": "English" },
-  "german": { "en": "Deutsch", "de": "Deutsch", "zh": "Deutsch" },
-  "chinese": { "en": "简体中文", "de": "简体中文", "zh": "简体中文" },
-  "showWidget": { "en": "Show widget", "de": "Widget anzeigen", "zh": "显示天气组件" },
-  "temperature": { "en": "Temperature", "de": "Temperatur", "zh": "温度" },
-  "celsius": { "en": "Celsius", "de": "Celsius", "zh": "摄氏度" },
-  "fahrenheit": { "en": "Fahrenheit", "de": "Fahrenheit", "zh": "华氏度" },
+  "quitApp": { "en": "Quit app", "de": "App beenden", "es": "Salir de la app", "zh": "退出应用" },
+  "language": { "en": "Language", "de": "Anzeigesprache", "es": "Idioma", "zh": "显示语言" },
+  "english": { "en": "English", "de": "English", "es": "English", "zh": "English" },
+  "german": { "en": "Deutsch", "de": "Deutsch", "es": "Deutsch", "zh": "Deutsch" },
+  "chinese": { "en": "简体中文", "de": "简体中文", "es": "简体中文", "zh": "简体中文" },
+  "showWidget": {
+    "en": "Show widget",
+    "de": "Widget anzeigen",
+    "es": "Mostrar widget",
+    "zh": "显示天气组件"
+  },
+  "temperature": { "en": "Temperature", "de": "Temperatur", "es": "Temperatura", "zh": "温度" },
+  "celsius": { "en": "Celsius", "de": "Celsius", "es": "Celsius", "zh": "摄氏度" },
+  "fahrenheit": { "en": "Fahrenheit", "de": "Fahrenheit", "es": "Fahrenheit", "zh": "华氏度" },
   "cityPostcode": {
     "en": "City or postcode",
     "de": "Stadt oder Postleitzahl",
+    "es": "Ciudad o código postal",
     "zh": "城市或邮政编码"
   },
-  "searchLocations": { "en": "Search locations", "de": "Orte suchen", "zh": "搜索地点" },
+  "searchLocations": {
+    "en": "Search locations",
+    "de": "Orte suchen",
+    "es": "Buscar ubicaciones",
+    "zh": "搜索地点"
+  },
   "removeWeatherLocation": {
     "en": "Remove weather location",
     "de": "Wetterort entfernen",
+    "es": "Eliminar ubicación del tiempo",
     "zh": "移除天气地点"
   },
   "enterCity": {
     "en": "Enter a city or postcode with at least two characters.",
     "de": "Gib mindestens zwei Zeichen für eine Stadt oder Postleitzahl ein.",
+    "es": "Escribe una ciudad o un código postal con al menos dos caracteres.",
     "zh": "请输入至少两个字符的城市或邮政编码。"
   },
   "noLocations": {
     "en": "No locations found. Try another city or postcode.",
     "de": "Keine Orte gefunden. Versuche eine andere Stadt oder Postleitzahl.",
+    "es": "Sin resultados. Prueba con otra ciudad o código postal.",
     "zh": "未找到地点，请尝试其他城市或邮政编码。"
   },
   "searchUnavailable": {
     "en": "Location search is unavailable. Check your connection and try again.",
     "de": "Die Ortssuche ist nicht verfügbar. Prüfe deine Verbindung und versuche es erneut.",
+    "es": "Búsqueda no disponible. Revisa tu conexión e inténtalo de nuevo.",
     "zh": "地点搜索不可用。请检查网络连接后重试。"
   },
-  "findApp": { "en": "Find an app", "de": "App suchen", "zh": "搜索应用" },
+  "findApp": { "en": "Find an app", "de": "App suchen", "es": "Buscar una app", "zh": "搜索应用" },
   "clearCategory": {
     "en": "Clear category filter",
     "de": "Kategoriefilter löschen",
+    "es": "Borrar filtro de categoría",
     "zh": "清除分类筛选"
   },
-  "appCategories": { "en": "App categories", "de": "App-Kategorien", "zh": "应用分类" },
-  "hidden": { "en": "Hidden ({count})", "de": "Ausgeblendet ({count})", "zh": "已隐藏（{count}）" },
+  "appCategories": {
+    "en": "App categories",
+    "de": "App-Kategorien",
+    "es": "Categorías de apps",
+    "zh": "应用分类"
+  },
+  "hidden": {
+    "en": "Hidden ({count})",
+    "de": "Ausgeblendet ({count})",
+    "es": "Ocultas ({count})",
+    "zh": "已隐藏（{count}）"
+  },
   "noMatches": {
     "en": "Nothing here. Yet.",
     "de": "Hier ist noch nichts.",
+    "es": "Nada por aquí. Todavía.",
     "zh": "这里还没有内容。"
   },
   "noHidden": {
     "en": "No hidden apps.",
     "de": "Keine ausgeblendeten Apps.",
+    "es": "No hay apps ocultas.",
     "zh": "没有隐藏的应用。"
   },
   "roomForNew": {
     "en": "A little room for something new.",
     "de": "Hier ist Platz für etwas Neues.",
+    "es": "Un hueco para algo nuevo.",
     "zh": "这里可以放入新应用。"
   },
   "findingApps": {
     "en": "Finding your apps…",
     "de": "Apps werden gesucht…",
+    "es": "Buscando tus apps…",
     "zh": "正在查找应用…"
   },
   "noCategoryApps": {
     "en": "Apps in this category will appear here.",
     "de": "Apps dieser Kategorie werden hier angezeigt.",
+    "es": "Las apps de esta categoría aparecerán aquí.",
     "zh": "此分类中的应用会显示在这里。"
   },
   "hiddenHint": {
     "en": "Apps you hide will appear here.",
     "de": "Ausgeblendete Apps erscheinen hier.",
+    "es": "Las apps que ocultes aparecerán aquí.",
     "zh": "隐藏的应用会显示在这里。"
   },
   "noMatchesHint": {
     "en": "No apps match “{query}”. Try another name.",
     "de": "Keine Apps entsprechen „{query}“. Versuche einen anderen Namen.",
+    "es": "Ninguna app coincide con “{query}”. Prueba con otro nombre.",
     "zh": "没有与“{query}”匹配的应用。请尝试其他名称。"
   },
-  "greetingNight": { "en": "One more moment.", "de": "Einen Moment noch.", "zh": "稍等片刻。" },
-  "morning": { "en": "Good morning.", "de": "Guten Morgen.", "zh": "早上好。" },
-  "afternoon": { "en": "Good afternoon.", "de": "Guten Tag.", "zh": "下午好。" },
-  "evening": { "en": "Good evening.", "de": "Guten Abend.", "zh": "晚上好。" },
+  "greetingNight": {
+    "en": "One more moment.",
+    "de": "Einen Moment noch.",
+    "es": "Un momento más.",
+    "zh": "稍等片刻。"
+  },
+  "morning": {
+    "en": "Good morning.",
+    "de": "Guten Morgen.",
+    "es": "Buenos días.",
+    "zh": "早上好。"
+  },
+  "afternoon": {
+    "en": "Good afternoon.",
+    "de": "Guten Tag.",
+    "es": "Buenas tardes.",
+    "zh": "下午好。"
+  },
+  "evening": {
+    "en": "Good evening.",
+    "de": "Guten Abend.",
+    "es": "Buenas noches.",
+    "zh": "晚上好。"
+  },
   "aLittleHelp": {
     "en": "A little help from your TV.",
     "de": "Ein wenig Hilfe von deinem Fernseher.",
+    "es": "Una pequeña ayuda de tu tele.",
     "zh": "电视需要一点帮助。"
   },
   "makeFavorites": {
     "en": "Make room for your favorites.",
     "de": "Deine Favoriten verdienen einen Platz.",
+    "es": "Haz sitio para tus favoritas.",
     "zh": "把喜欢的应用加入收藏。"
   },
   "pinHint": {
     "en": "Find an app you love. Hold OK to pin it here.",
     "de": "Finde eine App und halte OK, um sie hier anzupinnen.",
+    "es": "Encuentra una app que te guste. Mantén OK para fijarla aquí.",
     "zh": "找到喜欢的应用，长按 OK 将其固定在这里。"
   },
-  "exploreApps": { "en": "Explore your apps", "de": "Apps entdecken", "zh": "浏览应用" },
-  "moveApps": { "en": "Move apps", "de": "Apps verschieben", "zh": "移动应用" },
-  "inputsHeading": { "en": "Inputs", "de": "Eingänge", "zh": "输入源" },
+  "exploreApps": {
+    "en": "Explore your apps",
+    "de": "Apps entdecken",
+    "es": "Explora tus apps",
+    "zh": "浏览应用"
+  },
+  "moveApps": { "en": "Move apps", "de": "Apps verschieben", "es": "Mover apps", "zh": "移动应用" },
+  "inputsHeading": { "en": "Inputs", "de": "Eingänge", "es": "Entradas", "zh": "输入源" },
   "noInputs": {
     "en": "No inputs to show.",
     "de": "Keine Eingänge verfügbar.",
+    "es": "No hay entradas que mostrar.",
     "zh": "没有可用的输入源。"
   },
   "findingInputs": {
     "en": "Finding your inputs…",
     "de": "Eingänge werden gesucht…",
+    "es": "Buscando tus entradas…",
     "zh": "正在查找输入源…"
   },
   "physicalInputs": {
     "en": "Your TV’s physical HDMI inputs will appear here.",
     "de": "Die HDMI-Eingänge deines Fernsehers erscheinen hier.",
+    "es": "Las entradas HDMI de tu tele aparecerán aquí.",
     "zh": "电视的 HDMI 输入源会显示在这里。"
   },
-  "refreshInputs": { "en": "Refresh inputs", "de": "Eingänge aktualisieren", "zh": "刷新输入源" },
-  "retry": { "en": "Try again", "de": "Erneut versuchen", "zh": "重试" },
-  "open": { "en": "Open", "de": "Öffnen", "zh": "打开" },
-  "select": { "en": "Select", "de": "Auswählen", "zh": "选择" },
-  "move": { "en": "Move", "de": "Verschieben", "zh": "移动" },
-  "done": { "en": "Done", "de": "Fertig", "zh": "完成" },
-  "close": { "en": "Close", "de": "Schließen", "zh": "关闭" },
-  "homeLabel": { "en": "Home", "de": "Startseite", "zh": "主页" },
+  "refreshInputs": {
+    "en": "Refresh inputs",
+    "de": "Eingänge aktualisieren",
+    "es": "Actualizar entradas",
+    "zh": "刷新输入源"
+  },
+  "retry": { "en": "Try again", "de": "Erneut versuchen", "es": "Reintentar", "zh": "重试" },
+  "open": { "en": "Open", "de": "Öffnen", "es": "Abrir", "zh": "打开" },
+  "select": { "en": "Select", "de": "Auswählen", "es": "Seleccionar", "zh": "选择" },
+  "move": { "en": "Move", "de": "Verschieben", "es": "Mover", "zh": "移动" },
+  "done": { "en": "Done", "de": "Fertig", "es": "Listo", "zh": "完成" },
+  "close": { "en": "Close", "de": "Schließen", "es": "Cerrar", "zh": "关闭" },
+  "homeLabel": { "en": "Home", "de": "Startseite", "es": "Inicio", "zh": "主页" },
   "options": {
     "en": "Hold OK for options",
     "de": "OK halten für Optionen",
+    "es": "Mantén OK para ver opciones",
     "zh": "长按 OK 查看选项"
   },
-  "connected": { "en": "Connected", "de": "Verbunden", "zh": "已连接" },
-  "noDevice": { "en": "No device connected", "de": "Kein Gerät verbunden", "zh": "未连接设备" },
-  "externalInput": { "en": "External input", "de": "Externer Eingang", "zh": "外部输入源" },
-  "addFavorite": { "en": "Add to favorites", "de": "Zu Favoriten hinzufügen", "zh": "添加到收藏" },
+  "connected": { "en": "Connected", "de": "Verbunden", "es": "Conectado", "zh": "已连接" },
+  "noDevice": {
+    "en": "No device connected",
+    "de": "Kein Gerät verbunden",
+    "es": "Ningún dispositivo conectado",
+    "zh": "未连接设备"
+  },
+  "externalInput": {
+    "en": "External input",
+    "de": "Externer Eingang",
+    "es": "Entrada externa",
+    "zh": "外部输入源"
+  },
+  "addFavorite": {
+    "en": "Add to favorites",
+    "de": "Zu Favoriten hinzufügen",
+    "es": "Añadir a favoritos",
+    "zh": "添加到收藏"
+  },
   "removeFavorite": {
     "en": "Remove from favorites",
     "de": "Aus Favoriten entfernen",
+    "es": "Quitar de favoritos",
     "zh": "从收藏中移除"
   },
-  "hideApp": { "en": "Hide app", "de": "App ausblenden", "zh": "隐藏应用" },
-  "showApp": { "en": "Show app", "de": "App anzeigen", "zh": "显示应用" },
-  "favorite": { "en": "Favorite", "de": "Favorit", "zh": "收藏" },
-  "tvSettings": { "en": "TV settings", "de": "TV-Einstellungen", "zh": "电视设置" },
+  "hideApp": { "en": "Hide app", "de": "App ausblenden", "es": "Ocultar app", "zh": "隐藏应用" },
+  "showApp": { "en": "Show app", "de": "App anzeigen", "es": "Mostrar app", "zh": "显示应用" },
+  "favorite": { "en": "Favorite", "de": "Favorit", "es": "Favorita", "zh": "收藏" },
+  "tvSettings": {
+    "en": "TV settings",
+    "de": "TV-Einstellungen",
+    "es": "Ajustes del televisor",
+    "zh": "电视设置"
+  },
   "loadingWeather": {
     "en": "Loading weather…",
     "de": "Wetter wird geladen…",
+    "es": "Cargando el tiempo…",
     "zh": "正在加载天气…"
   },
   "weatherUnavailable": {
     "en": "Weather unavailable",
     "de": "Wetter nicht verfügbar",
+    "es": "Tiempo no disponible",
     "zh": "天气不可用"
   },
   "setWeatherLocation": {
     "en": "Set weather location",
     "de": "Wetterort festlegen",
+    "es": "Fijar ubicación del tiempo",
     "zh": "设置天气地点"
   },
   "configureWeather": {
     "en": "Configure weather location",
     "de": "Wetterort konfigurieren",
+    "es": "Configurar ubicación del tiempo",
     "zh": "配置天气地点"
   },
   "weatherInLocation": {
     "en": "Weather in {city}. Configure weather location.",
     "de": "Wetter in {city}. Wetterort konfigurieren.",
+    "es": "El tiempo en {city}. Configura la ubicación.",
     "zh": "{city}的天气。配置天气地点。"
   },
   "lastReading": {
     "en": "Last saved reading",
     "de": "Letzter gespeicherter Wert",
+    "es": "Último dato guardado",
     "zh": "上次保存的数据"
   },
-  "selectClose": { "en": "Select", "de": "Auswählen", "zh": "选择" },
-  "closeDialog": { "en": "Close", "de": "Schließen", "zh": "关闭" },
+  "selectClose": { "en": "Select", "de": "Auswählen", "es": "Elegir", "zh": "选择" },
+  "closeDialog": { "en": "Close", "de": "Schließen", "es": "Cerrar", "zh": "关闭" },
   "dismissNotification": {
     "en": "Dismiss notification",
     "de": "Meldung schließen",
+    "es": "Descartar aviso",
     "zh": "关闭通知"
   },
-  "opening": { "en": "Opening…", "de": "Wird geöffnet…", "zh": "正在打开…" },
+  "opening": { "en": "Opening…", "de": "Wird geöffnet…", "es": "Abriendo…", "zh": "正在打开…" },
   "desktopPreview": {
     "en": "Desktop preview · {app} will open on your TV.",
     "de": "Desktop-Vorschau · {app} wird auf deinem Fernseher geöffnet.",
+    "es": "Vista previa · {app} se abrirá en tu tele.",
     "zh": "桌面预览 · {app}将在电视上打开。"
   },
   "favoriteRemoved": {
     "en": "{app} removed from favorites.",
     "de": "{app} aus Favoriten entfernt.",
+    "es": "{app} eliminada de favoritos.",
     "zh": "已从收藏中移除 {app}。"
   },
   "favoriteAdded": {
     "en": "{app} added to favorites.",
     "de": "{app} zu Favoriten hinzugefügt.",
+    "es": "{app} añadida a favoritos.",
     "zh": "已将 {app} 添加到收藏。"
   },
   "appRestored": {
     "en": "{app} is back in your library.",
     "de": "{app} ist wieder in deiner Bibliothek.",
+    "es": "{app} vuelve a estar en tu biblioteca.",
     "zh": "{app}已恢复到应用库。"
   },
   "appHidden": {
     "en": "{app} hidden. You can restore it from Apps.",
     "de": "{app} ausgeblendet. Du kannst sie unter Apps wiederherstellen.",
+    "es": "{app} oculta. Puedes recuperarla en Aplicaciones.",
     "zh": "已隐藏 {app}。你可以在“应用”中恢复。"
   },
   "refreshNotice": {
     "en": "Refreshing your apps and inputs…",
     "de": "Apps und Eingänge werden aktualisiert…",
+    "es": "Actualizando tus apps y entradas…",
     "zh": "正在刷新应用和输入源…"
   },
   "savedError": {
     "en": "Your changes couldn’t be saved.",
     "de": "Änderungen konnten nicht gespeichert werden.",
+    "es": "No se pudieron guardar los cambios.",
     "zh": "无法保存更改。"
   },
   "tvUnreachable": {
     "en": "Your TV couldn’t be reached.",
     "de": "Der Fernseher ist nicht erreichbar.",
+    "es": "No se puede conectar con tu tele.",
     "zh": "无法连接电视。"
   },
   "appOpenError": {
     "en": "This app couldn’t be opened.",
     "de": "Diese App konnte nicht geöffnet werden.",
+    "es": "No se pudo abrir esta app.",
     "zh": "无法打开此应用。"
   },
-  "dismissSearch": { "en": "Clear search", "de": "Suche löschen", "zh": "清除搜索" },
-  "languageMenu": { "en": "Language", "de": "Anzeigesprache", "zh": "显示语言" },
-  "slate": { "en": "Slate", "de": "Schiefer", "zh": "石板" },
-  "midnight": { "en": "Midnight", "de": "Mitternacht", "zh": "午夜" },
-  "prism": { "en": "Prism", "de": "Prisma", "zh": "棱镜" },
-  "monumentValley": { "en": "Monument Valley", "de": "Monument Valley", "zh": "纪念碑谷" },
-  "sanFrancisco": { "en": "San Francisco", "de": "San Francisco", "zh": "旧金山" },
-  "summit": { "en": "Summit", "de": "Gipfel", "zh": "山巅" },
-  "forest": { "en": "Forest", "de": "Wald", "zh": "森林" },
-  "yosemite": { "en": "Yosemite", "de": "Yosemite", "zh": "优胜美地" },
-  "northernLights": { "en": "Northern lights", "de": "Nordlichter", "zh": "北极光" },
-  "liveTV": { "en": "Live TV", "de": "Live-TV", "zh": "电视直播" },
-  "homebrew": { "en": "Homebrew", "de": "Homebrew", "zh": "自制应用商店" },
-  "browser": { "en": "Browser", "de": "Browser", "zh": "浏览器" },
-  "categoryStreaming": { "en": "Streaming", "de": "Streaming", "zh": "流媒体" },
-  "categoryMusic": { "en": "Music", "de": "Musik", "zh": "音乐" },
-  "categoryGaming": { "en": "Gaming", "de": "Spiele", "zh": "游戏" },
-  "categoryUtilities": { "en": "Utilities", "de": "Werkzeuge", "zh": "工具" },
-  "clearSkies": { "en": "Clear skies", "de": "Klarer Himmel", "zh": "晴朗" },
-  "clearNight": { "en": "Clear night", "de": "Klare Nacht", "zh": "晴朗的夜晚" },
-  "mostlyClear": { "en": "Mostly clear", "de": "Überwiegend klar", "zh": "大致晴朗" },
-  "partlyCloudy": { "en": "Partly cloudy", "de": "Teilweise bewölkt", "zh": "局部多云" },
-  "overcast": { "en": "Overcast", "de": "Bedeckt", "zh": "阴天" },
-  "fog": { "en": "Fog", "de": "Nebel", "zh": "雾" },
-  "drizzle": { "en": "Drizzle", "de": "Nieselregen", "zh": "毛毛雨" },
-  "rain": { "en": "Rain", "de": "Regen", "zh": "雨" },
-  "snow": { "en": "Snow", "de": "Schnee", "zh": "雪" },
-  "thunderstorms": { "en": "Thunderstorms", "de": "Gewitter", "zh": "雷暴" },
-  "currentWeather": { "en": "Current weather", "de": "Aktuelles Wetter", "zh": "当前天气" },
-  "searching": { "en": "Searching…", "de": "Suche läuft…", "zh": "正在搜索…" },
-  "space": { "en": "Space", "de": "Leerzeichen", "zh": "空格" },
-  "delete": { "en": "Delete", "de": "Löschen", "zh": "删除" },
-  "clear": { "en": "Clear", "de": "Leeren", "zh": "清除" },
-  "hiddenLabel": { "en": "Hidden", "de": "Ausgeblendet", "zh": "已隐藏" },
-  "scrollTestApp": { "en": "Scroll test", "de": "Scroll-Test", "zh": "滚动测试" },
+  "dismissSearch": {
+    "en": "Clear search",
+    "de": "Suche löschen",
+    "es": "Borrar búsqueda",
+    "zh": "清除搜索"
+  },
+  "languageMenu": { "en": "Language", "de": "Anzeigesprache", "es": "Idioma", "zh": "显示语言" },
+  "slate": { "en": "Slate", "de": "Schiefer", "es": "Pizarra", "zh": "石板" },
+  "midnight": { "en": "Midnight", "de": "Mitternacht", "es": "Medianoche", "zh": "午夜" },
+  "prism": { "en": "Prism", "de": "Prisma", "es": "Prisma", "zh": "棱镜" },
+  "monumentValley": {
+    "en": "Monument Valley",
+    "de": "Monument Valley",
+    "es": "Monument Valley",
+    "zh": "纪念碑谷"
+  },
+  "sanFrancisco": {
+    "en": "San Francisco",
+    "de": "San Francisco",
+    "es": "San Francisco",
+    "zh": "旧金山"
+  },
+  "summit": { "en": "Summit", "de": "Gipfel", "es": "Cumbre", "zh": "山巅" },
+  "forest": { "en": "Forest", "de": "Wald", "es": "Bosque", "zh": "森林" },
+  "yosemite": { "en": "Yosemite", "de": "Yosemite", "es": "Yosemite", "zh": "优胜美地" },
+  "northernLights": {
+    "en": "Northern lights",
+    "de": "Nordlichter",
+    "es": "Auroras boreales",
+    "zh": "北极光"
+  },
+  "liveTV": { "en": "Live TV", "de": "Live-TV", "es": "TV en directo", "zh": "电视直播" },
+  "homebrew": { "en": "Homebrew", "de": "Homebrew", "es": "Homebrew", "zh": "自制应用商店" },
+  "browser": { "en": "Browser", "de": "Browser", "es": "Navegador", "zh": "浏览器" },
+  "categoryStreaming": { "en": "Streaming", "de": "Streaming", "es": "Streaming", "zh": "流媒体" },
+  "categoryMusic": { "en": "Music", "de": "Musik", "es": "Música", "zh": "音乐" },
+  "categoryGaming": { "en": "Gaming", "de": "Spiele", "es": "Juegos", "zh": "游戏" },
+  "categoryUtilities": { "en": "Utilities", "de": "Werkzeuge", "es": "Utilidades", "zh": "工具" },
+  "clearSkies": { "en": "Clear skies", "de": "Klarer Himmel", "es": "Despejado", "zh": "晴朗" },
+  "clearNight": {
+    "en": "Clear night",
+    "de": "Klare Nacht",
+    "es": "Noche despejada",
+    "zh": "晴朗的夜晚"
+  },
+  "mostlyClear": {
+    "en": "Mostly clear",
+    "de": "Überwiegend klar",
+    "es": "Casi despejado",
+    "zh": "大致晴朗"
+  },
+  "partlyCloudy": {
+    "en": "Partly cloudy",
+    "de": "Teilweise bewölkt",
+    "es": "Parcialmente nublado",
+    "zh": "局部多云"
+  },
+  "overcast": { "en": "Overcast", "de": "Bedeckt", "es": "Cubierto", "zh": "阴天" },
+  "fog": { "en": "Fog", "de": "Nebel", "es": "Niebla", "zh": "雾" },
+  "drizzle": { "en": "Drizzle", "de": "Nieselregen", "es": "Llovizna", "zh": "毛毛雨" },
+  "rain": { "en": "Rain", "de": "Regen", "es": "Lluvia", "zh": "雨" },
+  "snow": { "en": "Snow", "de": "Schnee", "es": "Nieve", "zh": "雪" },
+  "thunderstorms": { "en": "Thunderstorms", "de": "Gewitter", "es": "Tormentas", "zh": "雷暴" },
+  "currentWeather": {
+    "en": "Current weather",
+    "de": "Aktuelles Wetter",
+    "es": "Tiempo actual",
+    "zh": "当前天气"
+  },
+  "searching": { "en": "Searching…", "de": "Suche läuft…", "es": "Buscando…", "zh": "正在搜索…" },
+  "space": { "en": "Space", "de": "Leerzeichen", "es": "Espacio", "zh": "空格" },
+  "delete": { "en": "Delete", "de": "Löschen", "es": "Eliminar", "zh": "删除" },
+  "clear": { "en": "Clear", "de": "Leeren", "es": "Borrar", "zh": "清除" },
+  "hiddenLabel": { "en": "Hidden", "de": "Ausgeblendet", "es": "Oculta", "zh": "已隐藏" },
+  "scrollTestApp": {
+    "en": "Scroll test",
+    "de": "Scroll-Test",
+    "es": "Prueba de desplazamiento",
+    "zh": "滚动测试"
+  },
   "scrollTestOnly": {
     "en": "Test card for scrolling; no app to launch.",
     "de": "Testkarte zum Scrollen; keine App zum Öffnen.",
+    "es": "Tarjeta de prueba; no hay app que abrir.",
     "zh": "滚动测试卡片，没有可启动的应用。"
   }
 }

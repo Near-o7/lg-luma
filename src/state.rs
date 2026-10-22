@@ -579,10 +579,10 @@ impl State {
                 }
             }
             if let Target::Choice(index) = self.focus {
-                let count = if matches!(self.subpage, Some(Subpage::Clock | Subpage::Temperature)) {
-                    2
-                } else {
-                    3
+                let count = match self.subpage {
+                    Some(Subpage::Clock | Subpage::Temperature) => 2,
+                    Some(Subpage::Language) => Language::ALL.len(),
+                    _ => 3,
                 };
                 match direction {
                     Direction::Left => self.close_subpage(),
@@ -1176,7 +1176,8 @@ impl State {
                         }
                     }
                     Some(Subpage::Language) => {
-                        self.preferences.language = Language::ALL[index.min(2)];
+                        self.preferences.language =
+                            Language::ALL[index.min(Language::ALL.len() - 1)];
                         self.weather.cancel_search();
                     }
                     Some(Subpage::WeatherLocation) => return vec![],

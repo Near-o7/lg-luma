@@ -564,6 +564,36 @@ fn language_selection_restores_its_parent_and_is_saved_with_preferences() {
 }
 
 #[test]
+fn remote_can_select_and_restore_every_language() {
+    for (index, language) in crate::i18n::Language::ALL.into_iter().enumerate() {
+        let mut state = ready();
+        state.open(2);
+        state.focus = Target::Setting(4);
+        state.activate();
+        for _ in 0..index {
+            state.direction(Direction::Down, &controls(&state));
+        }
+        assert_eq!(state.focus, Target::Choice(index));
+        assert_eq!(state.activate(), vec![Effect::Save]);
+        assert_eq!(state.preferences.language, language);
+        assert_eq!(state.focus, Target::Setting(4));
+
+        let saved = serde_json::to_value(&state.preferences).unwrap();
+        let mut restored = State::new(serde_json::from_value(saved).unwrap());
+        restored.open(2);
+        restored.focus = Target::Setting(4);
+        restored.activate();
+        assert_eq!(restored.preferences.language, language);
+        assert_eq!(restored.focus, Target::Choice(index));
+        restored.direction(Direction::Down, &controls(&restored));
+        assert_eq!(
+            restored.focus,
+            Target::Choice((index + 1) % crate::i18n::Language::ALL.len())
+        );
+    }
+}
+
+#[test]
 fn unsupported_language_preferences_recover_without_losing_other_choices() {
     let preferences: Preferences = serde_json::from_value(
         json!({"language":"unknown","favorites":["netflix"],"show_names":true}),

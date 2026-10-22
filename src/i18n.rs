@@ -1,4 +1,4 @@
-//! Bundled English, German and Chinese message catalog.
+//! Bundled English, German, Spanish and Chinese message catalog.
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{collections::BTreeMap, sync::OnceLock};
 use time::OffsetDateTime;
@@ -19,14 +19,16 @@ pub enum Language {
     En,
     De,
     Zh,
+    Es,
 }
 impl Language {
-    pub const ALL: [Self; 3] = [Self::En, Self::De, Self::Zh];
+    pub const ALL: [Self; 4] = [Self::En, Self::De, Self::Zh, Self::Es];
     pub fn code(self) -> &'static str {
         match self {
             Self::En => "en",
             Self::De => "de",
             Self::Zh => "zh",
+            Self::Es => "es",
         }
     }
     pub fn name(self) -> &'static str {
@@ -34,6 +36,7 @@ impl Language {
             Self::En => "English",
             Self::De => "Deutsch",
             Self::Zh => "简体中文",
+            Self::Es => "Español",
         }
     }
     pub fn index(self) -> usize {
@@ -41,6 +44,7 @@ impl Language {
             Self::En => 0,
             Self::De => 1,
             Self::Zh => 2,
+            Self::Es => 3,
         }
     }
     pub fn t(self, key: &str) -> &str {
@@ -148,6 +152,34 @@ impl Language {
                 now.day(),
                 ["一", "二", "三", "四", "五", "六", "日"][weekday]
             ),
+            Self::Es => format!(
+                "{}, {} de {}",
+                [
+                    "lunes",
+                    "martes",
+                    "miércoles",
+                    "jueves",
+                    "viernes",
+                    "sábado",
+                    "domingo"
+                ][weekday],
+                now.day(),
+                [
+                    "enero",
+                    "febrero",
+                    "marzo",
+                    "abril",
+                    "mayo",
+                    "junio",
+                    "julio",
+                    "agosto",
+                    "septiembre",
+                    "octubre",
+                    "noviembre",
+                    "diciembre"
+                ][month]
+            )
+            .to_uppercase(),
         }
     }
     pub fn clock(self, now: OffsetDateTime, hour24: bool) -> String {
@@ -184,6 +216,7 @@ pub fn deserialize_language<'de, D: Deserializer<'de>>(
         match serde_json::Value::deserialize(deserializer)?.as_str() {
             Some("de") => Language::De,
             Some("zh") => Language::Zh,
+            Some("es") => Language::Es,
             _ => Language::En,
         },
     )
@@ -212,6 +245,10 @@ mod tests {
             "Netflix zu Favoriten hinzugefügt."
         );
         assert_eq!(
+            Language::Es.format("favoriteAdded", &[("app", "Netflix")]),
+            "Netflix añadida a favoritos."
+        );
+        assert_eq!(
             Language::Zh.format("hidden", &[("count", "3")]),
             "已隐藏（3）"
         );
@@ -225,6 +262,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(Language::De.date(now), "MITTWOCH, 21. OKTOBER");
+        assert_eq!(Language::Es.date(now), "MIÉRCOLES, 21 DE OCTUBRE");
         assert_eq!(Language::Zh.date(now), "10月21日星期三");
         assert_eq!(Language::Zh.clock(now, false), "下午8:41");
         assert_eq!(Language::En.clock(now, true), "20:41");
