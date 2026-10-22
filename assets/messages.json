@@ -253,9 +253,9 @@
     "zh": "正在刷新应用和输入源…"
   },
   "savedError": {
-    "en": "Your changes couldn’t be saved. Device storage may be full.",
-    "de": "Änderungen konnten nicht gespeichert werden. Der Gerätespeicher ist möglicherweise voll.",
-    "zh": "无法保存更改，设备存储空间可能已满。"
+    "en": "Your changes couldn’t be saved.",
+    "de": "Änderungen konnten nicht gespeichert werden.",
+    "zh": "无法保存更改。"
   },
   "tvUnreachable": {
     "en": "Your TV couldn’t be reached.",

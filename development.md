@@ -202,7 +202,15 @@ The placeholder cards are never a fallback for an inventory failure.
 
 ## Storage, weather and languages
 
-TV preferences live beside the installed executable. Desktop preview retains the legacy
+TV preferences live in an app-owned persistent directory outside the installed executable's
+payload. Startup probes `/media/developer/<appid>/`, `/media/developer/temp/<appid>/` and
+`/media/internal/.<appid>/`, selecting a directory the jailed app can actually create and write.
+Production `/media/cryptofs` installations prefer internal storage. `/media/developer/temp` is
+on the persistent developer partition, not the reboot-cleared `/tmp`. No settings are placed
+in `/tmp` and no system/app-payload permissions are widened. Existing JSON preferences and a
+valid weather cache from beside this installation's old executable are imported once, without
+overwriting the chosen destination. Invalid existing preferences still report an error.
+Startup prints `Luma persistent storage:` with the chosen path. Desktop preview retains the legacy
 `$XDG_CONFIG_HOME/luma-native/preferences.json` path, or `~/.config/luma-native/preferences.json`,
 so existing preview choices survive flattening. `--preferences PATH` isolates a manual run.
 Invalid preference files report an error rather than being overwritten. Writes use atomic
@@ -260,7 +268,10 @@ Host CI cannot prove hardware compatibility, small-text quality or presentation 
 
 Homebrew Channel's details page reads `packages[].shortDescription` (or `fullDescriptionUrl`),
 not `manifest.appDescription`. The feed generator writes the root app metadata description into
-both fields; the catalog description is on the package entry beside `title` and `iconUri`.
+`shortDescription` and `manifest.appDescription`. It also copies `assets/homebrew-description.html`
+to `dist/description.html` and sets the package's `fullDescriptionUrl` to that version's release
+asset. Homebrew Channel prefers this HTML description when the URL is present. CI uploads the
+HTML alongside the feed and IPK, so the feed and its description must be published together.
 
 Key modules: `state.rs` focus/preferences, `view.rs` geometry, `renderer.rs` GPU caches/draws,
 `font.rs` lazy metrics/outlines, `vector.rs` GPU mesh upload, `platform.rs` worker/inventory,
