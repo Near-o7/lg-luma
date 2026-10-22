@@ -2031,10 +2031,10 @@ fn footer(out: &mut Scene, state: &State, assets: &Assets) {
             false,
         );
         let second_x = 134. + assets.width(language.t("move"), style) + 25.6;
-        keycap(out, "Back", second_x, 1030.4, 39., false);
+        keycap(out, "OK/Back", second_x, 1030.4, 62., false);
         out.text(
             language.t("done"),
-            Rect::new(second_x + 47., 1033., 150., 20.),
+            Rect::new(second_x + 70., 1033., 150., 20.),
             text(14.4, 400, 0.005),
             color,
             false,

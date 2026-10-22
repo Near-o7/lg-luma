@@ -299,5 +299,11 @@
   "space": { "en": "Space", "de": "Leerzeichen", "zh": "空格" },
   "delete": { "en": "Delete", "de": "Löschen", "zh": "删除" },
   "clear": { "en": "Clear", "de": "Leeren", "zh": "清除" },
-  "hiddenLabel": { "en": "Hidden", "de": "Ausgeblendet", "zh": "已隐藏" }
+  "hiddenLabel": { "en": "Hidden", "de": "Ausgeblendet", "zh": "已隐藏" },
+  "scrollTestApp": { "en": "Scroll test", "de": "Scroll-Test", "zh": "滚动测试" },
+  "scrollTestOnly": {
+    "en": "Test card for scrolling; no app to launch.",
+    "de": "Testkarte zum Scrollen; keine App zum Öffnen.",
+    "zh": "滚动测试卡片，没有可启动的应用。"
+  }
 }

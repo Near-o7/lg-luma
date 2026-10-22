@@ -183,7 +183,8 @@ categories, Hidden, favorite-first ordering, wrapped names, and search with the 
 keyboard or a physical keyboard. The desktop preview has a remote-operable keyboard panel.
 TV text fields retain focus while SDL/webOS owns text entry; Done/Back dismisses editing and
 restores the field's next control. Options add/remove favorites or hide/restore apps.
-Move mode saves on each Left/Right step. General settings control app names, clock format and
+Move mode saves on each Left/Right step. Press OK again or Back to finish, keeping the moved
+favorite focused without launching it. General settings control app names, clock format and
 reduced motion. Clock format and each input open nested choice pages with checkmarks; Left/Back
 returns to the parent row. Background has all nine wallpapers and enters at the currently applied
 background. Input choices are On, Off and Auto, with the same descriptions as the web app.
@@ -235,6 +236,34 @@ transitions as the interactive UI.
 `click:X:Y` uses authored 1920×1080 coordinates and injects actual SDL button-down/up events.
 Bounded scripted runs ignore physical pointer/keyboard events so window-entry hover cannot change
 the scene during a slow first upload. Unbounded scripts return to normal input after their actions.
+
+### Manual scroll preview with additional apps
+
+`--test-extra-apps N` explicitly appends up to 300 labeled placeholder cards to a successful
+inventory read, reusing real apps as artwork/category templates. It never replaces a failed TV
+inventory with demo data. Normal launches show the real inventory only. Placeholder cards cannot
+send launch requests to the TV; OK displays a short preview notice instead.
+
+The preview defaults to a separate `scroll-preview-preferences.json` beside normal preferences,
+initialized from your current choices on its first run. Favoriting/hiding/reordering test cards
+there does not modify normal favorites. Use `--preferences PATH` to choose another preview file.
+Each successful inventory refresh appends the same requested cards again without duplication.
+
+After installing the updated IPK and closing any running Luma instance, run in root SSH:
+
+```sh
+APP=/media/developer/apps/usr/palm/applications/com.luma.launcher.native
+XDG_RUNTIME_DIR=/tmp/xdg /usr/bin/jailer \
+  -t native_devmode -i com.luma.launcher.native -p "$APP" \
+  "$APP/luma-native" \
+  '{"@system_native_app":true,"nid":"com.luma.launcher.native"}' \
+  --test-extra-apps 120
+```
+
+Open Apps and scroll through the added `Scroll test` cards. To try more than six Home favorites,
+pin test cards while in this preview. Stop it with Ctrl+C, then launch Luma normally to return
+to the regular inventory/preferences. For the desktop preview, use
+`pnpm native:dev --test-extra-apps 120`.
 
 ### Compare with the web interface
 

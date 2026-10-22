@@ -34,7 +34,9 @@ impl Platform {
                         Ok((demo_inventory(), None))
                     }),
                     Request::Launch(id) => Response::Launched(if webos {
-                        if !valid_app_id(&id) {
+                        if crate::scroll_preview::is_placeholder(&id) {
+                            Err("Scroll preview cards cannot be launched".into())
+                        } else if !valid_app_id(&id) {
                             Err("Invalid application identifier".into())
                         } else {
                             call(

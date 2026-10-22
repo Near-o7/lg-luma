@@ -7,6 +7,8 @@ mod model;
 mod platform;
 mod raster;
 mod renderer;
+#[path = "scroll-preview.rs"]
+mod scroll_preview;
 mod state;
 mod storage;
 mod vector;
@@ -52,6 +54,7 @@ struct Options {
     diagnostics: Option<PathBuf>,
     profile_frames: Option<usize>,
     weather_test_server: Option<String>,
+    test_extra_apps: usize,
 }
 
 impl Options {
@@ -74,6 +77,9 @@ impl Options {
             if arg == "--help" {
                 println!(
                     "Luma native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --resolution SIZE   Request 1080p, 4k, or WIDTHxHEIGHT; verify actual drawable\n  --frames N          Exit after N event-loop frames\n  --profile-frames N  Force N presentations (20+) and report pacing after warmup\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/click:X:Y/wait\n  --time RFC3339      Fix the preview's clock and date\n  --screenshot PATH   Save an offscreen PNG\n  --capture-scale N   Capture at 1x/1080p (default) or 2x/4k\n  --diagnostics PATH  Save actual drawable, GPU, font-cache and timing information\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
+                );
+                println!(
+                    "\n  --test-extra-apps N  Explicit scroll preview with up to 300 non-launchable extra cards; separate preferences"
                 );
                 std::process::exit(0);
             }
@@ -99,6 +105,13 @@ impl Options {
                 }
                 "--diagnostics" => result.diagnostics = Some(value.into()),
                 "--weather-test-server" => result.weather_test_server = Some(value),
+                "--test-extra-apps" => {
+                    result.test_extra_apps = value
+                        .parse::<usize>()
+                        .ok()
+                        .filter(|count| *count <= 300)
+                        .ok_or("--test-extra-apps must be between 0 and 300")?;
+                }
                 "--profile-frames" => {
                     result.profile_frames = Some(
                         value
@@ -170,6 +183,10 @@ fn effects(
                 }
             }
             Effect::Launch(id) => {
+                if scroll_preview::is_placeholder(&id) {
+                    state.notify(state.preferences.language.t("scrollTestOnly"));
+                    continue;
+                }
                 if !state.launching {
                     if platform.webos {
                         state.launching = true;
@@ -378,12 +395,34 @@ fn run() -> Result<(), String> {
     });
     let assets = view::Assets::load(root)?;
     startup_stage("asset metadata");
-    let preferences_path = options
+    let default_preferences = options
         .preferences
         .clone()
         .map(Ok)
         .unwrap_or_else(|| storage::default_path(webos))?;
-    let mut state = State::new(storage::load(&preferences_path)?);
+    let preferences_path = if options.test_extra_apps > 0 && options.preferences.is_none() {
+        default_preferences.with_file_name("scroll-preview-preferences.json")
+    } else {
+        default_preferences.clone()
+    };
+    // Start the preview with the user's current choices, but keep test favorites
+    // and hidden placeholders out of their normal preferences file.
+    let initial_preferences = if options.test_extra_apps > 0
+        && options.preferences.is_none()
+        && !preferences_path.exists()
+    {
+        storage::load(&default_preferences)?
+    } else {
+        storage::load(&preferences_path)?
+    };
+    let mut state = State::new(initial_preferences);
+    if options.test_extra_apps > 0 {
+        eprintln!(
+            "Luma scroll preview: explicit {}-app expansion; preferences {}",
+            options.test_extra_apps,
+            preferences_path.display()
+        );
+    }
     // Discover the local offset before any HTTP/platform workers start.
     let local_offset = OffsetDateTime::now_local()
         .map(|now| now.offset())
@@ -521,7 +560,12 @@ fn run() -> Result<(), String> {
         state.tick();
         while let Ok(response) = platform.receiver.try_recv() {
             match response {
-                Response::Inventory(Ok((inventory, warning))) => {
+                Response::Inventory(Ok((mut inventory, warning))) => {
+                    scroll_preview::append(
+                        &mut inventory,
+                        options.test_extra_apps,
+                        state.preferences.language,
+                    );
                     state.set_inventory(inventory, warning);
                     if initial_focus
                         && state.focus == Target::Nav(0)

@@ -1009,7 +1009,10 @@ impl State {
     }
 
     pub fn activate(&mut self) -> Vec<Effect> {
-        if self.moving.is_some() {
+        if self.moving.take().is_some() {
+            // Order was saved at every move. A fresh OK release finishes the
+            // mode and keeps the selected favorite, rather than launching it.
+            self.dirty = true;
             return vec![];
         }
         self.dirty = true;
