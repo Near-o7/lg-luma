@@ -54,5 +54,5 @@ geometry produces the small/large webOS installation icons.
 
 Weather data: [Open-Meteo](https://open-meteo.com/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-PlxNative informed the Rust/SDL/GPU architecture; no PlxNative source is included. The provided
-Apple design guidance informed focus, motion and materials. This is not an Apple or LG product.
+The provided Apple design guidance informed focus, motion and materials. This is not an Apple
+or LG product.

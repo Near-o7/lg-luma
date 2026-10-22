@@ -1,5 +1,5 @@
 //! A small GLES2-compatible GPU painter. Rust owns vector glyphs and the draw list;
-//! SDL only supplies the context. No browser, LVGL, Qt or copied PlxNative code.
+//! SDL only supplies the context. No browser, LVGL or Qt runtime.
 use crate::{
     font::Font,
     raster::{Size, Viewport},

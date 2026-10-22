@@ -226,7 +226,7 @@ runtime font/translation services or telemetry are used. Weather attribution: Op
 ## Compatibility
 
 Luma's native startup, rendering and app/input discovery have been verified on rooted webOS 26.
-A lower supported version is not yet established. On webOS 26 use elevated Homebrew Channel
+External testing confirms compatibility with webOS 6 and newer. On webOS 26 use elevated Homebrew Channel
 0.8.0-rc1+ for `lunabus.query`. Root SSH execution does not establish the normal jailed caller
 permissions; check TV-menu startup, launching/reopening and remote/pointer behavior manually.
 

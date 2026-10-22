@@ -1,38 +1,31 @@
 # Luma
 
-A native, remote-first launcher for rooted LG webOS TVs. Rust owns the interface, focus,
-preferences and platform work; SDL2 supplies windowing/input and OpenGL ES 2 draws the UI.
-Bundled icons, logos and text use cached vector geometry.
+A native launcher for rooted LG webOS TVs, inspired by Apple TV.
 
-**Manually verified on an LG OLED55C57 running webOS 26:** startup from the TV menu,
-rendering, and discovery of 29 apps and four inputs. Earlier firmware is not yet verified for
-Luma. See [compatibility](development.md#compatibility) and [asset licenses](assets.md).
+> [!NOTE]
+> Tested on **LG OLED55C57** running **webOS 26**.
+> External testing confirms compatibility with **webOS 6 and newer**.
 
 <table>
   <tr>
     <td width="50%" align="center">
-      <strong>Home</strong><br>
       <img src="docs/home.png" alt="Luma native Home screen, desktop preview">
     </td>
     <td width="50%" align="center">
-      <strong>Apps</strong><br>
       <img src="docs/apps.png" alt="Luma native app library, desktop preview">
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <strong>General settings</strong><br>
       <img src="docs/settings.png" alt="Luma native General settings with Quit app, desktop preview">
     </td>
     <td width="50%" align="center">
-      <strong>Inputs</strong><br>
       <img src="docs/inputs.png" alt="Luma native input settings, desktop preview">
     </td>
   </tr>
 </table>
 
-Screenshots come from the native desktop preview with sample apps and a fixed time.
-Regenerate them with `pnpm screenshots` inside `nix develop`.
+Screenshots show the native desktop preview with sample apps and inputs.
 
 ## Features
 
@@ -165,6 +158,5 @@ Favorites, hidden apps, settings, weather location and cached readings stay in l
 Weather search/forecast requests go to Open-Meteo, with embedded TLS roots and bounded responses.
 There is no browser geolocation, IP-based location lookup, telemetry or runtime font download.
 
-This is an independent MIT implementation, architecturally inspired by
-[PlxNative](https://github.com/GLinnik21/plx-native), with no PlxNative source included.
+Luma is licensed under MIT.
 Luma is not affiliated with LG, Apple, Plex or any app brands shown in its UI.
