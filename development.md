@@ -17,7 +17,7 @@ dist/                        Generated ARM IPK, checksum and Homebrew feed
 
 React, JSX, Vite, browser tests and web rendering are no longer part of the project. Node/pnpm
 remain build/deployment tools for Sharp, the webOS CLI and formatting/linting. The installed app
-is the Rust executable `luma`, with app ID `com.luma.launcher`.
+is the Rust executable `luma`, with app ID `com.ecklf.luma`.
 
 ## Toolchain and commands
 
@@ -165,10 +165,10 @@ the original process arguments available to SDL/libhelpers. To expose the actual
 sandbox's stdout/stderr, close Luma and run in the TV's root SSH shell:
 
 ```sh
-APP=/media/developer/apps/usr/palm/applications/com.luma.launcher
+APP=/media/developer/apps/usr/palm/applications/com.ecklf.luma
 XDG_RUNTIME_DIR=/tmp/xdg RUST_BACKTRACE=1 /usr/bin/jailer \
-  -t native_devmode -i com.luma.launcher -p "$APP" \
-  "$APP/luma" '{"@system_native_app":true,"nid":"com.luma.launcher"}'
+  -t native_devmode -i com.ecklf.luma -p "$APP" \
+  "$APP/luma" '{"@system_native_app":true,"nid":"com.ecklf.luma"}'
 ```
 
 Startup prints accepted launch parameters, SDL driver, actual sample count, cumulative stage

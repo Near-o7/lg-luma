@@ -5,7 +5,7 @@ use crate::model::{App, Input, Inventory, demo_inventory, valid_app_id};
 use serde_json::{Value, json};
 use std::{collections::HashSet, sync::mpsc, thread};
 
-pub const APP_ID: &str = "com.luma.launcher";
+pub const APP_ID: &str = "com.ecklf.luma";
 pub enum Request {
     Refresh,
     Launch(String),
@@ -236,6 +236,8 @@ pub fn normalize_apps(raw: &Value) -> Result<Vec<App>, String> {
         let live = id == "com.webos.app.livetv";
         let visible = entry.get("visible");
         if id == APP_ID
+            || id == "com.luma.native"
+            || id == "com.luma.launcher"
             || id == "com.luma.launcher.native"
             || id == "com.webos.app.home"
             || id.starts_with("com.webos.app.hdmi")

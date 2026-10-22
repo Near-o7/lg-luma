@@ -30,10 +30,10 @@ versions only when requested. The Cargo package version is independent.
 
 ## Build and identity
 
-`com.luma.launcher` is the native app's ID and `luma` its executable. Root `appinfo.json` is the
-package metadata source. The native app replaces the former web app under the same ID; browser
-local storage is not migrated. Native preferences remain local JSON. The former separate
-prototype ID `com.luma.launcher.native` is excluded from app inventory.
+`com.ecklf.luma` is the native app's ID and `luma` its executable. Root `appinfo.json` is the
+package metadata source. It installs separately from the former web app `com.luma.launcher` and
+prototypes `com.luma.launcher.native` and `com.luma.native`, all excluded from app inventory. Preferences are local JSON
+per installation; browser local storage and preferences from other IDs are not migrated.
 
 ARM builds must use the NDK's gnueabi soft-float calling convention and explicit sysroot, with
 isolated pkg-config. Preserve the Cortex-A9/VFP Rust flags and `getauxval` compatibility.
