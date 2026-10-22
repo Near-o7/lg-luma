@@ -1,5 +1,5 @@
 {
-  description = "Luma web and Rust/SDL2 development environment";
+  description = "Luma Rust/SDL2 development and packaging environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -48,38 +48,27 @@
               pkgs.pnpm_10.version == pnpmVersion
             ) "The flake's pnpm must match package.json; update flake.lock and packageManager together.";
             pkgs.pnpm_10;
-          browsers =
-            assert pkgs.lib.assertMsg
-              (pkgs.playwright-driver.version == project.devDependencies."@playwright/test")
-              "The flake's Playwright browsers must match @playwright/test; update flake.lock with that dependency.";
-            pkgs.playwright-driver.browsers;
         in
         {
-          default = pkgs.mkShell (
-            {
-              name = "luma";
-              packages = [
-                pkgs.nodejs_24
-                pnpm
-                rust
-                pkgs.pkg-config
-                pkgs.SDL2
-                pkgs.woff2
-                (pkgs.python3.withPackages (python: [ python.fonttools ]))
-                pkgs.cmake
-                pkgs.git
-              ]
-              ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-                pkgs.libGL
-                pkgs.mesa
-                pkgs.xvfb-run
-              ];
-            }
-            // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-              # Nix-built browsers carry their runtime libraries on Linux.
-              PLAYWRIGHT_BROWSERS_PATH = "${browsers}";
-            }
-          );
+          default = pkgs.mkShell ({
+            name = "luma";
+            packages = [
+              pkgs.nodejs_24
+              pnpm
+              rust
+              pkgs.pkg-config
+              pkgs.SDL2
+              pkgs.woff2
+              (pkgs.python3.withPackages (python: [ python.fonttools ]))
+              pkgs.cmake
+              pkgs.git
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+              pkgs.libGL
+              pkgs.mesa
+              pkgs.xvfb-run
+            ];
+          });
         }
       );
 

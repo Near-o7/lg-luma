@@ -8,9 +8,10 @@
     "node_modules/**",
     "dist/**",
     ".build/**",
-    "test-results/**",
-    "playwright-report/**",
+    "target/**",
     "pnpm-lock.yaml",
-    "public/fonts/**"
+    "assets/fonts/**",
+    "assets/licenses/**",
+    "assets/ui-icons/**"
   ]
 }
