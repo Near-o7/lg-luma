@@ -33,7 +33,7 @@ A native launcher for rooted LG webOS TVs, inspired by Apple TV.
 https://github.com/ecklf/lg-luma/releases/latest/download/repo.json
 ```
 
-### Install over SSH
+### SSH
 
 On your computer, replace `TV_IP`:
 
