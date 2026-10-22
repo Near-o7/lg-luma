@@ -1,36 +1,58 @@
 # Luma assets and references
 
-- `public/mark.svg`, `public/app-icon.svg`, `public/wallpapers/midnight.svg`, `public/wallpapers/slate.svg`, and `public/wallpapers/prism.svg`: original Luma artwork, MIT. The TV app icon has a transparent background; webOS supplies the panel via `iconColor`, so there is no second background with its own clipping radius.
-- `public/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`, https://images.unsplash.com/photo-1509316785289-025f5b846b35. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`, https://images.unsplash.com/photo-1501594907352-04cda38ebc29. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/summit.jpg`: Unsplash photo `1454496522488-7a8e488e8606`, https://images.unsplash.com/photo-1454496522488-7a8e488e8606. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/forest.jpg`: Unsplash photo `1441974231531-c6227db76b6e`, https://images.unsplash.com/photo-1441974231531-c6227db76b6e. Bundled under the [Unsplash License](https://unsplash.com/license).
-- `public/wallpapers/yosemite.jpg`: [Tunnel View, Yosemite Valley, Yosemite NP](https://commons.wikimedia.org/wiki/File:Tunnel_View,_Yosemite_Valley,_Yosemite_NP_-_Diliff.jpg) by David Iliff (Diliff), [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Resized to a 2560px-wide JPEG; the image retains its CC BY-SA 3.0 license.
-- `public/wallpapers/northern-lights.jpg`: Unsplash photo `1531366936337-7c912a4589a7`, https://images.unsplash.com/photo-1531366936337-7c912a4589a7. Bundled under the [Unsplash License](https://unsplash.com/license).
-- Inter variable font: Rasmus Andersson, SIL Open Font License 1.1. License bundled at `public/fonts/ofl.txt`.
-- Interface icons: Lucide, ISC license (dependency license in node_modules/lucide-react/LICENSE).
-- Brand treatments identify installed third-party apps; their names and marks belong to their respective owners. Luma is not affiliated with those companies, Apple, or LG.
+- `assets/mark.svg`, `assets/app-icon.svg`, and the Midnight/Slate/Prism SVG wallpapers:
+  original Luma artwork, MIT. webOS supplies the app icon panel using `iconColor`.
+- `assets/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`,
+  https://images.unsplash.com/photo-1509316785289-025f5b846b35, [Unsplash License](https://unsplash.com/license).
+- `assets/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`,
+  https://images.unsplash.com/photo-1501594907352-04cda38ebc29, Unsplash License.
+- `assets/wallpapers/summit.jpg`: Unsplash photo `1454496522488-7a8e488e8606`,
+  https://images.unsplash.com/photo-1454496522488-7a8e488e8606, Unsplash License.
+- `assets/wallpapers/forest.jpg`: Unsplash photo `1441974231531-c6227db76b6e`,
+  https://images.unsplash.com/photo-1441974231531-c6227db76b6e, Unsplash License.
+- `assets/wallpapers/yosemite.jpg`: [Tunnel View, Yosemite Valley, Yosemite NP](https://commons.wikimedia.org/wiki/File:Tunnel_View,_Yosemite_Valley,_Yosemite_NP_-_Diliff.jpg)
+  by David Iliff (Diliff), [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
+  Resized to a 2560px JPEG; generated wallpapers/thumbnails retain the source license.
+- `assets/wallpapers/northern-lights.jpg`: Unsplash photo `1531366936337-7c912a4589a7`,
+  https://images.unsplash.com/photo-1531366936337-7c912a4589a7, Unsplash License.
+- Inter variable font: Rasmus Andersson, SIL Open Font License 1.1, `assets/fonts/ofl.txt`.
+- Noto Sans SC: copyright 2014–2021 Adobe, SIL OFL 1.1. Source/license in `assets/fonts/`;
+  `tools/font-assets.mjs` pins the Google Fonts revision and checksums. Generated regular/medium
+  subsets are renamed Luma CJK and retain copyright/license tables.
+- Lucide interface icons: exported standalone SVG sources in `assets/ui-icons/`, ISC license
+  bundled at `assets/licenses/lucide.txt`. PlayStation/Apple TV input paths were supplied by the
+  user; the brand marks belong to Sony/Apple. Spotify/Kodi symbol treatments use the original
+  native artwork. Logos identify third-party apps; Luma is unaffiliated with their owners.
+- SDL-webOS 2.30.12 (`release-2.30.12-webos.5`, standard SDL ABI), zlib license.
+  `tools/webos-runtime.mjs` records archive/library SHA-256. Notice at `assets/licenses/sdl2.txt`.
 
-Luma's logo is a folded-light **L**: an icy-blue ribbon turns into a cyan-and-indigo base. The browser mark and TV app icon share the same vector geometry, sized for a clear silhouette at small icon sizes.
+The bundled icon/logo SVG sources are compiled into derived `.lvec` triangles with the same
+source licenses. Apple TV, Disney+, Prime Video and Das Erste retain the white display treatment.
+YouTube's wordmark is white and its play mark red. Jellyfin retains its gradient and in-file
+CC BY-SA attribution. Both licenses and this document travel inside the IPK.
 
-`public/wallpaper-thumbnails/` contains 480×270 JPEG derivatives of the photographs listed above. They are resized/cropped for the Settings gallery and retain each source photograph's license and attribution.
+Generated `.build/assets/thumbnails/` are cropped/resized derivatives of the same wallpaper
+sources. Original sources remain in `assets/`; no artwork service is contacted on the TV.
 
 ## Brand SVGs
 
-The requested app logos use downloaded vector artwork, rather than font approximations. SVG outlines are preserved; Apple TV, Disney+, Prime Video, and Das Erste use a white monochrome display treatment for contrast. YouTube's wordmark is recolored white for its dark card, while its play icon stays red. All files are bundled locally under `public/logos/`.
+| Asset             | Source                                                                                                | License / attribution                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `apple-tv.svg`    | [Apple TV](https://commons.wikimedia.org/wiki/File:Apple_TV_logo.svg)                                 | Apple Inc.; public-domain logo artwork                                                 |
+| `prime-video.svg` | [Prime Video](https://commons.wikimedia.org/wiki/File:Amazon_Prime_Video_logo.svg)                    | Amazon; public-domain logo artwork                                                     |
+| `disney-plus.svg` | [Disney+](https://commons.wikimedia.org/wiki/File:Disney%2B_logo.svg)                                 | Disney Enterprises; public-domain logo artwork                                         |
+| `jellyfin.svg`    | [Jellyfin branding](https://github.com/jellyfin/jellyfin-ux/blob/master/branding/SVG/banner-dark.svg) | Jellyfin contributors; [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| `netflix.svg`     | [Netflix](https://commons.wikimedia.org/wiki/File:Netflix_2015_logo.svg)                              | Netflix Inc.; public-domain logo artwork                                               |
+| `youtube.svg`     | [YouTube](https://commons.wikimedia.org/wiki/File:YouTube_2024.svg)                                   | Google Inc.; public-domain logo artwork                                                |
+| `arte.svg`        | [ARTE](https://commons.wikimedia.org/wiki/File:Arte_Logo_2026.svg)                                    | ARTE; public-domain logo artwork                                                       |
+| `zdf.svg`         | [ZDF](https://commons.wikimedia.org/wiki/File:ZDF_logo.svg)                                           | ZDF; public-domain logo artwork                                                        |
+| `das-erste.svg`   | [Das Erste](https://commons.wikimedia.org/wiki/File:Das_Erste_2014.svg)                               | ARD; public-domain logo artwork                                                        |
 
-| Asset             | Source                                                                                                                          | Source license / attribution                                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `apple-tv.svg`    | [Apple TV logo](https://commons.wikimedia.org/wiki/File:Apple_TV_logo.svg)                                                      | Apple Inc.; public-domain logo artwork                                                                                              |
-| `prime-video.svg` | [Amazon Prime Video logo](https://commons.wikimedia.org/wiki/File:Amazon_Prime_Video_logo.svg)                                  | Amazon; public-domain logo artwork                                                                                                  |
-| `disney-plus.svg` | [Disney+ logo](https://commons.wikimedia.org/wiki/File:Disney%2B_logo.svg)                                                      | Disney Enterprises, Inc.; public-domain logo artwork                                                                                |
-| `jellyfin.svg`    | [Jellyfin official branding, banner-dark.svg](https://github.com/jellyfin/jellyfin-ux/blob/master/branding/SVG/banner-dark.svg) | Jellyfin contributors; [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); original license notice retained in the SVG |
-| `netflix.svg`     | [Netflix 2015 logo](https://commons.wikimedia.org/wiki/File:Netflix_2015_logo.svg)                                              | Netflix Inc.; public-domain logo artwork                                                                                            |
-| `youtube.svg`     | [YouTube 2024](https://commons.wikimedia.org/wiki/File:YouTube_2024.svg)                                                        | Google Inc.; public-domain logo artwork                                                                                             |
-| `arte.svg`        | [ARTE 2026 logo](https://commons.wikimedia.org/wiki/File:Arte_Logo_2026.svg)                                                    | ARTE; public-domain logo artwork                                                                                                    |
-| `zdf.svg`         | [ZDF logo](https://commons.wikimedia.org/wiki/File:ZDF_logo.svg)                                                                | ZDF; public-domain logo artwork                                                                                                     |
-| `das-erste.svg`   | [Das Erste 2014](https://commons.wikimedia.org/wiki/File:Das_Erste_2014.svg)                                                    | ARD; public-domain logo artwork                                                                                                     |
+Installed-app PNG/JPEG artwork is collected from the owner's TV. Names and marks remain the
+property of the respective app owners. Luma's folded-light L logo is original artwork; its SVG
+geometry produces the small/large webOS installation icons.
 
-The PlayStation and Apple TV input symbols use the SVG paths supplied by the user. PlayStation is a Sony Interactive Entertainment mark; Apple TV is an Apple mark. HDMI, USB, and generic device symbols are Lucide icons.
+Weather data: [Open-Meteo](https://open-meteo.com/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-The Apple design guidance supplied for this project informed motion, focus feedback, materials, typography, and reduced-motion behavior. It is not an Apple product.
+The provided Apple design guidance informed focus, motion and materials. This is not an Apple
+or LG product.

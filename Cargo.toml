@@ -1,0 +1,41 @@
+[package]
+name = "luma"
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+default-run = "luma"
+license = "MIT"
+description = "A remote-first native launcher for rooted LG webOS TVs"
+
+[workspace]
+members = ["vector-geometry", "tools/vector-assets"]
+resolver = "3"
+
+[features]
+default = []
+webos = ["dep:libc"]
+
+[dependencies]
+gl = "0.14"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+libc = { version = "0.2", optional = true }
+luma-vector-geometry = { path = "vector-geometry" }
+owned_ttf_parser = "0.25"
+sdl2 = { version = "0.38", features = ["use-pkgconfig"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+time = { version = "0.3", features = ["local-offset", "formatting", "parsing"] }
+ureq = { version = "3.4", default-features = false, features = ["rustls"] }
+
+[profile.release]
+lto = "thin"
+strip = true
+codegen-units = 1
+
+# Keep on-demand glyph geometry responsive in desktop debug previews.
+[profile.dev.package.lyon_tessellation]
+opt-level = 3
+
+[profile.dev.package.ttf-parser]
+opt-level = 3

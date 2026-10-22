@@ -18,16 +18,19 @@ const repository = process.env.GITHUB_REPOSITORY || 'ecklf/lg-luma';
 if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('Invalid GitHub repository name.');
 const sourceUrl = `https://github.com/${repository}`;
 const releaseUrl = `${sourceUrl}/releases/download/${tag}`;
-const filename = `${manifest.id}_${manifest.version}_all.ipk`;
+const filename = `${manifest.id}_${manifest.version}_arm.ipk`;
 const output = path.join(root, 'dist');
 const bytes = await fs.readFile(path.join(output, filename));
 const iconUri = `${releaseUrl}/${manifest.largeIcon}`;
+const shortDescription = manifest.appDescription?.trim();
+if (!shortDescription) throw new Error('appinfo.json must provide a non-empty appDescription.');
 const feed = {
   paging: { page: 1, count: 1, maxPage: 1, itemsTotal: 1 },
   packages: [
     {
       id: manifest.id,
       title: manifest.title,
+      shortDescription,
       iconUri,
       manifest: {
         id: manifest.id,
@@ -46,7 +49,7 @@ const feed = {
   ],
 };
 await fs.copyFile(
-  path.join(output, 'app', manifest.largeIcon),
+  path.join(root, '.build/package', manifest.largeIcon),
   path.join(output, manifest.largeIcon),
 );
 await fs.writeFile(path.join(output, 'repo.json'), JSON.stringify(feed, null, 2) + '\n');

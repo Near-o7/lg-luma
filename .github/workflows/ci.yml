@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   build:
-    name: Check, test, and package
+    name: Rust checks, rendering, and native package
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     outputs:
       tag: ${{ steps.package.outputs.tag }}
     steps:
@@ -29,17 +29,33 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          components: rustfmt, clippy
+          targets: armv7-unknown-linux-gnueabi
+      - name: Install desktop and asset dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev pkg-config woff2 python3-fonttools libgl1-mesa-dri xvfb
       - name: Check formatting
         run: pnpm format:check
+      - name: Lint Rust and packaging tools
+        run: pnpm check
       - name: Run unit tests
         run: pnpm test
-      - name: Lint, typecheck, and build the IPK and Homebrew feed
+      - name: Generate native assets
+        run: pnpm assets
+      - name: Exercise desktop rendering and mocked weather
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a -s '-screen 0 1920x1080x24' pnpm test:smoke
+      - name: Set up the webOS SDK
+        run: pnpm sdk
+      - name: Cross-build and verify the native IPK and Homebrew feed
         id: package
-        run: pnpm run package
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Run browser tests
-        run: pnpm test:browser
+        run: |
+          export WEBOS_NDK="$GITHUB_WORKSPACE/.build/toolchain/arm-webos-linux-gnueabi_sdk-buildroot"
+          pnpm build
+          node tools/package.mjs
+          node tools/repository.mjs
       - name: Upload release files
         uses: actions/upload-artifact@v7
         with:
@@ -50,14 +66,17 @@ jobs:
             dist/sha256sums
             dist/repo.json
             dist/app-icon-large.png
-      - name: Upload browser test diagnostics
-        if: failure()
+      - name: Upload native rendering diagnostics
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: browser-test-results
+          name: native-rendering
           if-no-files-found: ignore
           retention-days: 7
-          path: test-results/
+          include-hidden-files: true
+          path: |
+            .build/*.png
+            .build/*-render.json
 
   release:
     name: Publish release and Homebrew feed

@@ -1,161 +1,162 @@
 # Luma
 
-A modern, remote-first launcher for rooted LG webOS TVs, inspired by the clarity and feel of Apple TV.
+A native launcher for rooted LG webOS TVs, inspired by Apple TV.
 
 > [!NOTE]
 > Tested on **LG OLED55C57** running **webOS 26**.
+> External testing confirms compatibility with **webOS 6 and newer**.
 
 <table>
   <tr>
     <td width="50%" align="center">
-      <strong>Home</strong><br>
-      <img src="docs/home.png" alt="Luma Home screen, desktop preview">
+      <img src="docs/home.png" alt="Luma native Home screen, desktop preview">
     </td>
     <td width="50%" align="center">
-      <strong>Apps</strong><br>
-      <img src="docs/apps.png" alt="Luma Apps library, desktop preview">
+      <img src="docs/apps.png" alt="Luma native app library, desktop preview">
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <strong>Settings</strong><br>
-      <img src="docs/settings.png" alt="Luma Settings, desktop preview">
+      <img src="docs/settings.png" alt="Luma native General settings with Quit app, desktop preview">
     </td>
     <td width="50%" align="center">
-      <strong>Inputs</strong><br>
-      <img src="docs/inputs.png" alt="Luma input settings, desktop preview">
+      <img src="docs/inputs.png" alt="Luma native input settings, desktop preview">
     </td>
   </tr>
 </table>
 
-## Install
+Screenshots show the native desktop preview with sample apps and inputs.
 
-Use [Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel) on your rooted LG TV.
+## Features
 
-1. Open Homebrew Channel and check **Settings → Root status: ok**.
-2. Go to **Settings → Add repository**, enter this URL, and confirm:
+- Home favorites in one horizontally scrolling row, with physical inputs beneath.
+- App library with categories, search, favorites and hide/restore controls.
+- Remote arrows, OK, hold-OK reordering/options and Magic Remote pointer input.
+- General, Background, Weather and Inputs settings; Quit app in General.
+- English, German and Simplified Chinese; local fonts and artwork.
+- Explicit city/postcode weather search, Celsius/Fahrenheit and cached readings.
+- TV system keyboard for text entry; a custom keyboard for desktop preview.
+- On-demand drawing when idle, VSync-paced animation, and reduced-motion settings.
 
-   ```text
-   https://github.com/ecklf/lg-luma/releases/latest/download/repo.json
-   ```
+## Build and install
 
-3. Return to the app list, select **Luma**, and choose **Install**.
-4. Open **Luma** from your TV's apps.
-
-### Manual installation
-
-Download the `.ipk` from the [latest release](https://github.com/ecklf/lg-luma/releases/latest). Open [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop), connect to your TV's IP address on port `22` as `root`, and install the downloaded package.
-
-You can also install over SSH. Replace `TV_IP` with your TV's address and use the filename you downloaded:
+From the repository root, with Nix flakes enabled:
 
 ```sh
-scp -O com.luma.launcher_1.1.1_all.ipk root@TV_IP:/tmp/luma.ipk
-ssh root@TV_IP
-```
-
-Then run in the TV's root shell:
-
-```sh
-luna-send -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.luma.launcher","ipkUrl":"/tmp/luma.ipk","subscribe":true}'
-```
-
-Wait for the installation success response, then press Ctrl+C if the subscription stays open. Fully close and reopen Luma after updating.
-
-## Inputs on Home
-
-Open **Settings → Inputs** and select an input to choose when it appears on Home:
-
-- **On** — always show it.
-- **Off** — never show it.
-- **Auto** — show it only when the TV reports it connected (the default).
-
-Choices are saved per input. Hidden and disconnected inputs remain available in Settings, and **Refresh inputs** updates the detected devices and their connection states.
-
-## Optional: open at boot
-
-After testing the installed app, run this inside the TV's root SSH shell:
-
-```sh
-sh /media/developer/apps/usr/palm/applications/com.luma.launcher/autostart.sh enable
-```
-
-This adds an app-owned hook at `/var/lib/webosbrew/init.d/65-luma`. It launches after a full boot with a 25-second delay. It does not run on every standby wake. Disable it before uninstalling:
-
-```sh
-sh /media/developer/apps/usr/palm/applications/com.luma.launcher/autostart.sh disable
-```
-
-## Optional: remote Home button
-
-Use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/) to map your remote's Home key to this command (one line):
-
-```sh
-/usr/bin/luna-send -t 1 -w 5000 luna://com.webos.service.applicationmanager/launch '{"id":"com.luma.launcher"}'
-```
-
-Test the mapping on a spare button first. Disable any other Home-button listener before enabling Luma's mapping. Disable the Luma mapping in Input Hook to restore the normal button.
-
-Luma does not inject code into LG services, replace the stock launcher, or bind-mount system directories. Root-only Home routing is separate from the app itself.
-
-## Troubleshooting
-
-### webOS 26: denied exec method
-
-Homebrew Channel 0.8.0-rc1 or newer provides the `lunabus.query` API permission mapping for elevated services ([upstream fix](https://github.com/webosbrew/webos-homebrew-channel/pull/233)). Luma declares that group alongside its app-launch permissions. Update Homebrew Channel and reinstall the latest Luma release if an older installation reports `Denied method call "exec" for category "/"`.
-
-If the denial persists after reopening Luma, perform a full TV reboot. If it still occurs, inspect the installed caller permissions and the Homebrew service mapping from the root SSH shell:
-
-```sh
-cat /var/luna-service2*/client-permissions.d/com.luma.launcher*.json
-cat /var/luna-service2*/api-permissions.d/org.webosbrew.hbchannel.service.api.lunabus.query.json
-```
-
-The caller needs `lunabus.query`, and Homebrew's mapping should contain `{"lunabus.query":["org.webosbrew.hbchannel.service/*"]}`. Homebrew Channel must also be elevated. Installing Luma via `luna-send` does not require elevating Luma itself.
-
-## Compatibility and privacy
-
-- Targets webOS 24–26 / Chromium 108+. Graphics are packaged at 1920 × 1080 and scale for desktop preview.
-- App/input discovery uses Homebrew Channel's elevated `exec` service. Fixed inventory commands read only app and physical-input lists.
-- App launches use the public application manager API with the `application.launcher` and `application.query` ACGs. Homebrew service access declares `lunabus.query` for webOS 26 / Homebrew Channel 0.8.0-rc1. No service permissions are rewritten.
-- Service bridges are retained until completion, bounded by timeouts, and cancelled afterward. Partial refresh failures preserve the last valid inventory.
-- All app names and IDs come from inventory on the TV. A failure never substitutes desktop sample apps.
-- Preferences, recent launches, weather location, and cached readings stay in this app's local storage. Forecast requests require an enabled widget and a configured location; city searches are sent only when you press Search. The packaged Content Security Policy limits web network connections to Open-Meteo's weather and geocoding APIs.
-- Homebrew Channel permissions and native service behavior need verification on the physical TV, particularly webOS 26. Browser tests cannot establish hardware compatibility.
-
-## Development
-
-Use Node.js 22+ and pnpm 10 (the project pins pnpm 10.34.5):
-
-```sh
-git clone https://github.com/ecklf/lg-luma.git
-cd lg-luma
+nix develop
 pnpm install --frozen-lockfile
-pnpm dev
-```
-
-Open **http://127.0.0.1:5173**. The browser preview uses sample apps and inputs; TV actions show a preview message. On a TV, Luma loads the actual inventory.
-
-### Build a package
-
-```sh
+pnpm sdk
+export WEBOS_NDK="$PWD/.build/toolchain/arm-webos-linux-gnueabi_sdk-buildroot"
 pnpm run package
 ```
 
-Output: `dist/com.luma.launcher_1.1.1_all.ipk`, `dist/sha256sums`, and the Homebrew feed `dist/repo.json` with its icon. The standalone app is in `dist/app/` and works directly from `index.html` without a server.
+`pnpm sdk` downloads and relocates the pinned SDK for your host. It supports Apple Silicon/Intel
+macOS and ARM64/x86-64 Linux. The Nix shell supports Apple Silicon macOS and ARM64/x86-64 Linux.
+Keep the SDK path free of spaces. The first native runtime preparation also downloads a
+checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 
-Photographs, fonts, and app-logo SVGs are bundled locally. `pnpm assets` prepares them again if deliberately removed; normal builds and TV use need no asset downloads.
+Output:
 
-To deploy a local build, register your TV's root SSH connection with `pnpm exec ares-setup-device`, then run `pnpm run deploy --device tv`.
+```text
+dist/com.ecklf.luma_2.0.0_arm.ipk
+dist/sha256sums
+dist/repo.json
+dist/app-icon-large.png
+```
 
-### Releases
+Open [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop), connect to the TV's
+IP on port **22** as **root**, and install the IPK. Open **Luma** from the TV menu. Homebrew
+Channel must be elevated; on webOS 26 use **0.8.0-rc1 or newer** for its `lunabus.query` mapping.
 
-GitHub Actions checks pull requests and pushes to `main`, runs the unit and browser tests, and builds the installable package. After a successful build on `main`, CI publishes a new app version with its IPK, checksum, icon, and Homebrew feed. The version tag (for example, `v1.1.1`) is created automatically at the tested commit.
+The native package uses **`com.ecklf.luma`** and installs separately from the old
+`com.luma.launcher` web app and the former `com.luma.launcher.native` / `com.luma.native` prototypes. Native preferences
+are local JSON files and are separate for each installation; browser preferences are not migrated.
+Homebrew Channel treats this ID as a separate app rather than an update to the old launcher.
 
-For each release, update the version in both `package.json` and `appinfo.json`, then merge to `main`. Already-published versions are skipped. To retry a failed run, use **Actions → CI → Run workflow** on `main`.
+### Install over SSH
 
-The stable feed URL always serves the latest release. Contributor checks, controls, weather behavior, and the code map are documented in [agents.md](agents.md).
+On your computer, replace `TV_IP`:
 
-## License
+```sh
+scp -O dist/com.ecklf.luma_2.0.0_arm.ipk root@TV_IP:/tmp/luma.ipk
+ssh root@TV_IP
+```
 
-MIT for Luma's source. See [assets.md](assets.md) for artwork, font, icon, and integration references.
+In the TV's root shell:
+
+```sh
+luna-send -i luna://com.webos.appInstallService/dev/install \
+  '{"id":"com.ecklf.luma","ipkUrl":"/tmp/luma.ipk","subscribe":true}'
+```
+
+Wait for installation success; Ctrl+C closes an ongoing subscription. Fully close and reopen
+Luma after updating. The [development guide](development.md#tv-startup-diagnostics) has a jailed
+launch command that exposes errors hidden by the normal menu launch.
+
+### Homebrew feed
+
+The package command generates the release feed for:
+
+```text
+https://github.com/ecklf/lg-luma/releases/latest/download/repo.json
+```
+
+Add that repository in Homebrew Channel once a native release is published. The feed carries the
+ARM IPK's SHA-256, byte size and version-specific release URL. Existing published releases may
+still contain the web launcher; use the locally built ARM IPK for this native rewrite.
+
+## Desktop development
+
+```sh
+nix develop
+pnpm install --frozen-lockfile
+pnpm assets
+pnpm dev
+```
+
+The desktop preview uses sample inventory and never calls TV services. To manually exercise a
+longer app grid:
+
+```sh
+pnpm dev --test-extra-apps 120
+```
+
+Preview preferences are separate from normal preferences. See [development.md](development.md)
+for controls, vector rendering, diagnostics, tests and the source layout.
+
+## Optional: boot and Home-button routing
+
+After verifying Luma, enable the bundled cold-boot hook in the TV's root shell:
+
+```sh
+sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/autostart.sh enable
+```
+
+It launches after a full boot with a 25-second delay. Disable before uninstalling:
+
+```sh
+sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/autostart.sh disable
+```
+
+Use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/) for optional Home-key
+routing. Configure its Execute action with this one-line command:
+
+```sh
+/usr/bin/luna-send -t 1 -w 5000 luna://com.webos.service.applicationmanager/launch '{"id":"com.ecklf.luma"}'
+```
+
+Test on a spare button first. Disable the mapping in Input Hook to restore normal Home behavior.
+Installing Luma does not enable either optional routing integration.
+
+## Privacy and scope
+
+App/input discovery uses fixed inventory commands through Homebrew Channel's elevated service.
+App launches use the native Luna bus with declared permissions. There is no demo inventory
+fallback on the TV. Native caller permissions and lifecycle behavior can differ by firmware.
+
+Favorites, hidden apps, settings, weather location and cached readings stay in local JSON files.
+Weather search/forecast requests go to Open-Meteo, with embedded TLS roots and bounded responses.
+There is no browser geolocation, IP-based location lookup, telemetry or runtime font download.
+
+Luma is licensed under MIT.
+Luma is not affiliated with LG, Apple, Plex or any app brands shown in its UI.
