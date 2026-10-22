@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 pub const WEATHER_SECTION: usize = 2;
 pub const INPUTS_SECTION: usize = 3;
 pub const SECTION_COUNT: usize = 4;
+pub const APPS_COLUMNS: usize = 6;
 pub const HOME_STRIP_LEFT: f32 = 84.;
 pub const HOME_STRIP_RIGHT: f32 = 1836.;
 pub const HOME_TILE_WIDTH: f32 = 270.;
@@ -738,19 +739,32 @@ impl State {
                     return vec![];
                 }
             }
-            if let Target::App(id) = &self.focus
-                && matches!(direction, Direction::Up)
-                && self.apps().iter().take(6).any(|app| &app.id == id)
+            if self.page == Page::Apps
+                && let Target::App(id) = &self.focus
+                && matches!(direction, Direction::Up | Direction::Down)
             {
-                self.focus(
-                    if self.page == Page::Apps {
-                        Target::Filter(1)
-                    } else {
-                        Target::Nav(0)
-                    },
-                    controls,
-                );
-                return vec![];
+                let apps = self.apps();
+                if let Some(index) = apps.iter().position(|app| &app.id == id) {
+                    // A preceding row may be above the visible scroll region.
+                    // Its grid index still defines the route; reveal_focus then
+                    // scrolls it into view, without letting the fixed nav steal Up.
+                    let next = match direction {
+                        Direction::Up if index < APPS_COLUMNS => Some(Target::Filter(1)),
+                        Direction::Up => Some(Target::App(apps[index - APPS_COLUMNS].id.clone())),
+                        Direction::Down
+                            if (index / APPS_COLUMNS + 1) * APPS_COLUMNS < apps.len() =>
+                        {
+                            Some(Target::App(
+                                apps[(index + APPS_COLUMNS).min(apps.len() - 1)].id.clone(),
+                            ))
+                        }
+                        _ => None,
+                    };
+                    if let Some(next) = next {
+                        self.focus(next, controls);
+                    }
+                    return vec![];
+                }
             }
             if let Target::Background(index) = self.focus {
                 match direction {

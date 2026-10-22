@@ -193,6 +193,8 @@ Scrolling Apps content fades into the existing wallpaper near the header and foo
 of exposing a hard clipping edge. The same alpha mask applies to card surfaces, rings, shadows,
 vector logos and text; the header and wallpaper are unmasked. Remote focus keeps selected Apps
 cards below the top fade region. No blur texture or additional wallpaper decode is used.
+Apps Up/Down follows the six-column grid order, including offscreen rows. Up reaches the category
+toolbar only from the first row; scrolling cannot cause a mid-grid jump into the fixed header.
 
 Desktop preferences live in `$XDG_CONFIG_HOME/luma-native/preferences.json`, or
 `~/.config/luma-native/preferences.json`. `--preferences PATH` isolates a test run. Native preferences

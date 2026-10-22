@@ -4,8 +4,8 @@ use crate::{
     model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode},
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
-        Control, HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page, Rect, State, Subpage,
-        Target, TextField, WEATHER_SECTION,
+        APPS_COLUMNS, Control, HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page, Rect, State,
+        Subpage, Target, TextField, WEATHER_SECTION,
     },
     weather::{self, Unit},
 };
@@ -1230,7 +1230,7 @@ fn library(out: &mut Scene, state: &State, assets: &Assets) {
         );
     }
     let mut y = 270.4;
-    for row in apps.chunks(6) {
+    for row in apps.chunks(APPS_COLUMNS) {
         let row_height = FACE_HEIGHT
             + 18.4
             + row
