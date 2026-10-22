@@ -39,7 +39,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.luma.launcher_1.1.1_arm.ipk
+dist/com.luma.launcher_2.0.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png
@@ -58,7 +58,7 @@ automatically migrated. The former `com.luma.launcher.native` prototype remains 
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.luma.launcher_1.1.1_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.luma.launcher_2.0.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 

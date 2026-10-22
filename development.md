@@ -246,6 +246,10 @@ publication retains the version/tag guards: a published version is skipped, a dr
 and a tag pointing at another commit requires a new app version. Versions change only on request.
 Host CI cannot prove hardware compatibility, small-text quality or presentation frame rate.
 
+Homebrew Channel's details page reads `packages[].shortDescription` (or `fullDescriptionUrl`),
+not `manifest.appDescription`. The feed generator writes the root app metadata description into
+both fields; the catalog description is on the package entry beside `title` and `iconUri`.
+
 Key modules: `state.rs` focus/preferences, `view.rs` geometry, `renderer.rs` GPU caches/draws,
 `font.rs` lazy metrics/outlines, `vector.rs` GPU mesh upload, `platform.rs` worker/inventory,
 `luna.rs` LS2, `weather*.rs` scheduling/HTTPS/cache, `storage.rs` atomic JSON, and `main.rs` SDL loop.

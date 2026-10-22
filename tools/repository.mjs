@@ -22,12 +22,15 @@ const filename = `${manifest.id}_${manifest.version}_arm.ipk`;
 const output = path.join(root, 'dist');
 const bytes = await fs.readFile(path.join(output, filename));
 const iconUri = `${releaseUrl}/${manifest.largeIcon}`;
+const shortDescription = manifest.appDescription?.trim();
+if (!shortDescription) throw new Error('appinfo.json must provide a non-empty appDescription.');
 const feed = {
   paging: { page: 1, count: 1, maxPage: 1, itemsTotal: 1 },
   packages: [
     {
       id: manifest.id,
       title: manifest.title,
+      shortDescription,
       iconUri,
       manifest: {
         id: manifest.id,
