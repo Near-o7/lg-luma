@@ -22,6 +22,7 @@ const filename = `${manifest.id}_${manifest.version}_arm.ipk`;
 const output = path.join(root, 'dist');
 const bytes = await fs.readFile(path.join(output, filename));
 const iconUri = `${releaseUrl}/${manifest.largeIcon}`;
+const descriptionFilename = 'description.html';
 const shortDescription = manifest.appDescription?.trim();
 if (!shortDescription) throw new Error('appinfo.json must provide a non-empty appDescription.');
 const feed = {
@@ -31,6 +32,7 @@ const feed = {
       id: manifest.id,
       title: manifest.title,
       shortDescription,
+      fullDescriptionUrl: `${releaseUrl}/${descriptionFilename}`,
       iconUri,
       manifest: {
         id: manifest.id,
@@ -51,6 +53,10 @@ const feed = {
 await fs.copyFile(
   path.join(root, '.build/package', manifest.largeIcon),
   path.join(output, manifest.largeIcon),
+);
+await fs.copyFile(
+  path.join(root, 'assets/homebrew-description.html'),
+  path.join(output, descriptionFilename),
 );
 await fs.writeFile(path.join(output, 'repo.json'), JSON.stringify(feed, null, 2) + '\n');
 if (process.env.GITHUB_OUTPUT) await fs.appendFile(process.env.GITHUB_OUTPUT, `tag=${tag}\n`);

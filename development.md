@@ -268,7 +268,10 @@ Host CI cannot prove hardware compatibility, small-text quality or presentation 
 
 Homebrew Channel's details page reads `packages[].shortDescription` (or `fullDescriptionUrl`),
 not `manifest.appDescription`. The feed generator writes the root app metadata description into
-both fields; the catalog description is on the package entry beside `title` and `iconUri`.
+`shortDescription` and `manifest.appDescription`. It also copies `assets/homebrew-description.html`
+to `dist/description.html` and sets the package's `fullDescriptionUrl` to that version's release
+asset. Homebrew Channel prefers this HTML description when the URL is present. CI uploads the
+HTML alongside the feed and IPK, so the feed and its description must be published together.
 
 Key modules: `state.rs` focus/preferences, `view.rs` geometry, `renderer.rs` GPU caches/draws,
 `font.rs` lazy metrics/outlines, `vector.rs` GPU mesh upload, `platform.rs` worker/inventory,
