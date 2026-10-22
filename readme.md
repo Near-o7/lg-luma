@@ -154,7 +154,8 @@ App/input discovery uses fixed inventory commands through Homebrew Channel's ele
 App launches use the native Luna bus with declared permissions. There is no demo inventory
 fallback on the TV. Native caller permissions and lifecycle behavior can differ by firmware.
 
-Favorites, hidden apps, settings, weather location and cached readings stay in local JSON files.
+Favorites, hidden apps, settings, weather location and cached readings stay in local JSON files
+in an app-owned persistent directory outside the installed payload.
 Weather search/forecast requests go to Open-Meteo, with embedded TLS roots and bounded responses.
 There is no browser geolocation, IP-based location lookup, telemetry or runtime font download.
 

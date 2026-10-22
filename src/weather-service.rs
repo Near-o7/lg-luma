@@ -286,7 +286,7 @@ pub fn load_cache(path: &Path) -> Option<Cache> {
     }
     serde_json::from_slice(&bytes).ok()
 }
-fn save_cache(path: &Path, cache: &Cache) -> Result<(), String> {
+pub(crate) fn save_cache(path: &Path, cache: &Cache) -> Result<(), String> {
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
