@@ -49,61 +49,66 @@ luna-send -i luna://com.webos.appInstallService/dev/install \
   '{"id":"com.ecklf.luma","ipkUrl":"/tmp/luma.ipk","subscribe":true}'
 ```
 
-## Optional: boot and Home-button routing
+## Replacing LG Home
 
-After verifying Luma, enable the bundled cold-boot hook in the TV's root shell:
+### Takeover Method
 
-```sh
-sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/autostart.sh enable
-```
+> [!WARNING]
+> Home replacement is experimental. Confirmed working on **webOS 26**.
+> Ensure to disable takeover before uninstalling Luma.
 
-It launches after a full boot with a 25-second delay. Disable before uninstalling:
-
-```sh
-sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/autostart.sh disable
-```
-
-Use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/) for optional Home-key
-routing. Configure its Execute action with this one-line command:
-
-```sh
-/usr/bin/luna-send -n 1 -w 5000 luna://com.webos.service.applicationmanager/launch '{"id":"com.ecklf.luma"}'
-```
-
-Test on a spare button first. Disable the mapping in Input Hook to restore normal Home behavior.
-Installing Luma does not enable either optional routing integration.
-
-### Native Home replacement (webOS 25/26)
-
-The optional Home integration uses the same bind-mount approach as
-[Glasshouse Home](https://github.com/rorygallagher2024/glasshouse/blob/main/server/lib/home-takeover.js),
-with Luma's native renderer. Install a package built with this integration first, then run as root:
+Install Luma and verify that it opens normally. Disable any Home mapping e.g.
+[LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/) and any other Home
+replacement, then run in the TV's root SSH shell:
 
 ```sh
 APP=/media/developer/apps/usr/palm/applications/com.ecklf.luma
-sh "$APP/autostart.sh" disable
+# If you enabled Lumas autostart method earlier, disable it first
+# sh "$APP/autostart.sh" disable
 sh "$APP/home.sh" enable
 ```
 
-`enable` outlines the changes and asks `Apply these changes? [y/n]:`. Enter `y` to proceed.
-Entering `n` or ending input cancels before the command makes changes.
+Takeover mounts Luma over the system Home app and reapplies the mount at cold boot.
+LG Home's original files remain underneath, using the same approach as
+[Glasshouse Home](https://github.com/rorygallagher2024/glasshouse/blob/main/server/lib/home-takeover.js).
 
-Disable any Home mapping in LG Input Hook and any other Home replacement first. This mounts a
-native Luma manifest over `com.webos.app.home`, so normal Home actions open Luma. The integration
-reapplies the mount at cold boot and follows the TV's existing Home Auto Launch and Quick Start+
-settings. It is intended to cover standby wake onto Home as well. **Home replacement is experimental
-and needs manual verification on the TV**, independently of Luma's normal app compatibility.
-
-Status and restoring LG Home, including from an SSH session after a failed launch:
+To see the status or disable the home override use:
 
 ```sh
 sh /var/lib/luma-home/home.sh status
 sh /var/lib/luma-home/home.sh disable
 ```
 
-Disable this integration before uninstalling Luma. The restore command remains available outside
-the installed package, and `restore` is an alias for `disable`. Boot diagnostics are written to
-`/var/lib/luma-home/boot.log`.
+`restore` is an alias for `disable`.
+
+Boot log: `/var/lib/luma-home/boot.log`. See the
+[development guide](development.md#optional-native-home-integration) for implementation details.
+
+### Autostart Method
+
+Open Luma 25 seconds after a full cold boot. Run in the TV's root SSH shell:
+
+```sh
+sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/autostart.sh enable
+```
+
+Use this when takeover is disabled. It launches Luma as a regular app and does not remap the Home button.
+
+Disable before enabling takeover or uninstalling Luma:
+
+```sh
+sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/autostart.sh disable
+```
+
+### LG Input Hook Method
+
+You can use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/), configure an Execute action with this one-line command:
+
+```sh
+/usr/bin/luna-send -n 1 -w 5000 luna://com.webos.service.applicationmanager/launch '{"id":"com.ecklf.luma"}'
+```
+
+Test on a spare button first. Disable the mapping in Input Hook to restore normal Home behavior.
 
 ## Development
 
