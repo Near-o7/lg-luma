@@ -11,6 +11,7 @@ tools/vector-assets/         Host-only SVG compiler
 tools/                       Asset preparation, SDK/runtime setup, packaging and release feed
 tests/                       Desktop rendering and mocked HTTP smoke scripts
 tv/autostart.sh              Optional cold-boot launch hook
+tv/home.sh / home.cjs         Optional root-only native Home integration
 dist/                        Generated ARM IPK, checksum and Homebrew feed
 .build/                      Generated assets, SDK/runtime caches and rendering diagnostics
 ```
@@ -186,6 +187,43 @@ used. Native requests run on one worker's private GLib context with a 6.5-second
 reply limit. Errors include URI and the bus refusal. Fixed inventory commands run via elevated
 Homebrew Channel `exec`, parsing complete multi-line `luna-send -n 1` JSON replies. Input-read
 failures preserve the last valid inputs. No failed inventory read substitutes demo apps on TV.
+
+### Optional native Home integration
+
+`tv/home.sh` and `tv/home.cjs` are packaged beside `luma`. They are a root-only, explicit integration
+for webOS 10/25 and 11/26. `enable` stages a native manifest with ID `com.webos.app.home` and
+symlinks to the installed executable, libraries and assets under `/var/lib/luma-home/app`, then
+bind-mounts it over `/usr/palm/applications/com.webos.app.home`. SAM rereads that one app through
+`blockSystemApp` followed by `releaseBlockSystemApp`, including `forceBlockSystemApp: false` when
+the TV schema requires it. The script verifies the reported manifest before stopping the previous
+Home process. It attempts to restore LG Home if applying the mount or refreshing SAM fails.
+
+Root-shell calls use `luna-send -n 1` on both firmware versions, with bounded stdout/stderr
+capture and operation-specific diagnostics for empty or invalid replies. `-t 1` is timing mode:
+it logs the payload to stderr and writes timing summaries to stdout, not a JSON response.
+
+The `enable` shell entry point prints the change summary and requires a `y`/`n` confirmation
+before creating the state directory, acquiring the lock or invoking the installer. Only `y`/`Y`
+proceeds. `n`/`N` or end-of-input cancels, and other input repeats the prompt. The boot hook and
+`apply` remain non-interactive, and `disable`/`restore` remain available without confirmation.
+
+The native CLI accepts SAM's Home `nid` and gives SDL the matching Home surface identity. The
+executable itself stays at its installed path for LS2 authentication, `$ORIGIN/lib`, asset discovery
+and preference selection. Opening Luma's normal tile while the Home mount is active redirects to
+the Home instance. The scripts do not create a browser wrapper or change the package's app ID.
+
+`64-luma-home` reapplies the mount from a detached boot hook. The existing TV Home Auto Launch
+and Quick Start+ settings determine whether power-on opens Home. Until the hook applies, LG Home
+can still appear. This integration does not change those settings or install a remote-key filter.
+`disable` (also `restore`) removes the mount, refreshes LG's manifest, stops the native Home
+instance and removes the boot hook. The copied restore scripts remain in `/var/lib/luma-home`
+even if the installed package is removed. Disable the standalone `65-luma` cold-boot hook before
+enabling this integration.
+
+Build and script checks cannot establish native Home compatibility. Manually verify Home, Back
+out of the last app, standby wake with the TV's chosen Quick Start+ setting, a full cold boot,
+saved preferences and restoring LG Home. The broader webOS 6+ app compatibility statement does
+not establish Home-replacement support on older firmware.
 
 ## Manual extra-app preview
 
