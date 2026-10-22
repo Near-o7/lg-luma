@@ -23,6 +23,7 @@
     "format": "cargo fmt --all && oxfmt --write .",
     "format:check": "cargo fmt --all -- --check && oxfmt --check .",
     "assets": "node tools/assets.mjs",
+    "screenshots": "pnpm assets && node tools/screenshots.mjs",
     "assets:vector": "node tools/vector-assets.mjs",
     "assets:fonts": "node tools/font-assets.mjs",
     "runtime": "node tools/webos-runtime.mjs",

@@ -8,6 +8,32 @@ Bundled icons, logos and text use cached vector geometry.
 rendering, and discovery of 29 apps and four inputs. Earlier firmware is not yet verified for
 Luma. See [compatibility](development.md#compatibility) and [asset licenses](assets.md).
 
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>Home</strong><br>
+      <img src="docs/home.png" alt="Luma native Home screen, desktop preview">
+    </td>
+    <td width="50%" align="center">
+      <strong>Apps</strong><br>
+      <img src="docs/apps.png" alt="Luma native app library, desktop preview">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>General settings</strong><br>
+      <img src="docs/settings.png" alt="Luma native General settings with Quit app, desktop preview">
+    </td>
+    <td width="50%" align="center">
+      <strong>Inputs</strong><br>
+      <img src="docs/inputs.png" alt="Luma native input settings, desktop preview">
+    </td>
+  </tr>
+</table>
+
+Screenshots come from the native desktop preview with sample apps and a fixed time.
+Regenerate them with `pnpm screenshots` inside `nix develop`.
+
 ## Features
 
 - Home favorites in one horizontally scrolling row, with physical inputs beneath.

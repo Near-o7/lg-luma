@@ -33,21 +33,22 @@ woff2, Python/fontTools, CMake and Git. Linux includes Mesa and Xvfb. Supported 
 Apple Silicon macOS and ARM64/x86-64 Linux. Without Nix, supply those tools and Rust 1.88+,
 including `armv7-unknown-linux-gnueabi` for TV builds. No browser installation is needed.
 
-| Command                   | Purpose                                                   |
-| ------------------------- | --------------------------------------------------------- |
-| `pnpm dev [--options]`    | Run the desktop preview                                   |
-| `pnpm assets [--4k]`      | Prepare fonts, vector artwork and raster backgrounds      |
-| `pnpm assets:vector`      | Recompile bundled SVG icon/logo meshes                    |
-| `pnpm assets:fonts`       | Restore checksum-pinned Noto font source if needed        |
-| `pnpm sdk`                | Download/relocate a pinned host webOS SDK                 |
-| `pnpm runtime`            | Prepare checksum-pinned SDL-webOS                         |
-| `pnpm build`              | Release ARM cross-build using `WEBOS_NDK`                 |
-| `pnpm run package`        | Assets, cross-build, IPK verification and Homebrew feed   |
-| `pnpm deploy --device tv` | Build/install/launch through an ares device profile       |
-| `pnpm check`              | Oxlint and workspace Clippy, without executing tests      |
-| `pnpm format:check`       | Rust and tooling/document formatting checks               |
-| `pnpm test`               | Rust workspace unit tests                                 |
-| `pnpm test:smoke`         | Desktop rendering, mocked weather and localization checks |
+| Command                   | Purpose                                                    |
+| ------------------------- | ---------------------------------------------------------- |
+| `pnpm dev [--options]`    | Run the desktop preview                                    |
+| `pnpm assets [--4k]`      | Prepare fonts, vector artwork and raster backgrounds       |
+| `pnpm screenshots`        | Capture native Home, Apps, General and Inputs into `docs/` |
+| `pnpm assets:vector`      | Recompile bundled SVG icon/logo meshes                     |
+| `pnpm assets:fonts`       | Restore checksum-pinned Noto font source if needed         |
+| `pnpm sdk`                | Download/relocate a pinned host webOS SDK                  |
+| `pnpm runtime`            | Prepare checksum-pinned SDL-webOS                          |
+| `pnpm build`              | Release ARM cross-build using `WEBOS_NDK`                  |
+| `pnpm run package`        | Assets, cross-build, IPK verification and Homebrew feed    |
+| `pnpm deploy --device tv` | Build/install/launch through an ares device profile        |
+| `pnpm check`              | Oxlint and workspace Clippy, without executing tests       |
+| `pnpm format:check`       | Rust and tooling/document formatting checks                |
+| `pnpm test`               | Rust workspace unit tests                                  |
+| `pnpm test:smoke`         | Desktop rendering, mocked weather and localization checks  |
 
 The TV target is ARMv7 **soft-float calling convention**, `gnueabi`, not `gnueabihf`. Codegen
 uses the NDK's Cortex-A9/VFP baseline with NEON disabled for Rust code. Hardware floating point
@@ -63,6 +64,17 @@ explicitly selected ARM webOS shared libraries; SDL overrides must have a real w
 backend. Avoid copying the whole SDK library directory or the TV's graphics drivers/libc.
 
 ## Controls and navigation
+
+### Documentation screenshots
+
+`pnpm screenshots` generates `docs/home.png`, `docs/apps.png`, `docs/settings.png` and
+`docs/inputs.png`, linked by the README. It builds the desktop executable without the TV feature,
+uses isolated temporary preferences, sample inventory and a fixed date/time, and captures actual
+1920×1080 OpenGL framebuffers. Weather is unconfigured, so no real weather APIs are contacted.
+It does not execute the test suites. A desktop display is required; on headless Linux use
+`xvfb-run -a pnpm screenshots`. These images document the native design, not TV hardware behavior.
+
+### Input
 
 | Input                     | Action                                                 |
 | ------------------------- | ------------------------------------------------------ |
