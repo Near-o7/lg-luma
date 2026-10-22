@@ -159,6 +159,9 @@ struct Press {
 }
 
 const SCRIPT_POINTER: u32 = u32::MAX - 1;
+// SDL-webOS's Back scancode is outside rust-sdl2's standard Scancode enum.
+// Keycode retains the raw value: SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_WEBOS_BACK).
+const WEBOS_BACK_KEYCODE: i32 = (1 << 30) | 482;
 
 fn effects(
     effects: Vec<Effect>,
@@ -693,6 +696,10 @@ fn run() -> Result<(), String> {
                         pending = state.back();
                     }
                     Keycode::Backspace if state.text_input_active() => state.delete(),
+                    Keycode::Backspace if !repeat => {
+                        press = None;
+                        pending = state.back();
+                    }
                     Keycode::Clear if matches!(state.overlay, Some(Overlay::SystemKeyboard)) => {
                         let length = state.editing_text().len() as i32;
                         state.delete_surrounding_text(-length, length);
@@ -702,7 +709,10 @@ fn run() -> Result<(), String> {
                         state.options();
                     }
                     Keycode::F5 if !repeat => pending.push(Effect::Refresh),
-                    key if i32::from(key) == 461 && !repeat => {
+                    key if !repeat
+                        && (i32::from(key) == 461
+                            || (webos && i32::from(key) == WEBOS_BACK_KEYCODE)) =>
+                    {
                         press = None;
                         pending = state.back();
                     }

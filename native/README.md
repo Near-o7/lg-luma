@@ -166,7 +166,7 @@ default.
 | Enter / OK                   | Activate on release                             |
 | Hold Enter / OK for 600 ms   | Move a Home favorite; app options in Apps       |
 | M / Menu / right-click       | App options                                     |
-| Escape / Back                | Dismiss panel, navigate back, or exit from Home |
+| Escape / Back / Backspace    | Dismiss panel, navigate back, or exit from Home |
 | Mouse / Magic Remote pointer | Hover, click, hold; wheel to scroll             |
 | F5                           | Refresh inventory                               |
 
@@ -188,6 +188,12 @@ favorite focused without launching it. General settings control app names, clock
 reduced motion. Clock format and each input open nested choice pages with checkmarks; Left/Back
 returns to the parent row. Background has all nine wallpapers and enters at the currently applied
 background. Input choices are On, Off and Auto, with the same descriptions as the web app.
+The native webOS Back key uses SDL's webOS-specific keycode and follows the same parent return
+routes as Left: Location → Weather's Location row, HDMI choices → that HDMI row, and Background
+gallery → Background in the sidebar. Open setting subpages restore their parent even if focus
+has moved to the top navigation. Back from the Settings sidebar focuses the Settings tab; Back
+again from that tab returns Home. Backspace deletes while editing text and acts as Back elsewhere
+in the desktop preview.
 Hidden appears only when needed, and search/category filters have separate clear controls.
 Scrolling Apps content fades into the existing wallpaper near the header and footer instead
 of exposing a hard clipping edge. The same alpha mask applies to card surfaces, rings, shadows,

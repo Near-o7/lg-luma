@@ -1289,7 +1289,7 @@ impl State {
             };
             return vec![];
         }
-        if self.subpage.is_some() && !matches!(self.focus, Target::Nav(_)) {
+        if self.page == Page::Settings && self.subpage.is_some() {
             self.close_subpage();
             return vec![];
         }
