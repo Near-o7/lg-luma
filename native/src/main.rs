@@ -739,28 +739,40 @@ fn run() -> Result<(), String> {
                     }
                     _ => {}
                 },
-                Event::MouseWheel { x, y, mouse_x, mouse_y, .. } if state.overlay.is_none() => {
+                Event::MouseWheel {
+                    x,
+                    y,
+                    mouse_x,
+                    mouse_y,
+                    ..
+                } if state.overlay.is_none() => {
                     let over_favorites = state.page == state::Page::Home
                         && pointer_position(&window, mouse_x, mouse_y).is_some_and(|(x, y)| {
-                            (64. ..1856.).contains(&x) && scene.controls.iter().any(|control| matches!(control.target, Target::App(_)) && control.rect.contains(x, y))
+                            (64. ..1856.).contains(&x)
+                                && scene.controls.iter().any(|control| {
+                                    matches!(control.target, Target::App(_))
+                                        && control.rect.contains(x, y)
+                                })
                         });
                     if state.page == state::Page::Home && (x != 0 || over_favorites) {
-                        state.scroll_favorites((if x != 0 { x } else { -y }) as f32 * state::HOME_TILE_PITCH);
+                        state.scroll_favorites(
+                            (if x != 0 { x } else { -y }) as f32 * state::HOME_TILE_PITCH,
+                        );
                         press = None;
                     } else {
                         let max = scene
-                        .controls
-                        .iter()
-                        .filter(|c| c.scrollable)
-                        .map(|c| {
-                            c.rect.y + c.rect.h + state.scroll
-                                - if state.page == state::Page::Home {
-                                    1041.6
-                                } else {
-                                    982.4
-                                }
-                        })
-                        .fold(0., f32::max);
+                            .controls
+                            .iter()
+                            .filter(|c| c.scrollable)
+                            .map(|c| {
+                                c.rect.y + c.rect.h + state.scroll
+                                    - if state.page == state::Page::Home {
+                                        1041.6
+                                    } else {
+                                        982.4
+                                    }
+                            })
+                            .fold(0., f32::max);
                         state.scroll = (state.scroll - y as f32 * 90.).clamp(0., max.max(0.));
                     }
                     state.pointer = true;
@@ -995,7 +1007,8 @@ fn hit(
         .find(|control| {
             control.rect.contains(x, y)
                 && (!control.scrollable
-                    || (x >= 64. && x < 1856. && y >= 108.8
+                    || ((64. ..1856.).contains(&x)
+                        && y >= 108.8
                         && y < if state.page == state::Page::Home && state.moving.is_none() {
                             1053.6
                         } else {

@@ -7,10 +7,12 @@ varying PAINT_PRECISION vec2 v_uv;
 varying PAINT_PRECISION vec4 v_color;
 varying PAINT_PRECISION vec4 v_shape;
 varying PAINT_PRECISION vec2 v_params;
+varying PAINT_PRECISION float v_logical_y;
 void main() {
     gl_Position = vec4(a_position.x / 960.0 - 1.0, 1.0 - a_position.y / 540.0, 0.0, 1.0);
     v_uv = a_uv;
     v_color = a_color;
     v_shape = a_shape;
     v_params = a_params;
+    v_logical_y = a_position.y;
 }

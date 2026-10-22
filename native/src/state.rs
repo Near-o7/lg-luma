@@ -244,7 +244,9 @@ impl State {
         };
         self.focus = Target::Nav(self.page_index());
         self.scroll = 0.;
-        if self.page == Page::Home { self.scroll_favorites(0.); }
+        if self.page == Page::Home {
+            self.scroll_favorites(0.);
+        }
         self.query.clear();
         self.filter = 0;
         self.overlay = None;
@@ -290,13 +292,26 @@ impl State {
     }
 
     pub fn scroll_favorites(&mut self, delta: f32) {
-        let count = self.preferences.favorites(&self.inventory.apps).iter()
-            .filter(|id| !self.preferences.hidden.contains(id)
-                && self.inventory.apps.iter().any(|app| &app.id == *id)).count();
-        let content = if count == 0 { 0. } else { (count - 1) as f32 * HOME_TILE_PITCH + HOME_TILE_WIDTH };
+        let count = self
+            .preferences
+            .favorites(&self.inventory.apps)
+            .iter()
+            .filter(|id| {
+                !self.preferences.hidden.contains(id)
+                    && self.inventory.apps.iter().any(|app| &app.id == *id)
+            })
+            .count();
+        let content = if count == 0 {
+            0.
+        } else {
+            (count - 1) as f32 * HOME_TILE_PITCH + HOME_TILE_WIDTH
+        };
         let max = (content - (HOME_STRIP_RIGHT - HOME_STRIP_LEFT)).max(0.);
         let next = (self.home_scroll + delta).clamp(0., max);
-        if next != self.home_scroll { self.home_scroll = next; self.dirty = true; }
+        if next != self.home_scroll {
+            self.home_scroll = next;
+            self.dirty = true;
+        }
     }
 
     pub fn set_inventory(&mut self, next: Inventory, warning: Option<String>) {
@@ -313,7 +328,9 @@ impl State {
     }
 
     pub fn reconcile_focus(&mut self) {
-        if self.page == Page::Home { self.scroll_favorites(0.); }
+        if self.page == Page::Home {
+            self.scroll_favorites(0.);
+        }
         if let Target::App(id) = &self.focus
             && !self.apps().iter().any(|app| &app.id == id)
         {
@@ -388,7 +405,11 @@ impl State {
             ) {
                 self.scroll = 0.;
             } else if control.scrollable {
-                let top = if self.page == Page::Apps { 164.8 } else { 120.8 };
+                let top = if self.page == Page::Apps {
+                    164.8
+                } else {
+                    120.8
+                };
                 if control.rect.y < top {
                     self.scroll = (self.scroll + control.rect.y - top).max(0.);
                 }
@@ -402,7 +423,9 @@ impl State {
                 }
             }
         }
-        if self.page == Page::Home { self.scroll_favorites(0.); }
+        if self.page == Page::Home {
+            self.scroll_favorites(0.);
+        }
         if self.scroll != previous || self.home_scroll != previous_home {
             self.dirty = true;
         }
@@ -515,19 +538,40 @@ impl State {
                 if let Some(index) = apps.iter().position(|app| &app.id == id) {
                     match direction {
                         Direction::Left | Direction::Right => {
-                            let next = if matches!(direction, Direction::Left) { index.saturating_sub(1) } else { (index + 1).min(apps.len() - 1) };
+                            let next = if matches!(direction, Direction::Left) {
+                                index.saturating_sub(1)
+                            } else {
+                                (index + 1).min(apps.len() - 1)
+                            };
                             let id = apps[next].id.clone();
                             self.focus(Target::App(id), controls);
                         }
                         Direction::Up => self.focus(Target::Nav(0), controls),
                         Direction::Down => {
-                            let x = controls.iter().find(|control| control.target == self.focus).map_or(960., |control| control.rect.center().0);
-                            let top = controls.iter().filter(|control| matches!(control.target, Target::Input(_)))
-                                .map(|control| control.rect.y).fold(f32::INFINITY, f32::min);
-                            let next = controls.iter().filter(|control| matches!(control.target, Target::Input(_)) && (control.rect.y - top).abs() < 1.)
-                                .min_by(|a, b| (a.rect.center().0 - x).abs().total_cmp(&(b.rect.center().0 - x).abs()))
+                            let x = controls
+                                .iter()
+                                .find(|control| control.target == self.focus)
+                                .map_or(960., |control| control.rect.center().0);
+                            let top = controls
+                                .iter()
+                                .filter(|control| matches!(control.target, Target::Input(_)))
+                                .map(|control| control.rect.y)
+                                .fold(f32::INFINITY, f32::min);
+                            let next = controls
+                                .iter()
+                                .filter(|control| {
+                                    matches!(control.target, Target::Input(_))
+                                        && (control.rect.y - top).abs() < 1.
+                                })
+                                .min_by(|a, b| {
+                                    (a.rect.center().0 - x)
+                                        .abs()
+                                        .total_cmp(&(b.rect.center().0 - x).abs())
+                                })
                                 .map(|control| control.target.clone());
-                            if let Some(next) = next { self.focus(next, controls); }
+                            if let Some(next) = next {
+                                self.focus(next, controls);
+                            }
                         }
                     }
                     return vec![];
@@ -756,8 +800,12 @@ impl State {
         let next = controls
             .iter()
             .filter(|candidate| candidate.target != self.focus)
-            .filter(|candidate| self.page != Page::Home || !matches!(candidate.target, Target::App(_))
-                || (candidate.rect.x >= HOME_STRIP_LEFT - 0.1 && candidate.rect.x + candidate.rect.w <= HOME_STRIP_RIGHT + 0.1))
+            .filter(|candidate| {
+                self.page != Page::Home
+                    || !matches!(candidate.target, Target::App(_))
+                    || (candidate.rect.x >= HOME_STRIP_LEFT - 0.1
+                        && candidate.rect.x + candidate.rect.w <= HOME_STRIP_RIGHT + 0.1)
+            })
             .filter_map(|candidate| {
                 // Header controls never steal an Up route from the active tab.
                 if self.overlay.is_none()

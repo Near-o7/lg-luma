@@ -1,12 +1,19 @@
 uniform sampler2D u_texture;
 uniform float u_aa;
+uniform vec4 u_edge_fade;
 varying PAINT_PRECISION vec2 v_uv;
 varying PAINT_PRECISION vec4 v_color;
 varying PAINT_PRECISION vec4 v_shape;
 varying PAINT_PRECISION vec2 v_params;
+varying PAINT_PRECISION float v_logical_y;
+float edge_coverage() {
+    if (u_edge_fade.y <= u_edge_fade.x) return 1.0;
+    return smoothstep(u_edge_fade.x, u_edge_fade.y, v_logical_y) *
+        (1.0 - smoothstep(u_edge_fade.z, u_edge_fade.w, v_logical_y));
+}
 void main() {
     if (v_params.x < 0.0) {
-        gl_FragColor = texture2D(u_texture, v_uv) * v_color;
+        gl_FragColor = texture2D(u_texture, v_uv) * v_color * vec4(1.0, 1.0, 1.0, edge_coverage());
         return;
     }
     float blur = max(-v_params.y, 0.0);
@@ -21,5 +28,5 @@ void main() {
     if (v_params.y > 0.0) {
         alpha *= smoothstep(-v_params.y - u_aa, -v_params.y, d);
     }
-    gl_FragColor = texture2D(u_texture, v_uv) * v_color * vec4(1.0, 1.0, 1.0, alpha);
+    gl_FragColor = texture2D(u_texture, v_uv) * v_color * vec4(1.0, 1.0, 1.0, alpha * edge_coverage());
 }

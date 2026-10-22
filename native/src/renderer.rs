@@ -67,6 +67,7 @@ pub enum Draw {
     Image(String, Rect, f32, bool),
     TintedImage(String, Rect, f32, bool, Color),
     Clip(Option<Rect>),
+    EdgeFade(Option<[f32; 4]>),
 }
 
 struct Texture {
@@ -189,6 +190,7 @@ enum BatchKind {
 struct Batch {
     kind: BatchKind,
     clip: Option<Rect>,
+    fade: Option<[f32; 4]>,
 }
 
 pub struct Renderer {
@@ -209,6 +211,7 @@ pub struct Renderer {
     vertices: Vec<f32>,
     batches: Vec<Batch>,
     clip: Option<Rect>,
+    fade: Option<[f32; 4]>,
     frame: u64,
     stats: RenderStats,
     pub info: GraphicsInfo,
@@ -321,6 +324,7 @@ impl Renderer {
             vertices: Vec::with_capacity(65536),
             batches: Vec::new(),
             clip: None,
+            fade: None,
             frame: 0,
             stats: RenderStats::new(Size::HD),
             info: GraphicsInfo {
@@ -469,6 +473,7 @@ impl Renderer {
                 _ => false,
             };
             if same_clip
+                && batch.fade == self.fade
                 && let BatchKind::Paint {
                     texture: previous,
                     count,
@@ -487,6 +492,7 @@ impl Renderer {
                 count: 6,
             },
             clip: self.clip,
+            fade: self.fade,
         });
     }
 
@@ -712,6 +718,7 @@ impl Renderer {
             self.batches.push(Batch {
                 kind: BatchKind::Text { key, origin, tint },
                 clip: self.clip,
+                fade: self.fade,
             });
         }
     }
@@ -829,6 +836,7 @@ impl Renderer {
                 tint,
             },
             clip: Some(clip),
+            fade: self.fade,
         });
     }
 
@@ -847,6 +855,7 @@ impl Renderer {
         self.vertices.clear();
         self.batches.clear();
         self.clip = None;
+        self.fade = None;
         for command in commands {
             match command {
                 Draw::Shape(rect, radius, border, color) => self.quad(
@@ -883,6 +892,7 @@ impl Renderer {
                     self.image(path, *rect, *radius, *contain, *tint)
                 }
                 Draw::Clip(clip) => self.clip = *clip,
+                Draw::EdgeFade(fade) => self.fade = *fade,
             }
         }
         let Viewport {
@@ -919,7 +929,25 @@ impl Renderer {
             );
             gl::ActiveTexture(gl::TEXTURE0);
             let mut paint_bound = false;
+            let mut current_fade = None;
             for batch in &self.batches {
+                if current_fade != Some(batch.fade) {
+                    // The same cheap alpha mask applies to shapes, textures,
+                    // icons and text; the unmasked wallpaper remains beneath.
+                    let fade = batch.fade.unwrap_or([0., 0., 0., 0.]);
+                    for program in [self.program, self.vector_program, self.text_program] {
+                        gl::UseProgram(program);
+                        gl::Uniform4f(
+                            gl::GetUniformLocation(program, c"u_edge_fade".as_ptr()),
+                            fade[0],
+                            fade[1],
+                            fade[2],
+                            fade[3],
+                        );
+                    }
+                    current_fade = Some(batch.fade);
+                    paint_bound = false;
+                }
                 if let Some(clip) = batch.clip {
                     gl::Enable(gl::SCISSOR_TEST);
                     gl::Scissor(

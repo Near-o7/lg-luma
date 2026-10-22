@@ -171,7 +171,14 @@ default.
 | F5                           | Refresh inventory                               |
 
 Left/Right switches focused top tabs immediately; clicking or OK also selects a tab. Home has
-favorites and all eligible physical inputs. Apps supports
+all favorites in one horizontally scrolling row, with eligible physical inputs beneath it.
+Left/Right advances through the saved favorite order and reveals the entire selected card;
+the strip keeps its position when visiting another page. Down from Home navigation enters the
+first fully visible favorite, Up from any favorite returns to Home navigation, and Down enters
+the nearest input in the first input row. Hold-OK reordering also reveals the selected card.
+The wheel scrolls horizontally when over favorites; elsewhere it scrolls the page vertically.
+Pointer hover/down never scrolls the strip. Adding favorites never creates a second app row.
+Apps supports
 categories, Hidden, favorite-first ordering, wrapped names, and search with the TV's system
 keyboard or a physical keyboard. The desktop preview has a remote-operable keyboard panel.
 TV text fields retain focus while SDL/webOS owns text entry; Done/Back dismisses editing and
@@ -181,6 +188,10 @@ reduced motion. Clock format and each input open nested choice pages with checkm
 returns to the parent row. Background has all nine wallpapers and enters at the currently applied
 background. Input choices are On, Off and Auto, with the same descriptions as the web app.
 Hidden appears only when needed, and search/category filters have separate clear controls.
+Scrolling Apps content fades into the existing wallpaper near the header and footer instead
+of exposing a hard clipping edge. The same alpha mask applies to card surfaces, rings, shadows,
+vector logos and text; the header and wallpaper are unmasked. Remote focus keeps selected Apps
+cards below the top fade region. No blur texture or additional wallpaper decode is used.
 
 Desktop preferences live in `$XDG_CONFIG_HOME/luma-native/preferences.json`, or
 `~/.config/luma-native/preferences.json`. `--preferences PATH` isolates a test run. Native preferences

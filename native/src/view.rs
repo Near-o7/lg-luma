@@ -4,8 +4,8 @@ use crate::{
     model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode},
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
-        Control, KEYS, Overlay, Page, Rect, State, Subpage, Target, TextField, WEATHER_SECTION,
-        HOME_TILE_PITCH, HOME_TILE_WIDTH,
+        Control, HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page, Rect, State, Subpage,
+        Target, TextField, WEATHER_SECTION,
     },
     weather::{self, Unit},
 };
@@ -231,7 +231,7 @@ impl Scene {
                         [brightness, brightness, brightness, alpha],
                     );
                 }
-                Draw::Clip(_) => {}
+                Draw::Clip(_) | Draw::EdgeFade(_) => {}
             }
         }
     }
@@ -311,6 +311,14 @@ pub fn scene_with_pill(
         1792.,
         main_bottom - MAIN_TOP,
     ))));
+    if state.page == Page::Apps {
+        out.draw.push(Draw::EdgeFade(Some([
+            MAIN_TOP,
+            152.8,
+            main_bottom - 24.,
+            main_bottom,
+        ])));
+    }
     match state.page {
         Page::Home => home(&mut out, state, assets, now),
         Page::Apps => library(&mut out, state, assets),
@@ -352,6 +360,7 @@ pub fn scene_with_pill(
         }
         out.control(Target::Retry, retry, false);
     }
+    out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
     header(&mut out, state, assets, now, pill_x, pill_width);
     footer(&mut out, state, assets);
@@ -459,8 +468,10 @@ fn tile(
         Rect::new(rect.x, rect.y, rect.w, rect.h + label_height),
         true,
     );
-    if rect.y + rect.h + label_height < MAIN_TOP || rect.y > 1054.
-        || rect.x + rect.w + 40. < 64. || rect.x - 40. > 1856.
+    if rect.y + rect.h + label_height < MAIN_TOP
+        || rect.y > 1054.
+        || rect.x + rect.w + 40. < 64.
+        || rect.x - 40. > 1856.
     {
         return;
     }
@@ -816,14 +827,31 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         grid_height = 247.5;
     }
     if !apps.is_empty() {
-        grid_height = FACE_HEIGHT + if names {
-            18.4 + apps.iter().map(|app| caption_height(state, assets, app, HOME_TILE_WIDTH)).fold(49.28, f32::max)
-        } else { 0. };
+        grid_height = FACE_HEIGHT
+            + if names {
+                18.4 + apps
+                    .iter()
+                    .map(|app| caption_height(state, assets, app, HOME_TILE_WIDTH))
+                    .fold(49.28, f32::max)
+            } else {
+                0.
+            };
     }
     for (index, app) in apps.iter().enumerate() {
-        tile(out, state, assets, app,
-            Rect::new(84. + index as f32 * HOME_TILE_PITCH - state.home_scroll, 544.8 - s, HOME_TILE_WIDTH, FACE_HEIGHT),
-            names, false);
+        tile(
+            out,
+            state,
+            assets,
+            app,
+            Rect::new(
+                84. + index as f32 * HOME_TILE_PITCH - state.home_scroll,
+                544.8 - s,
+                HOME_TILE_WIDTH,
+                FACE_HEIGHT,
+            ),
+            names,
+            false,
+        );
     }
     let input_y = 544.8 + grid_height + 41.6 - s;
     let inputs: Vec<_> = state
