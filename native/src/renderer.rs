@@ -1,11 +1,11 @@
-//! A small GLES2-compatible GPU painter. Rust owns the draw list and glyph atlas;
+//! A small GLES2-compatible GPU painter. Rust owns vector glyphs and the draw list;
 //! SDL only supplies the context. No browser, LVGL, Qt or copied PlxNative code.
 use crate::{
-    raster::{Shelf, Size, Viewport, glyph_size, recyclable_page},
+    font::Font,
+    raster::{Size, Viewport},
     state::Rect,
     vector,
 };
-use fontdue::{Font, Metrics};
 use gl::types::*;
 use serde::Serialize;
 use std::{
@@ -17,8 +17,8 @@ use std::{
 
 pub type Color = [f32; 4];
 pub const WHITE: Color = [0.96, 0.96, 0.96, 1.];
-const ATLAS: usize = 1024;
-const CACHED_ATLASES: usize = 4;
+const GLYPH_GEOMETRY_BUDGET: usize = 8 * 1024 * 1024;
+const TEXT_GEOMETRY_BUDGET: usize = 32 * 1024 * 1024;
 const TEXTURE_BUDGET: usize = 48 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug)]
@@ -83,17 +83,25 @@ impl Drop for Texture {
     }
 }
 
-#[derive(Clone, Copy)]
 struct Glyph {
-    metrics: Metrics,
-    uv: [f32; 4],
-    page: Option<usize>,
+    geometry: Vec<luma_vector_geometry::Vertex>,
+    frame: u64,
 }
 
-struct GlyphAtlas {
-    texture: Texture,
-    shelf: Shelf,
-    used: u64,
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct TextKey {
+    text: String,
+    weight: u16,
+    // Logical size, tracking, line height, available width and height.
+    layout: [u32; 5],
+    flags: u8,
+}
+
+struct TextRun {
+    mesh: Option<vector::Mesh>,
+    missing_glyphs: usize,
+    failures: usize,
+    frame: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -111,15 +119,18 @@ pub struct RenderStats {
     pub target: Size,
     pub viewport: Viewport,
     pub font_antialiasing: &'static str,
+    pub multisample_samples: u32,
     pub max_logical_font_px: f32,
     pub max_physical_font_px: f32,
     pub cached_glyphs: usize,
-    pub glyph_rasterizations: usize,
+    pub glyph_tessellations: usize,
     pub glyph_failures: usize,
     pub missing_glyphs: usize,
     pub missing_images: usize,
-    pub glyph_atlas_pages: usize,
-    pub glyph_atlas_bytes: usize,
+    pub glyph_geometry_bytes: usize,
+    pub cached_text_runs: usize,
+    pub text_geometry_bytes: usize,
+    pub text_triangles: usize,
     pub artwork_bytes: usize,
     pub vector_meshes: usize,
     pub vector_bytes: usize,
@@ -133,16 +144,19 @@ impl RenderStats {
         Self {
             target,
             viewport: Viewport::new(target),
-            font_antialiasing: "grayscale coverage",
+            font_antialiasing: "vector grayscale coverage",
+            multisample_samples: 0,
             max_logical_font_px: 0.,
             max_physical_font_px: 0.,
             cached_glyphs: 0,
-            glyph_rasterizations: 0,
+            glyph_tessellations: 0,
             glyph_failures: 0,
             missing_glyphs: 0,
             missing_images: 0,
-            glyph_atlas_pages: 0,
-            glyph_atlas_bytes: 0,
+            glyph_geometry_bytes: 0,
+            cached_text_runs: 0,
+            text_geometry_bytes: 0,
+            text_triangles: 0,
             artwork_bytes: 0,
             vector_meshes: 0,
             vector_bytes: 0,
@@ -165,6 +179,11 @@ enum BatchKind {
         rect: Rect,
         tint: Color,
     },
+    Text {
+        key: TextKey,
+        origin: [f32; 2],
+        tint: Color,
+    },
 }
 
 struct Batch {
@@ -175,14 +194,15 @@ struct Batch {
 pub struct Renderer {
     program: GLuint,
     vector_program: GLuint,
+    text_program: GLuint,
     buffer: GLuint,
     vao: GLuint,
     white: Texture,
-    atlases: Vec<GlyphAtlas>,
     font_directory: PathBuf,
     fonts: HashMap<u16, Font>,
     failed_fonts: HashSet<u16>,
-    glyphs: HashMap<(char, u16, u16), Glyph>,
+    glyphs: HashMap<(char, u16), Glyph>,
+    text_runs: HashMap<TextKey, TextRun>,
     textures: HashMap<String, Option<Texture>>,
     vectors: HashMap<String, Option<vector::Mesh>>,
     artwork_variants: HashMap<String, String>,
@@ -198,9 +218,8 @@ impl Renderer {
     pub fn new(font: &Path, gles: bool) -> Result<Self, String> {
         let directory = font.parent().ok_or("Invalid font path")?;
         let mut fonts = HashMap::new();
-        // Fontdue prepares outlines for every mapped character on construction.
-        // In particular, parsing both full CJK faces before an English Home
-        // screen costs far more than reading their file bytes. Load on demand.
+        // Open only the common face. Metrics and outlines stay lazy even when
+        // the much larger CJK fallback is needed later.
         fonts.insert(400, load_font(directory, 400)?);
         let mut max_texture_size = 0;
         let mut max_viewport = [0; 2];
@@ -239,13 +258,27 @@ impl Renderer {
             &[c"a_position", c"a_uv", c"a_color", c"a_shape", c"a_params"],
         )?;
         let vector_program = match link(
-            &(vertex_prefix + include_str!("shaders/vector.vert")),
-            &(fragment_prefix + include_str!("shaders/vector.frag")),
+            &(vertex_prefix.clone() + include_str!("shaders/vector.vert")),
+            &(fragment_prefix.clone() + include_str!("shaders/vector.frag")),
             &[c"a_position", c"a_offset", c"a_color", c"a_coverage"],
         ) {
             Ok(program) => program,
             Err(error) => {
                 unsafe { gl::DeleteProgram(program) };
+                return Err(error);
+            }
+        };
+        let text_program = match link(
+            &(vertex_prefix + include_str!("shaders/text.vert")),
+            &(fragment_prefix + include_str!("shaders/vector.frag")),
+            &[c"a_position", c"a_offset", c"a_origin", c"a_coverage"],
+        ) {
+            Ok(program) => program,
+            Err(error) => {
+                unsafe {
+                    gl::DeleteProgram(program);
+                    gl::DeleteProgram(vector_program);
+                }
                 return Err(error);
             }
         };
@@ -273,14 +306,15 @@ impl Renderer {
         Ok(Self {
             program,
             vector_program,
+            text_program,
             buffer,
             vao,
             white,
-            atlases: Vec::new(),
             font_directory: directory.into(),
             fonts,
             failed_fonts: HashSet::new(),
             glyphs: HashMap::new(),
+            text_runs: HashMap::new(),
             textures: HashMap::new(),
             vectors: HashMap::new(),
             artwork_variants: HashMap::new(),
@@ -320,124 +354,68 @@ impl Renderer {
         }
     }
 
-    fn glyph(&mut self, c: char, size: u16, font: u16) -> Option<Glyph> {
-        if let Some(glyph) = self.glyphs.get(&(c, size, font)) {
-            if let Some(page) = glyph.page {
-                self.atlases[page].used = self.frame;
-            }
-            return Some(*glyph);
+    fn glyph(&mut self, c: char, font: u16) -> Result<&[luma_vector_geometry::Vertex], String> {
+        let key = (c, font);
+        if !self.glyphs.contains_key(&key) {
+            let geometry = self.fonts[&font].geometry(c)?;
+            self.glyphs.insert(
+                key,
+                Glyph {
+                    geometry,
+                    frame: self.frame,
+                },
+            );
+            self.stats.glyph_tessellations += 1;
         }
-        let (metrics, bitmap) = self.fonts[&font].rasterize(c, f32::from(size) / 4.);
-        self.stats.glyph_rasterizations += 1;
-        if bitmap.is_empty() {
-            let glyph = Glyph {
-                metrics,
-                uv: [0.; 4],
-                page: None,
-            };
-            self.glyphs.insert((c, size, font), glyph);
-            return Some(glyph);
-        }
-        let (page, x, y) = self.reserve_glyph(metrics.width, metrics.height)?;
-        let atlas = &mut self.atlases[page];
-        atlas.used = self.frame;
-        let pixels: Vec<u8> = bitmap
-            .iter()
-            .flat_map(|alpha| [255, 255, 255, *alpha])
-            .collect();
-        if !pixels.is_empty() {
-            unsafe {
-                gl::BindTexture(gl::TEXTURE_2D, atlas.texture.id);
-                gl::TexSubImage2D(
-                    gl::TEXTURE_2D,
-                    0,
-                    x as i32,
-                    y as i32,
-                    metrics.width as i32,
-                    metrics.height as i32,
-                    gl::RGBA,
-                    gl::UNSIGNED_BYTE,
-                    pixels.as_ptr().cast(),
-                );
-            }
-        }
-        let glyph = Glyph {
-            metrics,
-            page: Some(page),
-            uv: [
-                x as f32 / atlas.texture.width as f32,
-                y as f32 / atlas.texture.height as f32,
-                (x + metrics.width) as f32 / atlas.texture.width as f32,
-                (y + metrics.height) as f32 / atlas.texture.height as f32,
-            ],
-        };
-        self.glyphs.insert((c, size, font), glyph);
-        Some(glyph)
+        let glyph = self.glyphs.get_mut(&key).unwrap();
+        glyph.frame = self.frame;
+        Ok(&glyph.geometry)
     }
 
-    fn reserve_glyph(&mut self, width: usize, height: usize) -> Option<(usize, usize, usize)> {
-        for (index, atlas) in self.atlases.iter_mut().enumerate() {
-            if let Some((x, y)) = atlas
-                .shelf
-                .reserve(width, height, atlas.texture.width as usize)
-            {
-                return Some((index, x, y));
-            }
-        }
-        let size = ATLAS
-            .min(self.info.max_texture_size as usize)
-            .max((width + 2).next_power_of_two())
-            .max((height + 2).next_power_of_two());
-        if size > self.info.max_texture_size as usize {
-            self.stats.glyph_failures += 1;
-            return None;
-        }
-        // Never recycle an atlas referenced by this frame's queued geometry.
-        let recycle = if self.atlases.len() >= CACHED_ATLASES {
-            recyclable_page(
-                self.atlases
-                    .iter()
-                    .enumerate()
-                    .map(|(index, page)| (index, page.used)),
-                self.frame,
-            )
-        } else {
-            None
-        };
-        let atlas = GlyphAtlas {
-            texture: glyph_texture(size),
-            shelf: Shelf::default(),
-            used: self.frame,
-        };
-        let index = if let Some(index) = recycle {
-            self.glyphs.retain(|_, glyph| glyph.page != Some(index));
-            self.atlases[index] = atlas;
-            index
-        } else {
-            self.atlases.push(atlas);
-            self.atlases.len() - 1
-        };
-        let (x, y) = self.atlases[index].shelf.reserve(width, height, size)?;
-        Some((index, x, y))
-    }
-
-    fn trim_atlases(&mut self) {
-        for index in (0..self.atlases.len()).rev() {
-            if self.atlases.len() <= CACHED_ATLASES {
-                break;
-            }
-            if self.atlases[index].used == self.frame {
-                continue;
-            }
-            let last = self.atlases.len() - 1;
-            self.glyphs.retain(|_, glyph| glyph.page != Some(index));
-            self.atlases.swap_remove(index);
-            for glyph in self.glyphs.values_mut() {
-                if glyph.page == Some(last) {
-                    glyph.page = Some(index);
+    fn trim_text_geometry(&mut self) {
+        let glyph_bytes =
+            |glyph: &Glyph| glyph.geometry.len() * size_of::<luma_vector_geometry::Vertex>();
+        let mut bytes: usize = self.glyphs.values().map(glyph_bytes).sum();
+        if bytes > GLYPH_GEOMETRY_BUDGET || self.glyphs.len() > 4096 {
+            let mut old: Vec<_> = self
+                .glyphs
+                .iter()
+                .filter(|(_, glyph)| glyph.frame != self.frame)
+                .map(|(key, glyph)| (*key, glyph.frame))
+                .collect();
+            old.sort_by_key(|(_, frame)| *frame);
+            for (key, _) in old {
+                if bytes <= GLYPH_GEOMETRY_BUDGET && self.glyphs.len() <= 4096 {
+                    break;
+                }
+                if let Some(glyph) = self.glyphs.remove(&key) {
+                    bytes -= glyph_bytes(&glyph);
                 }
             }
         }
+        let run_bytes = |run: &TextRun| run.mesh.as_ref().map_or(0, |mesh| mesh.bytes);
+        let mut bytes: usize = self.text_runs.values().map(run_bytes).sum();
+        if bytes > TEXT_GEOMETRY_BUDGET || self.text_runs.len() > 512 {
+            let mut old: Vec<_> = self
+                .text_runs
+                .iter()
+                .filter(|(_, run)| run.frame != self.frame)
+                .map(|(key, run)| (key.clone(), run.frame))
+                .collect();
+            old.sort_by_key(|(_, frame)| *frame);
+            for (key, _) in old {
+                if bytes <= TEXT_GEOMETRY_BUDGET && self.text_runs.len() <= 512 {
+                    break;
+                }
+                if let Some(run) = self.text_runs.remove(&key) {
+                    bytes -= run_bytes(&run);
+                }
+            }
+        }
+        self.stats.cached_glyphs = self.glyphs.len();
+        self.stats.glyph_geometry_bytes = self.glyphs.values().map(glyph_bytes).sum();
+        self.stats.cached_text_runs = self.text_runs.len();
+        self.stats.text_geometry_bytes = self.text_runs.values().map(run_bytes).sum();
     }
 
     fn quad(
@@ -513,16 +491,49 @@ impl Renderer {
     }
 
     fn text(&mut self, text: &str, rect: Rect, style: TextStyle, color: Color, centered: bool) {
-        // Layout/kerning retain the exact logical CSS size. Only the physical
-        // bitmap size is quantized for the glyph cache.
+        // Layout remains logical. Reuse the same run geometry at every density;
+        // its shader snaps insertion origins and computes pixel-sized coverage.
         let size_f = style.size;
         let viewport = self.stats.viewport;
-        let physical_size = glyph_size(size_f, viewport.text_scale());
         self.stats.max_logical_font_px = self.stats.max_logical_font_px.max(size_f);
         self.stats.max_physical_font_px = self
             .stats
             .max_physical_font_px
-            .max(f32::from(physical_size) / 4.);
+            .max(size_f * viewport.text_scale());
+        let padded = rect.inset(-size_f);
+        if padded.x + padded.w < 0.
+            || padded.y + padded.h < 0.
+            || padded.x > 1920.
+            || padded.y > 1080.
+            || self.clip.is_some_and(|clip| {
+                padded.x + padded.w < clip.x
+                    || padded.y + padded.h < clip.y
+                    || padded.x > clip.x + clip.w
+                    || padded.y > clip.y + clip.h
+            })
+        {
+            return;
+        }
+        let origin = [rect.x, rect.y];
+        let key = TextKey {
+            text: text.into(),
+            weight: style.weight,
+            layout: [
+                size_f.to_bits(),
+                style.tracking.to_bits(),
+                style.line_height.to_bits(),
+                rect.w.to_bits(),
+                rect.h.to_bits(),
+            ],
+            flags: u8::from(style.align_right)
+                | (u8::from(centered) << 1)
+                | (u8::from(self.stats.multisample_samples > 1) << 2),
+        };
+        if self.text_runs.contains_key(&key) {
+            self.submit_text(key, origin, color);
+            return;
+        }
+        let rect = Rect::new(0., 0., rect.w, rect.h);
         let font_id = style.weight + if style.size >= 32. { 1000 } else { 0 };
         let fallback_id = if style.weight >= 500 { 2500 } else { 2400 };
         if !self.ensure_font(font_id) {
@@ -630,23 +641,78 @@ impl Renderer {
                 previous = Some(c);
             }
         }
+        let mut vertices = Vec::new();
+        let mut missing_glyphs = 0;
+        let mut failures = 0;
+        let multisampled = self.stats.multisample_samples > 1;
         for (c, x, baseline, selected) in placed {
             if self.fonts[&selected].lookup_glyph_index(c) == 0 && !c.is_whitespace() {
-                self.stats.missing_glyphs += 1;
+                missing_glyphs += 1;
             }
-            if let Some(glyph) = self.glyph(c, physical_size, selected)
-                && let Some(page) = glyph.page
-            {
-                let m = glyph.metrics;
-                self.quad(
-                    viewport.glyph_rect(x, baseline, m),
-                    glyph.uv,
-                    -1., // Coverage is already antialiased; don't apply shape AA a second time.
-                    0.,
-                    color,
-                    self.atlases[page].texture.id,
-                );
+            match self.glyph(c, selected) {
+                Ok(geometry) => {
+                    for triangle in geometry.chunks_exact(3) {
+                        // True sample coverage needs only the original fill.
+                        // Exclude the boundary fringe, not just its alpha.
+                        if multisampled && triangle.iter().any(|vertex| vertex.coverage < 1.) {
+                            continue;
+                        }
+                        for vertex in triangle {
+                            vertices.extend_from_slice(&[
+                                vertex.position.x * size_f,
+                                vertex.position.y * size_f,
+                                if multisampled { 0. } else { vertex.offset[0] },
+                                if multisampled { 0. } else { vertex.offset[1] },
+                                x,
+                                baseline,
+                                0.,
+                                0.,
+                                vertex.coverage,
+                            ]);
+                        }
+                    }
+                }
+                Err(error) => {
+                    eprintln!("Luma glyph {c:?}: {error}");
+                    failures += 1;
+                }
             }
+        }
+        let mesh = if vertices.is_empty() {
+            None
+        } else {
+            match vector::Mesh::upload(1., 1., &vertices) {
+                Ok(mesh) => Some(mesh),
+                Err(error) => {
+                    eprintln!("Luma text: {error}");
+                    failures += 1;
+                    None
+                }
+            }
+        };
+        self.text_runs.insert(
+            key.clone(),
+            TextRun {
+                mesh,
+                missing_glyphs,
+                failures,
+                frame: self.frame,
+            },
+        );
+        self.submit_text(key, origin, color);
+    }
+
+    fn submit_text(&mut self, key: TextKey, origin: [f32; 2], tint: Color) {
+        let run = self.text_runs.get_mut(&key).unwrap();
+        run.frame = self.frame;
+        self.stats.missing_glyphs += run.missing_glyphs;
+        self.stats.glyph_failures += run.failures;
+        if let Some(mesh) = &run.mesh {
+            self.stats.text_triangles += mesh.vertices as usize / 3;
+            self.batches.push(Batch {
+                kind: BatchKind::Text { key, origin, tint },
+                clip: self.clip,
+            });
         }
     }
 
@@ -769,6 +835,14 @@ impl Renderer {
     pub fn render(&mut self, commands: &[Draw], width: u32, height: u32) {
         let started = Instant::now();
         self.stats = RenderStats::new(Size::new(width, height));
+        // Captures can bind a single-sample FBO even when the actual TV window
+        // is multisampled, so query the active target rather than assume.
+        let mut samples = 0;
+        unsafe { gl::GetIntegerv(gl::SAMPLES, &mut samples) };
+        self.stats.multisample_samples = samples.max(0) as u32;
+        if samples > 1 {
+            self.stats.font_antialiasing = "multisample vector coverage";
+        }
         self.frame += 1;
         self.vertices.clear();
         self.batches.clear();
@@ -888,42 +962,25 @@ impl Renderer {
                         let Some(mesh) = self.vectors.get(path).and_then(Option::as_ref) else {
                             continue;
                         };
-                        gl::UseProgram(self.vector_program);
-                        gl::BindBuffer(gl::ARRAY_BUFFER, mesh.buffer);
-                        gl::DisableVertexAttribArray(4);
-                        let mut offset = 0;
-                        for (index, size) in [2, 2, 4, 1].into_iter().enumerate() {
-                            gl::EnableVertexAttribArray(index as u32);
-                            gl::VertexAttribPointer(
-                                index as u32,
-                                size,
-                                gl::FLOAT,
-                                gl::FALSE,
-                                36,
-                                (offset * size_of::<f32>()) as *const _,
-                            );
-                            offset += size as usize;
-                        }
-                        gl::Uniform4f(
-                            gl::GetUniformLocation(self.vector_program, c"u_transform".as_ptr()),
-                            rect.w / mesh.width,
-                            rect.h / mesh.height,
-                            rect.x,
-                            rect.y,
+                        self.draw_mesh(
+                            self.vector_program,
+                            mesh,
+                            [rect.w / mesh.width, rect.h / mesh.height, rect.x, rect.y],
+                            *tint,
                         );
-                        gl::Uniform2f(
-                            gl::GetUniformLocation(self.vector_program, c"u_pixel_scale".as_ptr()),
-                            vw as f32 / 1920.,
-                            vh as f32 / 1080.,
+                        paint_bound = false;
+                    }
+                    BatchKind::Text { key, origin, tint } => {
+                        let Some(mesh) = self.text_runs.get(key).and_then(|run| run.mesh.as_ref())
+                        else {
+                            continue;
+                        };
+                        self.draw_mesh(
+                            self.text_program,
+                            mesh,
+                            [1., 1., origin[0], origin[1]],
+                            *tint,
                         );
-                        gl::Uniform4f(
-                            gl::GetUniformLocation(self.vector_program, c"u_tint".as_ptr()),
-                            tint[0],
-                            tint[1],
-                            tint[2],
-                            tint[3],
-                        );
-                        gl::DrawArrays(gl::TRIANGLES, 0, mesh.vertices);
                         paint_bound = false;
                     }
                 }
@@ -957,19 +1014,64 @@ impl Renderer {
                 }
             }
         }
-        self.trim_atlases();
-        self.stats.cached_glyphs = self.glyphs.len();
-        self.stats.glyph_atlas_pages = self.atlases.len();
-        self.stats.glyph_atlas_bytes = self
-            .atlases
-            .iter()
-            .map(|page| page.texture.width as usize * page.texture.height as usize * 4)
-            .sum();
+        self.trim_text_geometry();
         self.stats.vector_meshes = self.vectors.values().flatten().count();
         self.stats.vector_bytes = self.vectors.values().flatten().map(|mesh| mesh.bytes).sum();
         self.stats.artwork_bytes = bytes + self.stats.vector_bytes;
         self.stats.draw_calls = self.batches.len();
         self.stats.cpu_submission_ms = started.elapsed().as_secs_f64() * 1000.;
+    }
+
+    fn draw_mesh(&self, program: GLuint, mesh: &vector::Mesh, transform: [f32; 4], tint: Color) {
+        let viewport = self.stats.viewport;
+        unsafe {
+            gl::UseProgram(program);
+            if program == self.text_program {
+                gl::Uniform1f(
+                    gl::GetUniformLocation(program, c"u_fringe".as_ptr()),
+                    if self.stats.multisample_samples > 1 {
+                        0.
+                    } else {
+                        0.5
+                    },
+                );
+            }
+            gl::BindBuffer(gl::ARRAY_BUFFER, mesh.buffer);
+            gl::DisableVertexAttribArray(4);
+            let mut offset = 0;
+            for (index, size) in [2, 2, 4, 1].into_iter().enumerate() {
+                gl::EnableVertexAttribArray(index as u32);
+                gl::VertexAttribPointer(
+                    index as u32,
+                    size,
+                    gl::FLOAT,
+                    gl::FALSE,
+                    36,
+                    (offset * size_of::<f32>()) as *const _,
+                );
+                offset += size as usize;
+            }
+            gl::Uniform4f(
+                gl::GetUniformLocation(program, c"u_transform".as_ptr()),
+                transform[0],
+                transform[1],
+                transform[2],
+                transform[3],
+            );
+            gl::Uniform2f(
+                gl::GetUniformLocation(program, c"u_pixel_scale".as_ptr()),
+                viewport.width as f32 / 1920.,
+                viewport.height as f32 / 1080.,
+            );
+            gl::Uniform4f(
+                gl::GetUniformLocation(program, c"u_tint".as_ptr()),
+                tint[0],
+                tint[1],
+                tint[2],
+                tint[3],
+            );
+            gl::DrawArrays(gl::TRIANGLES, 0, mesh.vertices);
+        }
     }
 
     pub fn stats(&self) -> &RenderStats {
@@ -1053,15 +1155,7 @@ fn load_font(directory: &Path, id: u16) -> Result<Font, String> {
     let started = Instant::now();
     let bytes = std::fs::read(&path)
         .map_err(|e| format!("Font {}: {e}. Regenerate native assets.", path.display()))?;
-    let font = Font::from_bytes(
-        bytes,
-        fontdue::FontSettings {
-            // Only single-character rendering is used, never GSUB glyph indices.
-            load_substitutions: false,
-            ..Default::default()
-        },
-    )
-    .map_err(|e| format!("Font {}: {e}", path.display()))?;
+    let font = Font::from_bytes(bytes).map_err(|e| format!("Font {}: {e}", path.display()))?;
     if cfg!(feature = "webos") {
         eprintln!(
             "Luma font: {name} loaded in {} ms",
@@ -1077,6 +1171,7 @@ impl Drop for Renderer {
             gl::DeleteBuffers(1, &self.buffer);
             gl::DeleteProgram(self.program);
             gl::DeleteProgram(self.vector_program);
+            gl::DeleteProgram(self.text_program);
             if self.vao != 0 {
                 gl::DeleteVertexArrays(1, &self.vao);
             }
@@ -1115,13 +1210,6 @@ fn texture(width: u32, height: u32, pixels: &[u8]) -> Texture {
         height,
         frame: 0,
     }
-}
-
-fn glyph_texture(size: usize) -> Texture {
-    // White RGB in transparent gutters prevents dark fringes under linear
-    // filtering. Only alpha encodes grayscale glyph coverage.
-    let pixels: Vec<u8> = [255, 255, 255, 0].repeat(size * size);
-    texture(size as u32, size as u32, &pixels)
 }
 
 fn gl_string(name: GLenum) -> String {

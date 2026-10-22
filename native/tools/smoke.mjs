@@ -45,10 +45,10 @@ try {
     assert.equal(
       render.capture.glyph_failures,
       0,
-      'Visible text must never disappear when an atlas fills',
+      'Visible vector text must remain valid across cache reuse',
     );
     assert.equal(render.last_presented.glyph_failures, 0);
-    assert.equal(render.capture.font_antialiasing, 'grayscale coverage');
+    assert.equal(render.capture.font_antialiasing, 'vector grayscale coverage');
     assert.equal(render.capture.missing_glyphs, 0);
     assert.equal(render.capture.missing_images, 0);
     state.render = render;
@@ -109,7 +109,10 @@ try {
   assert.ok(
     two.render.capture.max_physical_font_px > one.render.capture.max_physical_font_px * 1.9,
   );
-  assert.ok(two.render.capture.glyph_atlas_pages > 0 && two.render.capture.glyph_atlas_pages <= 4);
+  assert.ok(two.render.capture.cached_glyphs > 0);
+  assert.ok(two.render.capture.cached_text_runs > 0);
+  assert.ok(two.render.capture.text_geometry_bytes > 0);
+  assert.ok(two.render.capture.text_triangles > 0);
   assert.equal(
     two.render.drawable_is_4k,
     two.render.drawable.width >= 3840 && two.render.drawable.height >= 2160,
@@ -126,7 +129,7 @@ try {
     .extract({ left: 168, top: 530, width: 1200, height: 192 })
     .raw()
     .toBuffer();
-  assert.notDeepEqual(high, low, '4K text must be rerasterized, not a bitmap enlargement');
+  assert.notDeepEqual(high, low, '4K vector text must use the drawable pixel scale');
   const hasWallpaper = await fs.access(path.join(out, 'assets/wallpapers/forest@2x.jpg')).then(
     () => true,
     () => false,

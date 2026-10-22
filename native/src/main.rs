@@ -1,4 +1,5 @@
 mod diagnostics;
+mod font;
 mod i18n;
 #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
 mod luna;
@@ -434,25 +435,50 @@ fn run() -> Result<(), String> {
     }
     attributes.set_double_buffer(true);
     attributes.set_alpha_size(8);
+    attributes.set_depth_size(0);
+    attributes.set_stencil_size(0);
     let requested = options.resolution.unwrap_or(if webos {
         Size::HD
     } else {
         Size::new(1280, 720)
     });
-    let mut builder = video.window("Luma Native", requested.width, requested.height);
-    builder.opengl().allow_highdpi().position_centered();
-    if options.fullscreen || (webos && options.resolution.is_none()) {
-        builder.fullscreen_desktop();
-    } else if webos {
-        // fullscreen_desktop overrides the requested dimensions. An explicit
-        // experimental TV size asks for a borderless surface instead.
-        builder.borderless();
-    } else {
-        builder.resizable();
+    let create_window = || {
+        let mut builder = video.window("Luma Native", requested.width, requested.height);
+        builder.opengl().allow_highdpi().position_centered();
+        if options.fullscreen || (webos && options.resolution.is_none()) {
+            builder.fullscreen_desktop();
+        } else if webos {
+            builder.borderless();
+        } else {
+            builder.resizable();
+        }
+        let window = builder.build().map_err(|e| e.to_string())?;
+        let context = window.gl_create_context()?;
+        Ok::<_, String>((window, context))
+    };
+    let mut opened = None;
+    let mut failures = Vec::new();
+    // Prefer true sample coverage of intact glyph outlines. Some TV EGL stacks
+    // have fewer configurations, so retain a usable non-MSAA fallback.
+    for samples in [4, 2, 0] {
+        attributes.set_multisample_buffers(u8::from(samples > 0));
+        attributes.set_multisample_samples(samples);
+        match create_window() {
+            Ok(window) => {
+                opened = Some(window);
+                break;
+            }
+            Err(error) => failures.push(format!("{samples}x MSAA: {error}")),
+        }
     }
-    let window = builder.build().map_err(|e| e.to_string())?;
-    let _context = window.gl_create_context()?;
+    let (window, _context) = opened.ok_or_else(|| failures.join("; "))?;
     gl::load_with(|name| video.gl_get_proc_address(name) as *const _);
+    if !webos {
+        unsafe { gl::Enable(gl::MULTISAMPLE) };
+    }
+    let mut samples = 0;
+    unsafe { gl::GetIntegerv(gl::SAMPLES, &mut samples) };
+    eprintln!("Luma GL multisampling: {samples} samples");
     startup_stage("window and GL context");
     if let Err(error) = video.gl_set_swap_interval(1) {
         eprintln!("VSync: {error}");
@@ -560,7 +586,11 @@ fn run() -> Result<(), String> {
             let mut pending = vec![];
             match event {
                 Event::Quit { .. } => running = false,
-                Event::Window { win_event, .. } => match win_event {
+                Event::Window {
+                    window_id,
+                    win_event,
+                    ..
+                } if window_id == window.id() => match win_event {
                     WindowEvent::Hidden | WindowEvent::Minimized => {
                         visible = false;
                         press = None;
@@ -835,6 +865,16 @@ fn run() -> Result<(), String> {
                 window.gl_swap_window();
                 if presented == 0 {
                     startup_stage("first frame");
+                    if webos {
+                        let stats = renderer.stats();
+                        eprintln!(
+                            "Luma vector text: {} glyphs, {} text runs, {} KiB glyph geometry, {} KiB GPU text",
+                            stats.cached_glyphs,
+                            stats.cached_text_runs,
+                            stats.glyph_geometry_bytes / 1024,
+                            stats.text_geometry_bytes / 1024,
+                        );
+                    }
                 }
                 presented += 1;
                 if options.profile_frames.is_some() {

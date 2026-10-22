@@ -45,13 +45,24 @@ impl Mesh {
                 path.display()
             ));
         }
+        Self::upload(width, height, &vertices)
+    }
+
+    pub fn upload(width: f32, height: f32, vertices: &[f32]) -> Result<Self, String> {
+        let count = vertices.len() / 9;
+        if count == 0 || !count.is_multiple_of(3) || vertices.len() != count * 9 {
+            return Err("Invalid vector buffer vertex count".into());
+        }
+        if vertices.iter().any(|value| !value.is_finite()) {
+            return Err("Invalid vector buffer coordinates".into());
+        }
         let mut buffer = 0;
         unsafe {
             gl::GenBuffers(1, &mut buffer);
             gl::BindBuffer(gl::ARRAY_BUFFER, buffer);
             gl::BufferData(
                 gl::ARRAY_BUFFER,
-                (vertices.len() * size_of::<f32>()) as isize,
+                std::mem::size_of_val(vertices) as isize,
                 vertices.as_ptr().cast(),
                 gl::STATIC_DRAW,
             );

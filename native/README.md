@@ -28,8 +28,8 @@ nix develop --command sh -c 'pnpm native:assets && pnpm native:dev'
 ```
 
 The preview opens a resizable 1280×720 window, letterboxing the same 1920×1080 layout used on TV.
-HiDPI framebuffer scaling and pointer coordinates are handled independently. Fonts are rasterized
-at the drawable's physical density, with grayscale coverage antialiasing and pixel-aligned glyph
+HiDPI framebuffer scaling and pointer coordinates are handled independently. Text uses vector
+glyph geometry with drawable-aware grayscale coverage antialiasing and pixel-aligned glyph
 origins/baselines; text layout and kerning stay in 1920×1080 logical coordinates. `--fullscreen`
 opens a fullscreen preview. Rust changes use incremental compilation and a relaunch.
 
@@ -54,9 +54,9 @@ its fringe stays one physical pixel wide as the drawable density changes. Gradie
 adaptively sampled into vertex colors at build time. Original SVGs remain the editable sources.
 
 The TV lazily loads each mesh into a static GPU vertex buffer once. A GLES2 shader applies
-placement, scale, tint and edge coverage; it uses no icon texture, SVG parser, tessellator or image
-decoder. Text still uses the separate grayscale glyph atlas. The geometry compiler is not linked
-into the TV executable. All geometry is generated for the bundled TV artwork sizes, including
+placement, scale, tint and edge coverage; it uses no icon texture, SVG parser or icon image
+decoder. The SVG compiler is not linked into the TV executable. Its polygon tessellator is shared
+with on-demand font outlines. Icon/logo geometry is generated for the bundled TV artwork sizes, including
 high-density rendering, rather than retessellated every frame.
 
 `pnpm native:assets` includes this step. To rebuild just the vector artwork:
@@ -71,19 +71,41 @@ remain raster images, and the webOS installation icon remains PNG. These assets 
 icon/logo rendering work on the TV. Diagnostics report cached vector meshes, GPU bytes and the
 number of vector triangles submitted in the frame.
 
-The renderer loads the common Inter 400 face initially, then loads other weights/optical sizes
+### Vector text
+
+The renderer opens the common Inter 400 face initially, then opens other weights/optical sizes
 only when text uses them. CJK fallback faces are opened only when Inter lacks a character in the
-text being drawn. Fontdue builds outline geometry for every mapped glyph when a face is loaded;
-eagerly opening both roughly 10 MB CJK faces made even English startup unnecessarily expensive.
-Single-character rendering does not load unused GSUB substitution glyphs.
+text being drawn. Owned TTF faces provide the original advances, kerning and line metrics without
+preparing all the font's glyphs. Only requested glyph outlines are converted into geometry.
+There are no glyph bitmap atlases or raster-size-dependent font textures.
+
+Individual outlines are cached in font-em coordinates. Complete text runs are combined into
+static GPU buffers and cached independently of position, color and drawable density, avoiding
+one draw call per letter. The text shader snaps each insertion origin/baseline to physical pixels
+and uses hardware multisample coverage of the original glyph outline when available. The window
+requests 4× MSAA, then retries with 2× or no MSAA if EGL cannot create that configuration. Text
+on multisampled targets omits inset/fringe triangles: moving a thin glyph's opposite edges inward
+can invert its fill triangles and produce small-text artifacts. Single-sample targets use a
+narrower half-physical-pixel boundary fringe. Icons retain their existing boundary AA. Runs are
+cached separately for the multisample and single-sample paths. Outline flattening uses
+subpixel precision for the current typography through 256 physical pixels/em. This preserves
+the font files and logical layout; it does not add font hinting or complex-script shaping.
+
+Glyph geometry has an 8 MiB/4096-entry CPU cache target and text runs a 32 MiB/512-entry GPU cache
+target. Old entries are evicted while the current frame's working set is preserved. A larger
+single-frame working set can temporarily exceed those targets. CJK is not exported into a huge
+prebaked mesh package or fully tessellated when opening its font. Diagnostics include glyph
+tessellations, cached text runs, geometry bytes, triangles, missing/failed glyphs and the actual
+`multisample_samples` of the active target. An offscreen capture can be single-sample even when
+the TV window uses MSAA; its diagnostics describe its own rendering path.
 
 ### HiDPI and 4K
 
-Text density is automatic: a 20px logical label uses a 40px glyph bitmap on a 2× drawable. The
-glyph cache keys include physical raster size and use separate atlas pages, so resizing and
-switching capture density cannot reuse undersized bitmaps. Grayscale coverage is applied once;
-transparent white atlas gutters prevent dark filtering fringes. There is no RGB subpixel AA or
-MSAA dependency for text.
+Text density is automatic: the same vector run for a 20px logical label occupies 40 physical
+pixels/em on a 2× drawable. Glyph-origin snapping and edge coverage use each drawable axis's
+actual fitted density, including letterboxed and fractionally sized windows. Resizing does not
+reuse undersized glyph bitmaps because text has no bitmap atlas. There is no RGB subpixel AA;
+hardware MSAA is preferred with a single-sample fallback.
 
 Generate optional 3840×2160 wallpaper variants for higher-density surfaces:
 
@@ -112,7 +134,7 @@ pnpm native:dev --script 'home,down' --frames 90 \
 ```
 
 `--capture-scale 1` is the default 1920×1080 comparison surface; `2` renders at 3840×2160 with
-fresh, density-appropriate glyphs. It does not enlarge a 1080p screenshot or force the TV's output.
+vector glyphs evaluated at that drawable density. It does not enlarge a 1080p screenshot or force the TV's output.
 
 To request a larger actual window/surface and collect presentation timings:
 
@@ -132,7 +154,7 @@ Profiling forces redraws and measures swap-to-swap pacing after ten warmup prese
 window pauses and the final screenshot stall are excluded. `cpu_submission` includes CPU work and
 driver waits, not a GPU timestamp. The ordinary `--frames` option counts event-loop iterations and
 must not be interpreted as a frame-rate measurement. The report also includes GPU/texture limits,
-font density, glyph failures, atlas/image byte estimates and draw calls. Larger framebuffers have
+font density, glyph failures, geometry/image byte estimates and draw calls. Larger framebuffers have
 four times the pixel area at 2× density; compare the requested modes on the TV before choosing a
 default.
 
@@ -176,7 +198,7 @@ nix develop --command sh -c 'pnpm native:check && pnpm native:smoke'
 and reads actual OpenGL framebuffers into `.build/native/*.png`. Captures use an offscreen
 1920×1080 framebuffer (or a separate 3840×2160 density check), independent of the desktop window's
 HiDPI scale. It also checks alpha compositing, nested settings, real SDL pointer events,
-density-appropriate glyph rasterization and forced presentation profiling. On Linux it can run under Xvfb
+drawable-aware vector text and forced presentation profiling. On Linux it can run under Xvfb
 with Mesa software rendering. It does not measure TV performance.
 The separate Native prototype GitHub workflow runs these checks on Linux and uploads its screenshots.
 
@@ -416,10 +438,8 @@ Web-preference migration, audio guidance and automatic boot/Home-button routing 
 The custom renderer batches consecutive
 draws, caches glyphs and images, evicts old artwork above a 48 MiB image budget, and repaints only
 when the scene changes or the small pill/panel/wallpaper animations run. Reduced motion disables
-these transitions. Text is CPU-rasterized once per cached
-glyph and physical raster size; UI compositing uses the GPU. Glyph atlases normally retain at most
-four 1024×1024 RGBA pages (16 MiB). A larger single-frame working set can temporarily require more;
-unused overflow pages are trimmed and pages referenced by queued text are never recycled.
+these transitions. Text outlines are tessellated on demand and cached as vector geometry;
+complete text runs are reused from GPU buffers with bounded caches as described above.
 No TV frame-rate or memory advantage is claimed yet.
 
 ## Code map
@@ -427,8 +447,10 @@ No TV frame-rate or memory advantage is claimed yet.
 - `src/model.rs`: inventory, identity, preferences and input visibility.
 - `src/state.rs`: focus/navigation, page/modal state and effects.
 - `src/view.rs`: screen composition, draw commands and hit regions.
-- `src/renderer.rs`, `src/shaders/`: GPU painter, clipping, glyph atlas and artwork cache.
-- `src/raster.rs`: density, pixel alignment and atlas packing/recycling policy.
+- `src/renderer.rs`, `src/shaders/`: GPU painter, clipping, vector text/run and artwork caches.
+- `src/font.rs`: lazy TTF metrics, kerning and individual glyph outlines.
+- `vector-geometry/`: shared fill tessellation and boundary coverage for artwork and glyphs.
+- `src/raster.rs`: logical layout, drawable density and viewport fitting.
 - `src/diagnostics.rs`: warmup-aware presentation/CPU timing summaries.
 - `src/platform.rs`: asynchronous TV/desktop adapter and inventory validation.
 - `src/luna.rs`: native LS2 registration, bounded requests and private GLib dispatch on the TV worker.
