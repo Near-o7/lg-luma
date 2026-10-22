@@ -41,6 +41,7 @@ use time::OffsetDateTime;
 
 #[derive(Default)]
 struct Options {
+    webos_home: bool,
     assets: Option<PathBuf>,
     preferences: Option<PathBuf>,
     screenshot: Option<PathBuf>,
@@ -70,7 +71,12 @@ impl Options {
                     .is_ok_and(|value| value.is_object())
             })
         {
-            args.next();
+            if let Some(argument) = args.next() {
+                let metadata: serde_json::Value =
+                    serde_json::from_str(&argument).map_err(|error| error.to_string())?;
+                result.webos_home = metadata.get("nid").and_then(serde_json::Value::as_str)
+                    == Some(platform::HOME_ID);
+            }
             eprintln!("Luma webOS launch parameters accepted");
         }
         while let Some(arg) = args.next() {
@@ -378,13 +384,22 @@ fn run() -> Result<(), String> {
         return Err("This desktop build cannot run on a TV. Build with --features webos.".into());
     }
     if webos {
+        if !options.webos_home && platform::redirect_to_home()? {
+            return Ok(());
+        }
+        let surface_id = if options.webos_home {
+            platform::HOME_ID
+        } else {
+            platform::APP_ID
+        };
         // SDL-webOS reads APPID for its shell surface and getenv (not a hint)
         // for WMCLASS. Set these before video init and before starting workers.
         // SAFETY: startup is still single-threaded here.
         unsafe {
-            std::env::set_var("APPID", platform::APP_ID);
-            std::env::set_var("SDL_VIDEO_WAYLAND_WMCLASS", platform::APP_ID);
+            std::env::set_var("APPID", surface_id);
+            std::env::set_var("SDL_VIDEO_WAYLAND_WMCLASS", surface_id);
         }
+        eprintln!("Luma webOS surface: {surface_id}");
         sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_BACK", "true");
     }
     let root = options.assets.clone().unwrap_or_else(|| {

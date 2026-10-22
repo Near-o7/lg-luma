@@ -6,6 +6,28 @@ use serde_json::{Value, json};
 use std::{collections::HashSet, sync::mpsc, thread};
 
 pub const APP_ID: &str = "com.ecklf.luma";
+pub const HOME_ID: &str = "com.webos.app.home";
+
+pub fn redirect_to_home() -> Result<bool, String> {
+    // The root-only integration mounts this marker with its native Home
+    // manifest. A normal tile launch then opens that same instance instead of
+    // starting a second renderer writing the same preferences.
+    if std::fs::read_to_string("/usr/palm/applications/com.webos.app.home/.luma-home")
+        .is_ok_and(|marker| marker.trim() == APP_ID)
+    {
+        thread::spawn(|| {
+            call(
+                "luna://com.webos.applicationManager/launch",
+                json!({"id": HOME_ID}),
+            )
+        })
+        .join()
+        .map_err(|_| "Home launch worker failed".to_string())??;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 pub enum Request {
     Refresh,
     Launch(String),

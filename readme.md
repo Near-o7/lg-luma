@@ -73,6 +73,38 @@ routing. Configure its Execute action with this one-line command:
 Test on a spare button first. Disable the mapping in Input Hook to restore normal Home behavior.
 Installing Luma does not enable either optional routing integration.
 
+### Native Home replacement (webOS 25/26)
+
+The optional Home integration uses the same bind-mount approach as
+[Glasshouse Home](https://github.com/rorygallagher2024/glasshouse/blob/main/server/lib/home-takeover.js),
+with Luma's native renderer. Install a package built with this integration first, then run as root:
+
+```sh
+APP=/media/developer/apps/usr/palm/applications/com.ecklf.luma
+sh "$APP/autostart.sh" disable
+sh "$APP/home.sh" enable
+```
+
+`enable` outlines the changes and asks `Apply these changes? [y/n]:`. Enter `y` to proceed.
+Entering `n` or ending input cancels before the command makes changes.
+
+Disable any Home mapping in LG Input Hook and any other Home replacement first. This mounts a
+native Luma manifest over `com.webos.app.home`, so normal Home actions open Luma. The integration
+reapplies the mount at cold boot and follows the TV's existing Home Auto Launch and Quick Start+
+settings. It is intended to cover standby wake onto Home as well. **Home replacement is experimental
+and needs manual verification on the TV**, independently of Luma's normal app compatibility.
+
+Status and restoring LG Home, including from an SSH session after a failed launch:
+
+```sh
+sh /var/lib/luma-home/home.sh status
+sh /var/lib/luma-home/home.sh disable
+```
+
+Disable this integration before uninstalling Luma. The restore command remains available outside
+the installed package, and `restore` is an alias for `disable`. Boot diagnostics are written to
+`/var/lib/luma-home/boot.log`.
+
 ## Development
 
 ### Setup & Building
