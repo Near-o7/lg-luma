@@ -43,6 +43,7 @@
     "de": "Apps und Eingänge aktualisieren",
     "zh": "刷新应用和输入源"
   },
+  "quitApp": { "en": "Quit app", "de": "App beenden", "zh": "退出应用" },
   "language": { "en": "Language", "de": "Anzeigesprache", "zh": "显示语言" },
   "english": { "en": "English", "de": "English", "zh": "English" },
   "german": { "en": "Deutsch", "de": "Deutsch", "zh": "Deutsch" },

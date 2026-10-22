@@ -194,6 +194,8 @@ gallery → Background in the sidebar. Open setting subpages restore their paren
 has moved to the top navigation. Back from the Settings sidebar focuses the Settings tab; Back
 again from that tab returns Home. Backspace deletes while editing text and acts as Back elsewhere
 in the desktop preview.
+General ends with **Quit app**, beneath **Refresh apps & inputs**, using a vector power icon.
+OK or a pointer click closes Luma through the normal native shutdown path.
 Hidden appears only when needed, and search/category filters have separate clear controls.
 Scrolling Apps content fades into the existing wallpaper near the header and footer instead
 of exposing a hard clipping edge. The same alpha mask applies to card surfaces, rings, shadows,

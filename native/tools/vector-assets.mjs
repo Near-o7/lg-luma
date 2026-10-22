@@ -53,6 +53,7 @@ export async function generateVectorAssets() {
     clock: 'Clock3',
     motion: 'Accessibility',
     refresh: 'RefreshCw',
+    power: 'Power',
     right: 'ChevronRight',
     left: 'ArrowLeft',
     arrow: 'ArrowRight',

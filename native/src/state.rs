@@ -1127,6 +1127,7 @@ impl State {
                         }
                         return vec![];
                     }
+                    5 => return vec![Effect::Quit],
                     _ => return vec![Effect::Refresh],
                 }
                 return vec![Effect::Save];

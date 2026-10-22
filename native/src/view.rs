@@ -1856,6 +1856,21 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     chevron: false,
                 },
             );
+            row(
+                out,
+                state,
+                assets,
+                Row {
+                    target: Target::Setting(5),
+                    rect: Rect::new(640., 600.8 - s, 1120., 72.),
+                    title: language.t("quitApp"),
+                    icon: Some("power"),
+                    value: None,
+                    description: None,
+                    selected: false,
+                    chevron: false,
+                },
+            );
         }
         1 => {
             for (index, (id, _title)) in BACKGROUNDS.iter().enumerate() {
