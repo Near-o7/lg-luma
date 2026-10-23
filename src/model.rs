@@ -97,6 +97,7 @@ pub struct Preferences {
     pub show_names: bool,
     pub hour_24: bool,
     pub reduced_motion: bool,
+    pub show_seconds: bool,
     pub input_modes: BTreeMap<String, InputMode>,
     /// Custom names by input app ID; the TV's port and label stay visible as detail.
     pub input_names: BTreeMap<String, String>,
@@ -119,6 +120,7 @@ impl Default for Preferences {
             show_names: false,
             hour_24: false,
             reduced_motion: false,
+            show_seconds: false,
             input_modes: BTreeMap::new(),
             input_names: BTreeMap::new(),
             show_weather: true,
