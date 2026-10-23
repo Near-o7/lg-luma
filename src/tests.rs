@@ -340,6 +340,79 @@ fn focused_navigation_tabs_switch_pages_immediately() {
 }
 
 #[test]
+fn greeting_name_row_opens_the_keyboard_and_saves_when_it_closes() {
+    let mut state = ready();
+    state.open(2);
+    state.focus = Target::Setting(6);
+    assert!(state.activate().is_empty());
+    assert!(state.text_input_active());
+    state.text("Ana");
+    assert_eq!(state.editing_text(), "Ana");
+    assert!(state.preferences.greeting_name.is_empty());
+    assert_eq!(state.finish_text_input(), vec![Effect::Save]);
+    assert_eq!(state.focus, Target::Setting(6));
+    assert!(state.finish_text_input().is_empty());
+    assert_eq!(
+        crate::i18n::Language::En.greeting(9, &state.preferences.greeting_name),
+        "Good morning, Ana."
+    );
+}
+
+#[test]
+fn greeting_name_replacement_commits_on_every_keyboard_completion_route() {
+    for route in 0..3 {
+        let mut state = ready();
+        state.preferences.greeting_name = "Ana".into();
+        state.open(2);
+        state.focus = Target::Setting(6);
+        state.activate();
+        assert!(state.editing_text().is_empty());
+        state.text("  BobX ");
+        state.delete_surrounding_text(-3, 3);
+        assert_eq!(state.editing_text(), "  Bo");
+        state.text("b  ");
+        assert_eq!(state.preferences.greeting_name, "Ana");
+        let effects = match route {
+            0 => {
+                state.overlay = Some(Overlay::SystemKeyboard);
+                state.finish_text_input()
+            }
+            1 => state.back(),
+            _ => {
+                state.focus = Target::Key(crate::state::KEYS.len() - 1);
+                state.activate()
+            }
+        };
+        assert_eq!(effects, vec![Effect::Save]);
+        assert_eq!(state.preferences.greeting_name, "Bob");
+        assert_eq!(state.focus, Target::Setting(6));
+        assert!(state.finish_text_input().is_empty());
+        state.activate();
+        state.text("   ");
+        assert!(state.back().is_empty());
+        assert_eq!(state.preferences.greeting_name, "Bob");
+    }
+}
+
+#[test]
+fn remote_can_reset_a_saved_greeting_name() {
+    let mut state = ready();
+    state.preferences.greeting_name = "Ana".into();
+    state.open(2);
+    state.focus = Target::Setting(6);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::Setting(7));
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(state.preferences.greeting_name.is_empty());
+    assert_eq!(state.focus, Target::Setting(6));
+    assert!(
+        controls(&state)
+            .iter()
+            .any(|c| c.target == Target::Setting(7))
+    );
+}
+
+#[test]
 fn clock_format_subpage_saves_and_restores_its_parent_row() {
     let mut state = ready();
     state.open(2);

@@ -97,6 +97,11 @@ that HDMI row, and the Background gallery to Background in the sidebar. Back fro
 focuses the Settings tab, then returns Home. General ends with a vector power-icon Quit app row.
 The Clock format subpage offers 12-hour, 24-hour and a Show seconds toggle (off by default); with
 seconds shown, the header clock redraws once per second instead of once per minute.
+General also has a **Greeting name** row: OK opens the text keyboard (the system keyboard on the TV)
+and the name is appended to the Home greeting ("Good evening, Ana."); an empty name keeps the plain
+greeting. The keyboard starts empty; closing it without a name preserves the saved value. Use
+**Reset greeting name** to remove it. Preferences are saved when the keyboard closes, including
+automatic system-keyboard dismissal.
 
 Home favorites form one horizontal strip, never a second row. Left/Right follows saved order,
 including reorder mode, and reveals complete cards. Up returns to Home navigation; Down enters

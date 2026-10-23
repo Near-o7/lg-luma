@@ -736,9 +736,9 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         c(0xf5f5f5, 0.72),
         false,
     );
-    let greeting = language.greeting(now.hour());
+    let greeting = language.greeting(now.hour(), &state.preferences.greeting_name);
     out.text(
-        greeting,
+        &greeting,
         Rect::new(84., 265. - shift - s, 1500., 95.),
         text(90.4, 500, -0.065).leading(1.05),
         WHITE,
@@ -1805,6 +1805,17 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     false,
                 ),
                 (4, "language", "language", language.name(), true),
+                (
+                    6,
+                    "greetingName",
+                    "type",
+                    if state.preferences.greeting_name.trim().is_empty() {
+                        language.t("stateOff")
+                    } else {
+                        state.preferences.greeting_name.as_str()
+                    },
+                    false,
+                ),
             ]
             .into_iter()
             .enumerate()
@@ -1825,13 +1836,30 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     },
                 );
             }
+            // Keep this row in place even without a name: completing the TV
+            // keyboard on pointer-down must not move Refresh or Quit beneath it.
+            row(
+                out,
+                state,
+                assets,
+                Row {
+                    target: Target::Setting(7),
+                    rect: Rect::new(640., 584.8 - s, 1120., 72.),
+                    title: language.t("resetGreetingName"),
+                    icon: Some("refresh"),
+                    value: None,
+                    description: None,
+                    selected: false,
+                    chevron: false,
+                },
+            );
             row(
                 out,
                 state,
                 assets,
                 Row {
                     target: Target::Setting(3),
-                    rect: Rect::new(640., 516.8 - s, 1120., 72.),
+                    rect: Rect::new(640., 684.8 - s, 1120., 72.),
                     title: if state.loading {
                         language.t("refreshNotice")
                     } else {
@@ -1850,7 +1878,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 assets,
                 Row {
                     target: Target::Setting(5),
-                    rect: Rect::new(640., 600.8 - s, 1120., 72.),
+                    rect: Rect::new(640., 768.8 - s, 1120., 72.),
                     title: language.t("quitApp"),
                     icon: Some("power"),
                     value: None,
@@ -2368,6 +2396,7 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
     out.text(
         match state.keyboard_field {
             TextField::Location => language.t("cityPostcode"),
+            TextField::Name => language.t("greetingName"),
             TextField::InputName => language.t("inputName"),
             TextField::Apps => language.t("findApp"),
         },

@@ -149,6 +149,21 @@ try {
   assert.equal(profiled.render.profile.presented, 24);
   assert.ok(profiled.render.profile.pacing.samples > 0);
   assert.ok(profiled.render.profile.cpu_submission.mean_ms >= 0);
+  const greetingEditor = 'settings,down,enter,down,down,down,down,enter';
+  for (const name of ['Ana', 'Bob']) {
+    const named = await scenario(
+      `greeting-${name}`,
+      `${greetingEditor},type:${name},back,home`,
+      fixedTime,
+    );
+    assert.equal(named.preferences.greeting_name, name);
+    assert.ok(named.ui_text.includes(`Good evening, ${name}.`));
+    assert.equal(
+      JSON.parse(await fs.readFile(preferences, 'utf8')).greeting_name,
+      name,
+      'Keyboard completion must save without waiting for another SDL input event',
+    );
+  }
   console.log(
     'Native smoke checks passed: rendering/alpha, navigation, persistence, SDL pointer input, DPI-aware glyphs, 4K capture and presentation profiling.',
   );

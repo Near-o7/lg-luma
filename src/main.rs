@@ -260,12 +260,18 @@ fn script(
         }
         "wait" => vec![],
         action if action.starts_with("type:") => {
-            let field = match state.subpage {
-                Some(state::Subpage::WeatherLocation) => state::TextField::Location,
-                Some(state::Subpage::Input(_)) => state::TextField::InputName,
-                _ => state::TextField::Apps,
+            let field = if state.text_input_active() {
+                state.keyboard_field
+            } else {
+                match state.subpage {
+                    Some(state::Subpage::WeatherLocation) => state::TextField::Location,
+                    Some(state::Subpage::Input(_)) => state::TextField::InputName,
+                    _ => state::TextField::Apps,
+                }
             };
-            state.open_keyboard(field);
+            if !state.text_input_active() {
+                state.open_keyboard(field);
+            }
             state.text(&action[5..]);
             vec![]
         }

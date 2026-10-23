@@ -244,6 +244,48 @@
     "zh": "显示语言",
     "pt": "Idioma"
   },
+  "greetingName": {
+    "en": "Greeting name",
+    "de": "Name in der Begrüßung",
+    "es": "Nombre en el saludo",
+    "zh": "问候称呼",
+    "pt": "Nome na saudação"
+  },
+  "resetGreetingName": {
+    "en": "Reset greeting name",
+    "de": "Begrüßungsnamen zurücksetzen",
+    "es": "Restablecer nombre del saludo",
+    "zh": "重置问候称呼",
+    "pt": "Redefinir nome da saudação"
+  },
+  "greetingNightNamed": {
+    "en": "Still up, {name}?",
+    "de": "Noch wach, {name}?",
+    "es": "¿Aún despiertos, {name}?",
+    "zh": "{name}，还没睡吗？",
+    "pt": "Ainda acordado, {name}?"
+  },
+  "morningNamed": {
+    "en": "Good morning, {name}.",
+    "de": "Guten Morgen, {name}.",
+    "es": "Buenos días, {name}.",
+    "zh": "{name}，早上好。",
+    "pt": "Bom dia, {name}."
+  },
+  "afternoonNamed": {
+    "en": "Good afternoon, {name}.",
+    "de": "Guten Tag, {name}.",
+    "es": "Buenas tardes, {name}.",
+    "zh": "{name}，下午好。",
+    "pt": "Boa tarde, {name}."
+  },
+  "eveningNamed": {
+    "en": "Good evening, {name}.",
+    "de": "Guten Abend, {name}.",
+    "es": "Buenas noches, {name}.",
+    "zh": "{name}，晚上好。",
+    "pt": "Boa noite, {name}."
+  },
   "english": {
     "en": "English",
     "de": "English",
