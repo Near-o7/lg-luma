@@ -12,7 +12,7 @@ const highResolution = process.argv.includes('--4k');
 for (const legacy of ['app-icons', 'icons.json', 'colors.json']) {
   await fs.rm(path.join(out, legacy), { recursive: true, force: true });
 }
-for (const directory of ['wallpapers', 'thumbnails', 'logos', 'ui-icons', 'surfaces']) {
+for (const directory of ['wallpapers', 'thumbnails', 'logos', 'ui-icons', 'surfaces', 'splash']) {
   await fs.mkdir(path.join(out, directory), { recursive: true });
 }
 
@@ -100,6 +100,15 @@ for (const file of await fs.readdir(path.join(source, 'wallpapers'))) {
     .resize(480, 270, { fit: 'cover' })
     .jpeg({ quality: 82 })
     .toFile(path.join(out, 'thumbnails', `${id}.jpg`));
+}
+// webOS shows `splashBackground` (a static image, scaled to 1080p) until the window opens. One
+// 1080p PNG per background lets the package start on the user's wallpaper instead of a grey card.
+for (const file of await fs.readdir(path.join(out, 'wallpapers'))) {
+  if (!file.endsWith('.jpg') || file.includes('@2x')) continue;
+  await sharp(path.join(out, 'wallpapers', file))
+    .resize(1920, 1080, { fit: 'cover' })
+    .png({ compressionLevel: 9 })
+    .toFile(path.join(out, 'splash', file.replace(/\.jpg$/, '.png')));
 }
 await fs.writeFile(
   path.join(out, 'version.txt'),

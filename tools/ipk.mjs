@@ -86,6 +86,7 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     'autostart.sh',
     'home.sh',
     'home.cjs',
+    'splash.png',
     'lib/libSDL2-2.0.so.0',
     'licenses/sdl2.txt',
     'licenses/lucide.txt',
@@ -111,7 +112,11 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
       'prism',
       'yosemite',
       'northern-lights',
-    ].flatMap((name) => [`assets/wallpapers/${name}.jpg`, `assets/thumbnails/${name}.jpg`]),
+    ].flatMap((name) => [
+      `assets/wallpapers/${name}.jpg`,
+      `assets/thumbnails/${name}.jpg`,
+      `splash/${name}.png`,
+    ]),
     ...vectorAssets.assets.map((name) => {
       if (typeof name !== 'string' || !/^(logos|ui-icons)\/[a-z0-9-]+\.lvec$/.test(name))
         throw new Error('Invalid packaged vector asset path.');
