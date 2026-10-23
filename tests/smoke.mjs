@@ -93,6 +93,9 @@ try {
   assert.deepEqual(saved.preferences.favorites.slice(0, 2), ['youtube.leanback.v4', 'netflix']);
   const clock = await scenario('clock', 'settings,click:900:284');
   assert.equal(clock.subpage, 'Clock');
+  assert.equal(clock.focus, 'ClockFormat');
+  assert.ok(clock.ui_text.includes('Clock format'));
+  assert.ok(clock.ui_text.includes('Time format'));
   const input = await scenario('inputs', 'settings,down,down,down,down,enter,enter,up,enter');
   assert.equal(input.preferences.input_modes['com.webos.app.hdmi1'], 'Off');
   assert.equal(input.subpage, null);
@@ -149,7 +152,7 @@ try {
   assert.equal(profiled.render.profile.presented, 24);
   assert.ok(profiled.render.profile.pacing.samples > 0);
   assert.ok(profiled.render.profile.cpu_submission.mean_ms >= 0);
-  const greetingEditor = 'settings,down,enter,down,down,down,down,enter';
+  const greetingEditor = 'settings,down,enter,down,down,down,down,enter,enter';
   for (const name of ['Ana', 'Bob']) {
     const named = await scenario(
       `greeting-${name}`,
@@ -164,6 +167,60 @@ try {
       'Keyboard completion must save without waiting for another SDL input event',
     );
   }
+  const greeting = await scenario(
+    'greeting-settings',
+    'settings,down,enter,down,down,down,down,enter,down',
+  );
+  assert.equal(greeting.subpage, 'Greeting');
+  assert.equal(greeting.focus, 'GreetingNameClear');
+  assert.ok(greeting.ui_text.includes('Clear name'));
+
+  const appNamesEditor = 'settings,down,enter,enter';
+  const appNames = await scenario('app-name-settings', appNamesEditor);
+  assert.equal(appNames.subpage, 'AppNames');
+  assert.ok(appNames.ui_text.includes('Show on Home'));
+  assert.ok(appNames.ui_text.includes('Show on Apps'));
+  assert.equal(appNames.preferences.show_home_names, false);
+  assert.equal(appNames.preferences.show_app_names, true);
+  const customNames = await scenario(
+    'home-names-enabled',
+    `${appNamesEditor},enter,down,enter,back,home`,
+  );
+  assert.equal(customNames.preferences.show_home_names, true);
+  assert.equal(customNames.preferences.show_app_names, false);
+  assert.ok(customNames.ui_text.includes('Netflix'));
+  const hiddenNames = await scenario('app-names-disabled', 'apps');
+  assert.equal(hiddenNames.preferences.show_app_names, false);
+  assert.ok(!hiddenNames.ui_text.includes('Netflix'));
+
+  const renamedInput = await scenario(
+    'input-rename-focus',
+    'settings,down,down,down,down,enter,down,enter,down,type:Console,back',
+  );
+  assert.equal(renamedInput.focus, 'InputRename');
+  assert.equal(renamedInput.preferences.input_names['com.webos.app.hdmi2'], 'Console');
+  assert.ok(renamedInput.ui_text.includes('Clear name'));
+  const clockEditor = 'settings,down,enter,down,enter';
+  const timeFormat = await scenario('clock-time-format', `${clockEditor},down,enter`);
+  assert.equal(timeFormat.subpage, 'TimeFormat');
+  assert.deepEqual(timeFormat.focus, { Choice: 0 });
+  assert.ok(timeFormat.ui_text.includes('HH:MM'));
+  assert.ok(timeFormat.ui_text.includes('HH:MM:SS'));
+  const withSeconds = await scenario(
+    'clock-time-format-saved',
+    `${clockEditor},down,enter,down,enter`,
+  );
+  assert.equal(withSeconds.subpage, 'Clock');
+  assert.equal(withSeconds.focus, 'ClockTimeFormat');
+  assert.equal(withSeconds.preferences.show_seconds, true);
+  assert.equal(withSeconds.preferences.hour_24, false);
+  const clockFocus = await scenario('clock-format-focus', `${clockEditor},enter,down`);
+  assert.equal(clockFocus.subpage, 'ClockFormat');
+  assert.deepEqual(clockFocus.focus, { Choice: 1 });
+  const system = await scenario('system-settings', 'settings,down,down,down,down,down,right,down');
+  assert.deepEqual(system.focus, { Setting: 5 });
+  assert.ok(system.ui_text.includes('Refresh apps & inputs'));
+  assert.ok(system.ui_text.includes('Quit app'));
   console.log(
     'Native smoke checks passed: rendering/alpha, navigation, persistence, SDL pointer input, DPI-aware glyphs, 4K capture and presentation profiling.',
   );

@@ -94,14 +94,22 @@ It does not execute the test suites. A desktop display is required; on headless 
 Backspace deletes while editing. Native Back uses SDL's webOS-specific keycode. Back dismisses
 the keyboard first; Weather Location then returns to its parent Location row, HDMI choices to
 that HDMI row, and the Background gallery to Background in the sidebar. Back from the sidebar
-focuses the Settings tab, then returns Home. General ends with a vector power-icon Quit app row.
-The Clock format subpage offers 12-hour, 24-hour and a Show seconds toggle (off by default); with
-seconds shown, the header clock redraws once per second instead of once per minute.
-General also has a **Greeting name** row: OK opens the text keyboard (the system keyboard on the TV)
-and the name is appended to the Home greeting ("Good evening, Ana."); an empty name keeps the plain
-greeting. The keyboard starts empty; closing it without a name preserves the saved value. Use
-**Reset greeting name** to remove it. Preferences are saved when the keyboard closes, including
-automatic system-keyboard dismissal.
+focuses the Settings tab, then returns Home. **System** in the sidebar groups **Refresh apps & inputs**
+and the vector power-icon **Quit app** action separately from General preferences.
+The **Clock** subpage contains **Clock format** (12-hour or 24-hour) and **Time format** (`HH:MM`
+or `HH:MM:SS`, defaulting to `HH:MM`). Choosing a format returns to its row in Clock, and Back
+from Clock restores its General row. With seconds shown, the header clock redraws once per second
+instead of once per minute. Existing saved hour and seconds preferences are retained.
+General has an **App names** subpage with independent **Show on Home** and **Show on Apps** toggles.
+Home captions default to off and Apps captions default to on, stored independently in `show_home_names`
+and `show_app_names`. The legacy `show_names` preference does not override these defaults. Hidden
+captions do not reserve layout space.
+The **Greeting** subpage contains **Name** and **Clear name**. Selecting Name opens the text keyboard
+(the system keyboard on the TV) and the name is appended to the Home greeting ("Good evening, Ana.").
+The keyboard starts empty; closing it without a name preserves the saved value. Clear name removes
+it. Preferences are saved when the keyboard closes, including automatic system-keyboard dismissal.
+Back from either subpage restores its General row. Input name removal also uses **Clear name**.
+Choice checkmarks identify saved values, while the bright row fill identifies only the current focus.
 
 Home favorites form one horizontal strip, never a second row. Left/Right follows saved order,
 including reorder mode, and reveals complete cards. Up returns to Home navigation; Down enters

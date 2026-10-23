@@ -105,7 +105,7 @@ try {
   await run('cargo', ['build', '--locked', '--package', 'luma']);
   await fs.writeFile(
     preferences,
-    JSON.stringify({ language: 'en', show_names: true, reduced_motion: true }),
+    JSON.stringify({ language: 'en', show_home_names: true, reduced_motion: true }),
   );
   const languages = await scenario('picker-en', picker);
   assert.equal(languages.subpage, 'Language');
@@ -144,7 +144,7 @@ try {
   assert.ok(chinese.ui_text.includes('10月21日星期三'));
   const chineseSettings = await scenario('zh-settings', 'settings,down');
   contains(chineseSettings, 'language', 'zh');
-  contains(chineseSettings, 'showAppNames', 'zh');
+  contains(chineseSettings, 'appNames', 'zh');
 
   const selected = await scenario(
     'zh-weather',
@@ -199,7 +199,7 @@ try {
 
   await fs.writeFile(
     preferences,
-    JSON.stringify({ language: 'en', show_names: true, reduced_motion: true }),
+    JSON.stringify({ language: 'en', show_home_names: true, reduced_motion: true }),
   );
   const portuguese = await scenario('pt-home', `${picker},down,down,down,down,enter,home,down`);
   assert.equal(portuguese.preferences.language, 'pt');
@@ -225,8 +225,7 @@ try {
     'Portuguese is restored after restart',
   );
   assert.ok(portugueseSettings.ui_text.includes('Português (Brasil)'));
-  for (const key of ['language', 'showAppNames', 'clockFormat'])
-    contains(portugueseSettings, key, 'pt');
+  for (const key of ['language', 'appNames', 'clock']) contains(portugueseSettings, key, 'pt');
   assert.equal(JSON.parse(await fs.readFile(preferences, 'utf8')).language, 'pt');
 
   const portugueseDialog = await scenario('pt-dialog', 'apps,down,menu');

@@ -111,12 +111,12 @@
     "zh": "显示自定义名称而不是端口",
     "pt": "Mostrar um nome próprio no lugar da porta"
   },
-  "resetInputName": {
-    "en": "Reset name",
-    "de": "Namen zurücksetzen",
-    "es": "Restablecer nombre",
-    "zh": "恢复默认名称",
-    "pt": "Redefinir nome"
+  "clearName": {
+    "en": "Clear name",
+    "de": "Name löschen",
+    "es": "Borrar nombre",
+    "zh": "清除名称",
+    "pt": "Limpar nome"
   },
   "back": {
     "en": "Back",
@@ -138,6 +138,13 @@
     "es": "General",
     "zh": "通用",
     "pt": "Geral"
+  },
+  "system": {
+    "en": "System",
+    "de": "System",
+    "es": "Sistema",
+    "zh": "系统",
+    "pt": "Sistema"
   },
   "favorites": {
     "en": "Favorites",
@@ -174,12 +181,26 @@
     "zh": "地点搜索结果",
     "pt": "Resultados de localização"
   },
-  "showAppNames": {
-    "en": "Show app names",
-    "de": "App-Namen auf dem Startbildschirm anzeigen",
-    "es": "Mostrar nombres de apps",
-    "zh": "在主页显示应用名称",
-    "pt": "Mostrar nomes dos apps"
+  "appNames": {
+    "en": "App names",
+    "de": "App-Namen",
+    "es": "Nombres de apps",
+    "zh": "应用名称",
+    "pt": "Nomes dos apps"
+  },
+  "showOnHome": {
+    "en": "Show on Home",
+    "de": "Auf der Startseite anzeigen",
+    "es": "Mostrar en Inicio",
+    "zh": "在主页显示",
+    "pt": "Mostrar no Início"
+  },
+  "showOnApps": {
+    "en": "Show on Apps",
+    "de": "In Apps anzeigen",
+    "es": "Mostrar en Aplicaciones",
+    "zh": "在应用页显示",
+    "pt": "Mostrar em Apps"
   },
   "clock24": {
     "en": "24-hour clock",
@@ -195,12 +216,19 @@
     "zh": "时钟格式",
     "pt": "Formato do relógio"
   },
-  "showSeconds": {
-    "en": "Show seconds",
-    "de": "Sekunden anzeigen",
-    "es": "Mostrar segundos",
-    "zh": "显示秒",
-    "pt": "Mostrar segundos"
+  "clock": {
+    "en": "Clock",
+    "de": "Uhr",
+    "es": "Reloj",
+    "zh": "时钟",
+    "pt": "Relógio"
+  },
+  "timeFormat": {
+    "en": "Time format",
+    "de": "Zeitformat",
+    "es": "Formato de visualización",
+    "zh": "时间显示",
+    "pt": "Formato de exibição"
   },
   "hour12": {
     "en": "12-hour",
@@ -251,12 +279,19 @@
     "zh": "问候称呼",
     "pt": "Nome na saudação"
   },
-  "resetGreetingName": {
-    "en": "Reset greeting name",
-    "de": "Begrüßungsnamen zurücksetzen",
-    "es": "Restablecer nombre del saludo",
-    "zh": "重置问候称呼",
-    "pt": "Redefinir nome da saudação"
+  "greeting": {
+    "en": "Greeting",
+    "de": "Begrüßung",
+    "es": "Saludo",
+    "zh": "问候语",
+    "pt": "Saudação"
+  },
+  "name": {
+    "en": "Name",
+    "de": "Name",
+    "es": "Nombre",
+    "zh": "名称",
+    "pt": "Nome"
   },
   "greetingNightNamed": {
     "en": "Still up, {name}?",
