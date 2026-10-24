@@ -540,6 +540,27 @@ and `pnpm test:release` covers version synchronization and the publish gate, inc
 Changesets version command in an isolated fixture. Host CI cannot prove hardware compatibility,
 small-text quality or presentation frame rate.
 
+### PR test IPKs
+
+`.github/workflows/pr-test-ipk.yml` runs **PR Test IPK** whenever a PR is opened, reopened or
+receives new commits, including fork PRs and drafts. It automatically builds the exact PR head
+commit and uploads the verified ARM IPK and `sha256sums`. One bot comment is created or updated
+with the full commit hash, workflow run and artifact download link. Failed or cancelled builds
+update the same comment with their status; superseded commits cannot overwrite the latest head's
+comment. Downloads are GitHub artifact ZIPs, require signing in and expire after 14 days.
+
+The workflow uses only the `opened`, `synchronize` and `reopened` PR events, without a deployment
+environment or required reviewers. Each new commit cancels the previous run. It becomes active
+after it is merged into the PR's base branch; reopen an existing PR to request its first build,
+or rerun a workflow to rebuild the same commit.
+
+Only the build job checks out PR code. It has read-only repository access, no persisted
+checkout credentials and no shared build caches. A separate job with comment-writing permission
+uses the trusted base-branch workflow and GitHub's artifact API without checking out PR code.
+The package keeps the normal `com.ecklf.luma` identity and version, so installing it replaces
+the existing Luma app. These builds are for manual TV verification; the ordinary CI checks still
+run independently.
+
 ## Releases
 
 Add a changeset to feature/fix PRs that should be included in the next app release:
