@@ -1,11 +1,15 @@
 //! One bounded LS2 round trip on the platform worker's own GLib context.
 //! The hub sees the installed native executable. LSCallFromApplication (the
 //! luna-send-pub -a path) instead requires an impersonation privilege we lack.
+//! `subscribe_as_app` is the one exception: as root, it holds a subscription
+//! through the system bus `luna-send -a`, which may act for an app ID.
+use crate::app_subscription::{self, AppSubscription};
 use libc::{c_char, c_int, c_ulong, c_void};
 use serde_json::Value;
 use std::{
     ffi::{CStr, CString},
     panic::{AssertUnwindSafe, catch_unwind},
+    process::Command,
     ptr,
     sync::mpsc,
     thread,
@@ -328,4 +332,27 @@ pub fn subscribe(
         Err(mpsc::RecvTimeoutError::Timeout) => Err("Luna subscription: no reply".into()),
         Err(mpsc::RecvTimeoutError::Disconnected) => Err("Luna subscription ended".into()),
     }
+}
+
+/// Like `subscribe`, but the call is made as `app_id` by a root `luna-send -a` child, which the
+/// system bus lets act for an app. For a Home manifest staged under LG's app-ID based role
+/// (webOS 10/11), where Luma's own connection cannot be that app. Requires root. Does not wait
+/// for the service; see `app_subscription::subscribe` for how replies and failures are reported.
+pub fn subscribe_as_app(
+    app_id: &str,
+    uri: &str,
+    payload: &Value,
+    timeout: Duration,
+    on_message: impl FnMut(Value) + Send + 'static,
+    on_end: impl FnOnce(bool) + Send + 'static,
+) -> Result<AppSubscription, String> {
+    let mut command = Command::new("/usr/bin/luna-send");
+    command.args(["-a", app_id, "-i", uri, &payload.to_string()]);
+    app_subscription::subscribe(
+        command,
+        timeout,
+        on_message,
+        on_end,
+        app_subscription::spawn_thread,
+    )
 }
