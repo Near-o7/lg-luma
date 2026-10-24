@@ -2,6 +2,13 @@
 
 A native launcher for rooted LG webOS TVs, inspired by Apple TV.
 
+<video src="docs/luma-preview.mp4" controls playsinline preload="metadata" style="width: 100%; height: auto;">
+  <a href="docs/luma-preview.mp4">Watch the Luma demo</a>
+</video>
+
+<details>
+<summary>Screenshots</summary>
+
 <table>
   <tr>
     <td width="50%" align="center">
@@ -20,6 +27,8 @@ A native launcher for rooted LG webOS TVs, inspired by Apple TV.
     </td>
   </tr>
 </table>
+
+</details>
 
 ### Recent apps
 
