@@ -28,6 +28,9 @@ pub enum Page {
 pub enum Target {
     Nav(usize),
     TvSettings,
+    Recent(String),
+    RecentEmpty,
+    RecentRetry,
     App(String),
     Input(String),
     Browse,
@@ -95,6 +98,7 @@ pub struct Control {
 #[derive(Clone, Debug)]
 pub enum Overlay {
     Options { id: String, restore: Target },
+    Recents { restore: Target },
     Keyboard,
     SystemKeyboard,
 }
@@ -136,6 +140,10 @@ pub enum Effect {
     /// Refresh apps: read the inventory and every app icon again.
     Reload,
     Launch(String),
+    Recent {
+        generation: u64,
+        command: crate::recents::Command,
+    },
     Quit,
     Weather(weather::Command),
 }
@@ -174,6 +182,7 @@ pub struct State {
     pub keyboard_field: TextField,
     pub greeting_name_draft: String,
     pub input_name: String,
+    pub recents: crate::recents::Recents,
 }
 
 impl State {
@@ -205,6 +214,7 @@ impl State {
             keyboard_field: TextField::Apps,
             greeting_name_draft: String::new(),
             input_name: String::new(),
+            recents: crate::recents::Recents::default(),
         }
     }
 
@@ -214,6 +224,15 @@ impl State {
     }
 
     pub fn tick(&mut self) {
+        let recents_open = self.recents_open();
+        if recents_open || self.recents.visibility > 0. {
+            self.dirty |= self.recents.animate(
+                recents_open,
+                self.preferences.reduced_motion,
+                self.pointer,
+                Instant::now(),
+            );
+        }
         if let Some(start) = self.panel_started {
             self.dirty = true;
             let duration = if self.overlay.is_some() { 120 } else { 150 };
@@ -255,7 +274,10 @@ impl State {
     }
 
     pub fn animating(&self) -> bool {
-        self.previous_background.is_some()
+        ((self.recents_open() || self.recents.visibility > 0.)
+            && (self.recents.visibility != if self.recents_open() { 1. } else { 0. }
+                || (!self.pointer && self.recents.position != self.recents.selected as f32)))
+            || self.previous_background.is_some()
             || self.panel_started.is_some()
             || (!self.preferences.reduced_motion
                 && self
@@ -540,6 +562,9 @@ impl State {
     pub fn direction(&mut self, direction: Direction, controls: &[Control]) -> Vec<Effect> {
         self.pointer = false;
         self.dirty = true;
+        if self.recents_open() {
+            return self.recent_direction(direction);
+        }
         if matches!(self.overlay, Some(Overlay::SystemKeyboard)) {
             // The TV keyboard owns its arrows until Done/Back dismisses it.
             return vec![];
@@ -1193,6 +1218,14 @@ impl State {
     }
 
     pub fn activate(&mut self) -> Vec<Effect> {
+        if self.recents_open() {
+            use crate::recents::Command;
+            return match self.focus.clone() {
+                Target::Recent(id) => self.recent_request(Command::Launch(id)),
+                Target::RecentRetry => self.recent_request(Command::List),
+                _ => vec![],
+            };
+        }
         if self.moving.take().is_some() {
             // Order was saved at every move. A fresh OK release finishes the
             // mode and keeps the selected favorite, rather than launching it.
@@ -1521,8 +1554,19 @@ impl State {
         }
         if let Some(overlay) = self.overlay.take() {
             self.panel_started = None;
-            if let Overlay::Options { restore, .. } = overlay {
+            if matches!(overlay, Overlay::Recents { .. }) {
+                self.recents.closing_focus = Some(self.focus.clone());
+                self.recents.updated = Instant::now();
+                self.pressed = None;
+                if self.preferences.reduced_motion {
+                    self.recents.visibility = 0.;
+                    self.recents.closing_focus = None;
+                }
+            }
+            if let Overlay::Options { restore, .. } | Overlay::Recents { restore } = overlay {
                 self.focus = restore;
+                self.recents.pending = None;
+                self.reconcile_focus();
                 return vec![];
             }
             self.focus = self.keyboard_return();
@@ -1551,7 +1595,7 @@ impl State {
             self.open(0);
             vec![]
         } else {
-            vec![Effect::Quit]
+            self.open_recents()
         }
     }
 }

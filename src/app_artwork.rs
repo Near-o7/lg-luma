@@ -14,10 +14,12 @@ use std::{
     thread,
 };
 
-const ROOTS: [&str; 3] = [
+const ROOTS: [&str; 5] = [
     "/media/developer/apps/usr/palm/applications",
     "/media/cryptofs/apps/usr/palm/applications",
     "/usr/palm/applications",
+    "/media/system/apps/usr/palm/applications",
+    "/mnt/otncabi/usr/palm/applications",
 ];
 pub const MAX_FILE: usize = 512 * 1024;
 const CACHE_BYTES: usize = 16 * 1024 * 1024;
@@ -243,6 +245,10 @@ pub struct Service {
 }
 
 impl Service {
+    pub fn enabled(&self) -> bool {
+        self.sender.is_some()
+    }
+
     pub fn new(enabled: bool) -> Self {
         Self::with_loader(enabled, load)
     }

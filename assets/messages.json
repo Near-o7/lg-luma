@@ -1,4 +1,36 @@
 {
+  "recentEmpty": {
+    "en": "No recent apps",
+    "de": "Keine zuletzt verwendeten Apps",
+    "es": "No hay aplicaciones recientes",
+    "zh": "暂无最近使用的应用",
+    "pt": "Nenhum app recente",
+    "it": "Nessuna app recente"
+  },
+  "recentError": {
+    "en": "Recent apps could not be updated",
+    "de": "Zuletzt verwendete Apps konnten nicht aktualisiert werden",
+    "es": "No se pudieron actualizar las aplicaciones recientes",
+    "zh": "无法更新最近使用的应用",
+    "pt": "Não foi possível atualizar os apps recentes",
+    "it": "Impossibile aggiornare le app recenti"
+  },
+  "recentLoading": {
+    "en": "Updating recent apps…",
+    "de": "Zuletzt verwendete Apps werden aktualisiert…",
+    "es": "Actualizando aplicaciones recientes…",
+    "zh": "正在更新最近使用的应用…",
+    "pt": "Atualizando apps recentes…",
+    "it": "Aggiornamento delle app recenti…"
+  },
+  "recentDesktop": {
+    "en": "Desktop preview · Sample history",
+    "de": "Desktop-Vorschau · Beispielverlauf",
+    "es": "Vista previa de escritorio · Historial de ejemplo",
+    "zh": "桌面预览 · 示例记录",
+    "pt": "Prévia no desktop · Histórico de exemplo",
+    "it": "Anteprima desktop · Cronologia di esempio"
+  },
   "home": {
     "en": "Home",
     "de": "Start",

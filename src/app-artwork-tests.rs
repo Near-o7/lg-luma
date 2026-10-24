@@ -78,7 +78,7 @@ fn inventory_metadata_resolves_absolute_relative_and_manifest_fallback_paths() {
         assert!(icon_path(&dirs[0], bad).is_none());
     }
     let source = Source::new("sample", &json!({"folderPath":"/etc"}));
-    assert_eq!(source.directories().len(), 3);
+    assert_eq!(source.directories().len(), ROOTS.len());
     assert_eq!(source.directories()[0], Path::new(ROOTS[0]).join("sample"));
 }
 

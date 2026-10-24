@@ -18,6 +18,10 @@ use time::OffsetDateTime;
 const MAIN_TOP: f32 = 108.8;
 const FACE_HEIGHT: f32 = 154.4;
 const GRID_PITCH: f32 = 296.4;
+const RECENTS_BACKDROP_OPACITY: f32 = 0.86;
+
+#[path = "recents-view.rs"]
+mod recents_view;
 
 pub struct Assets {
     pub root: PathBuf,
@@ -297,6 +301,19 @@ pub fn scene_with_pill(
             false,
         );
     }
+    let content_start = out.draw.len();
+    if state.recents_open() && state.recents.visibility == 1. {
+        out.shape(
+            Rect::new(0., 0., 1920., 1080.),
+            0.,
+            c(0x080b12, RECENTS_BACKDROP_OPACITY),
+        );
+        recents_view::render(&mut out, state, assets);
+        if let Some((notice, _)) = &state.notice {
+            toast(&mut out, state, assets, notice);
+        }
+        return out;
+    }
     let main_bottom = if state.page == Page::Home && state.moving.is_none() {
         1053.6
     } else {
@@ -368,10 +385,30 @@ pub fn scene_with_pill(
         match overlay {
             Overlay::Options { id, .. } => options(&mut out, state, assets, id),
             Overlay::Keyboard => keyboard(&mut out, state, assets),
-            Overlay::SystemKeyboard => {}
+            Overlay::SystemKeyboard | Overlay::Recents { .. } => {}
         }
         if let Some(opened) = state.panel_started {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
+        }
+    }
+    if state.recents_open() || state.recents.visibility > 0. {
+        // Crossfade the actual parent interface as well as the dimmed stage.
+        // Retain outgoing visuals after dismissal, while input immediately
+        // belongs to the restored parent. No geometry or hit targets move.
+        let parent_controls = std::mem::take(&mut out.controls);
+        let parent_modal = out.modal;
+        out.fade(content_start, 1. - state.recents.visibility, 1.);
+        let start = out.draw.len();
+        out.shape(
+            Rect::new(0., 0., 1920., 1080.),
+            0.,
+            c(0x080b12, RECENTS_BACKDROP_OPACITY),
+        );
+        recents_view::render(&mut out, state, assets);
+        out.fade(start, state.recents.visibility, 1.);
+        if !state.recents_open() {
+            out.controls = parent_controls;
+            out.modal = parent_modal;
         }
     }
     if let Some((notice, _)) = &state.notice {
@@ -485,62 +522,7 @@ fn tile(
         if focused { 14. } else { 9. },
         if focused { 0.4 } else { 0.165 },
     );
-    let logo = crate::branding::for_key(&app.brand);
-    let artwork = logo
-        .is_none()
-        .then(|| {
-            app.icon
-                .as_ref()
-                .and_then(|source| assets.artwork.get(source))
-        })
-        .flatten();
-    if let Some(rgb) = artwork.as_ref().map(|image| &image.color) {
-        out.shape(
-            rect,
-            19.2,
-            [
-                rgb[0] as f32 / 255.,
-                rgb[1] as f32 / 255.,
-                rgb[2] as f32 / 255.,
-                1.,
-            ],
-        );
-    } else {
-        out.image(
-            assets.path(format!("surfaces/{}.png", app.brand)),
-            rect,
-            19.2,
-            false,
-        );
-    }
-    out.border(rect, 19.2, 1., c(0xffffff, 0.063));
-    if let Some(brand) = logo {
-        let (ratio, h) = brand.artwork_size();
-        out.image(
-            assets.path(format!("logos/{}.lvec", app.brand)),
-            Rect::new(
-                rect.x + rect.w * (1. - ratio) / 2.,
-                rect.y + (rect.h - h) / 2.,
-                rect.w * ratio,
-                h,
-            ),
-            0.,
-            true,
-        );
-    } else if let Some(image) = artwork {
-        out.draw.push(Draw::AppImage(
-            image,
-            Rect::new(
-                rect.x + rect.w * 0.16,
-                rect.y + rect.h * 0.16,
-                rect.w * 0.68,
-                rect.h * 0.68,
-            ),
-            [1.; 4],
-        ));
-    } else {
-        brand_mark(out, assets, app, rect, state.preferences.language);
-    }
+    app_face(out, assets, app, rect, state.preferences.language, 19.2);
     if pinned {
         out.icon(
             assets,
@@ -610,6 +592,75 @@ fn tile(
     }
 }
 
+/// Shared card artwork for Home, Apps and Recents. Curated vectors always take
+/// precedence over installed artwork, with the same relative logo proportions.
+fn app_face(
+    out: &mut Scene,
+    assets: &Assets,
+    app: &App,
+    rect: Rect,
+    language: Language,
+    radius: f32,
+) {
+    let logo = crate::branding::for_key(&app.brand);
+    let artwork = logo
+        .is_none()
+        .then(|| {
+            app.icon
+                .as_ref()
+                .and_then(|source| assets.artwork.get(source))
+        })
+        .flatten();
+    if let Some(rgb) = artwork.as_ref().map(|image| &image.color) {
+        out.shape(
+            rect,
+            radius,
+            [
+                rgb[0] as f32 / 255.,
+                rgb[1] as f32 / 255.,
+                rgb[2] as f32 / 255.,
+                1.,
+            ],
+        );
+    } else {
+        out.image(
+            assets.path(format!("surfaces/{}.png", app.brand)),
+            rect,
+            radius,
+            false,
+        );
+    }
+    out.border(rect, radius, 1., c(0xffffff, 0.063));
+    if let Some(brand) = logo {
+        let (ratio, height) = brand.artwork_size();
+        let height = height * rect.h / FACE_HEIGHT;
+        out.image(
+            assets.path(format!("logos/{}.lvec", app.brand)),
+            Rect::new(
+                rect.x + rect.w * (1. - ratio) / 2.,
+                rect.y + (rect.h - height) / 2.,
+                rect.w * ratio,
+                height,
+            ),
+            0.,
+            true,
+        );
+    } else if let Some(image) = artwork {
+        out.draw.push(Draw::AppImage(
+            image,
+            Rect::new(
+                rect.x + rect.w * 0.16,
+                rect.y + rect.h * 0.16,
+                rect.w * 0.68,
+                rect.h * 0.68,
+            ),
+            [1.; 4],
+        ));
+    } else {
+        brand_mark(out, assets, app, rect, language);
+    }
+}
+
 fn caption_height(state: &State, assets: &Assets, app: &App, width: f32) -> f32 {
     let title = format!(
         "{}{}",
@@ -634,6 +685,14 @@ fn caption_height(state: &State, assets: &Assets, app: &App, width: f32) -> f32 
 }
 
 fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect, language: Language) {
+    let scale = rect.h / FACE_HEIGHT;
+    let rect = Rect::new(
+        rect.x / scale,
+        rect.y / scale,
+        rect.w / scale,
+        rect.h / scale,
+    );
+    let start = out.draw.len();
     let (cx, cy) = rect.center();
     match app.brand.as_str() {
         "plex" => {
@@ -713,6 +772,24 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect, language:
                 font,
                 WHITE,
                 false,
+            );
+        }
+    }
+    if scale != 1. {
+        for draw in &mut out.draw[start..] {
+            let rect = match draw {
+                Draw::Text(_, rect, style, _, _) => {
+                    style.size *= scale;
+                    rect
+                }
+                Draw::TintedImage(_, rect, _, _, _) => rect,
+                _ => continue,
+            };
+            *rect = Rect::new(
+                rect.x * scale,
+                rect.y * scale,
+                rect.w * scale,
+                rect.h * scale,
             );
         }
     }

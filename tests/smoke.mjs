@@ -55,14 +55,77 @@ try {
       255,
       'UI compositing must preserve opaque framebuffer alpha',
     );
-    assert.ok(
-      stats.channels.slice(0, 3).some((channel) => channel.stdev > 10),
-      'Framebuffer must contain rendered UI',
-    );
+    if (state.ui_text.includes('No recent apps')) {
+      // The intentionally sparse empty switcher has no bright header/footer
+      // controls. Verify its message pixels instead of full-screen variance.
+      const messagePixels = await sharp(screenshot)
+        .extract({ left: 360, top: 526, width: 1200, height: 60 })
+        .toBuffer();
+      const message = await sharp(messagePixels).stats();
+      assert.ok(
+        message.channels.slice(0, 3).some((channel) => channel.max > 200 && channel.stdev > 10),
+      );
+    } else {
+      assert.ok(
+        stats.channels.slice(0, 3).some((channel) => channel.stdev > 10),
+        'Framebuffer must contain rendered UI',
+      );
+    }
     return state;
   };
   const home = await scenario('home', 'down');
   assert.deepEqual(home.focus, { App: 'netflix' });
+  const recents = await scenario('recents', 'recents,await-recents');
+  assert.equal(recents.modal, true);
+  assert.deepEqual(recents.focus, { Recent: 'netflix' });
+  assert.equal(recents.recents.length, 8);
+  assert.equal(recents.recents_error, null);
+  assert.equal(recents.recents_visibility, 1);
+  assert.ok(!recents.ui_text.includes('Recent apps'));
+  assert.ok(!recents.ui_text.includes('Pick up where you left off.'));
+  assert.ok(recents.ui_text.includes('Desktop preview · Sample history'));
+  assert.ok(!recents.ui_text.includes('Netflix'));
+  assert.ok(!recents.ui_text.includes('YouTube'));
+  assert.ok(!recents.ui_text.includes('1 / 8'));
+  assert.ok(!recents.ui_text.includes('Close all'));
+  assert.ok(
+    !recents.ui_text.some((value) => value.includes('Switch') && value.includes('Close app')),
+  );
+  const recentClosed = await scenario(
+    'recent-closed',
+    'recents,await-recents,right,right,up,await-recents',
+  );
+  assert.equal(recentClosed.recents.length, 7);
+  assert.ok(!recentClosed.recents.some((entry) => entry.app.id === 'com.apple.appletv'));
+  assert.deepEqual(recentClosed.focus, { Recent: 'com.disney.disneyplus-prod' });
+  const recentsEmpty = await scenario(
+    'recents-empty',
+    `recents,await-recents,${Array(8).fill('up,await-recents').join(',')}`,
+  );
+  assert.deepEqual(recentsEmpty.recents, []);
+  assert.equal(recentsEmpty.focus, 'RecentEmpty');
+  assert.ok(recentsEmpty.ui_text.includes('No recent apps'));
+  assert.ok(!recentsEmpty.ui_text.includes('Apps you open will appear here.'));
+  const recentBack = await scenario('recents-back', 'settings,recents,await-recents,back');
+  assert.equal(recentBack.modal, false);
+  assert.equal(recentBack.page, 'Settings');
+  assert.equal(recentBack.recents_visibility, 0);
+  const recentLaunch = await scenario(
+    'recents-launch',
+    'recents,await-recents,right,enter,await-recents',
+  );
+  assert.equal(recentLaunch.modal, false);
+  const recentPointerLaunch = await scenario(
+    'recents-pointer-launch',
+    'recents,await-recents,click:960:527,await-recents',
+  );
+  assert.equal(recentPointerLaunch.modal, false);
+  assert.equal(recentPointerLaunch.recents_visibility, 0);
+  const recentHomeBack = await scenario('recents-home-back', 'home,down,back,await-recents');
+  assert.equal(recentHomeBack.modal, true);
+  assert.deepEqual(recentHomeBack.focus, { Recent: 'netflix' });
+  const recentYoutube = await scenario('recents-youtube', 'recents,await-recents,right');
+  assert.deepEqual(recentYoutube.focus, { Recent: 'youtube.leanback.v4' });
   const hidden = await scenario('apps', 'apps,down,menu,down,enter');
   assert.ok(hidden.preferences.hidden.includes('netflix'));
   assert.deepEqual(hidden.focus, { App: 'youtube.leanback.v4' });

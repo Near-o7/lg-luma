@@ -6,7 +6,9 @@ var source = JSON.parse(process.argv[1]);
 var roots = [
   '/media/developer/apps/usr/palm/applications',
   '/media/cryptofs/apps/usr/palm/applications',
-  '/usr/palm/applications'
+  '/usr/palm/applications',
+  '/media/system/apps/usr/palm/applications',
+  '/mnt/otncabi/usr/palm/applications'
 ];
 var remaining = 512 * 1024;
 var icons = [];

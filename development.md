@@ -80,16 +80,17 @@ It does not execute the test suites. A desktop display is required; on headless 
 
 ### Input
 
-| Input                     | Action                                                 |
-| ------------------------- | ------------------------------------------------------ |
-| Arrows                    | Move focus, revealing remote-focused content           |
-| OK / Enter                | Activate on release                                    |
-| Hold OK for 600 ms        | Reorder Home favorite or open app options              |
-| OK or Back in move mode   | Finish reordering without launching                    |
-| Escape / Back / Backspace | Parent navigation, overlay dismissal or quit from Home |
-| Menu / M / right-click    | App options                                            |
-| Pointer / wheel           | Hover, click, hold and scrolling                       |
-| F5                        | Refresh inventory                                      |
+| Input                         | Action                                                        |
+| ----------------------------- | ------------------------------------------------------------- |
+| Arrows                        | Move focus, revealing remote-focused content                  |
+| OK / Enter                    | Activate on release                                           |
+| Hold OK for 600 ms            | Reorder Home favorite or open app options                     |
+| OK or Back in move mode       | Finish reordering without launching                           |
+| Escape / Back / Backspace     | Parent navigation, overlay dismissal or Recent apps from Home |
+| Hold Back / Escape for 600 ms | Open Recent apps while Luma is focused                        |
+| Menu / M / right-click        | App options                                                   |
+| Pointer / wheel               | Hover, click, hold and scrolling                              |
+| F5                            | Refresh inventory                                             |
 
 Backspace deletes while editing. Native Back uses SDL's webOS-specific keycode. Back dismisses
 the keyboard first; Weather Location then returns to its parent Location row, HDMI choices to
@@ -122,6 +123,75 @@ vector icons/logos and text. The wallpaper/header are unmasked; no blur texture 
 
 TV editing uses the system keyboard through SDL-webOS. Desktop editing uses the custom panel.
 System text events update app/location queries; Done/Back stops editing and restores focus.
+
+### Recent apps
+
+Press Back on Home to open Recent apps, or hold Back (Escape on desktop) for 600 ms from any page.
+Short Back navigates on release. Back in an overlay, the system keyboard or
+move mode keeps its immediate dismissal behavior; Backspace keeps its editing/navigation role.
+Losing window focus cancels an unfinished hold. This is an app-local shortcut while Luma is focused.
+SDL-webOS Back (scancode 482) and long-Back Exit (505) are normalized before rust-sdl2 decodes the
+event, since the native keymap can leave their keycodes unset and the Rust scancode enum does not
+include them. Both Back and Exit access policies are claimed before video initialization. The
+native Exit signal opens the switcher without waiting for another timer; repeat/dismissal events
+are consumed until release, so the same press cannot dismiss an overlay and then reopen it from Home.
+
+The switcher uses a landscape-card strip on a dimmed wallpaper, a short, reversible crossfade to
+and from the actual parent interface, and a non-bouncy, interruptible horizontal transition.
+Reopening during dismissal reverses from the current opacity and keeps the visible cards.
+Dismissal restores parent input immediately while the outgoing cards finish fading. The transition
+does not move card hit targets; pointer interruption pauses only carousel movement, not the fade.
+Reduced motion makes both the crossfade and navigation immediate.
+Pointer hover/down preserves the current card positions and interrupts remote carousel movement.
+The backdrop uses 86% opacity so more of the wallpaper shows through. There are no app captions, action buttons,
+empty-state subtitle, heading, separate dismiss button, card count, footer instructions or Home
+header shortcut. Up closes the focused card directly; held-Up repeats are ignored to prevent
+unintentionally closing more apps as the next card becomes focused. Back dismisses the switcher; Quit app remains an
+explicit Settings → System action.
+
+| Input                 | Action                                      |
+| --------------------- | ------------------------------------------- |
+| Left / Right or wheel | Browse recent cards                         |
+| OK on a card          | Launch the app                              |
+| Up from a card        | Close that card immediately                 |
+| Pointer               | Select a card                               |
+| Back                  | Return to the exact previous page and focus |
+
+The platform worker uses the stock-Home operations captured on webOS 26:
+
+| Operation | Luna endpoint                                 | Payload                                                                                            |
+| --------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| History   | `com.webos.service.recent/listRecents`        | `{}`                                                                                               |
+| Close one | `com.webos.service.recent/removeRecent`       | `{"appId":"APP_ID"}`                                                                               |
+| Launch    | `com.webos.service.applicationmanager/launch` | `{"id":"APP_ID","params":{},"reason":"recent","checkUpdateOnLaunch":true,"autoInstallation":true}` |
+
+Service-name capitalization is significant. These fixed calls go through the native process's
+authenticated Homebrew Channel `exec` connection, using bounded root `luna-send` commands and no
+application impersonation. Mutations are sent once, checked for `returnValue: true`, then history
+is refreshed. They are not automatically retried after an ambiguous timeout. One request is active
+per overlay; generation IDs discard late replies after dismissal or reopening. Read/action errors
+stay in the overlay with a read-only Retry action and diagnostic details in stderr.
+
+History order is preserved, including input entries, with Luma/Home identities and duplicates
+excluded. The native integration still needs manual verification in both normal-tile and
+Home-takeover modes, including app/input launching, closing individual apps, short/long Back,
+focus restoration and service-denial handling.
+
+Cards share the Home/Apps face renderer: the same exact-ID curated vectors, surfaces, relative logo
+proportions, installed icons and generic fallbacks. Recent splash/snapshot artwork is not loaded.
+Installed icons keep the existing artwork worker and bounded caches. No TV images or recent history
+are bundled or saved into preferences. System and OTNCABI installation roots are supported by the
+bounded reader.
+
+Desktop preview uses labeled in-memory sample history and simulated mutations, with no TV calls:
+
+```sh
+pnpm dev --script recents,await-recents
+```
+
+`hold-back` is also a scripted opening action. Desktop smoke scenarios render normal, close-one,
+empty, launch, pointer and Home Back flows; unit tests cover hold timing, cancelled
+presses, stale responses, failures, navigation, reduced motion, reversible crossfades and consistent card artwork.
 
 ## Splash images
 

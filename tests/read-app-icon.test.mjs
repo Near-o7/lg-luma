@@ -9,6 +9,8 @@ const roots = [
   '/media/developer/apps/usr/palm/applications',
   '/media/cryptofs/apps/usr/palm/applications',
   '/usr/palm/applications',
+  '/media/system/apps/usr/palm/applications',
+  '/mnt/otncabi/usr/palm/applications',
 ];
 const directory = `${roots[0]}/sample`;
 
