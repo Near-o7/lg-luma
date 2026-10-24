@@ -30,15 +30,6 @@ https://github.com/user-attachments/assets/9c708bd3-5d38-48fe-a2bc-5587ac0a1a84
 
 </details>
 
-### Recent apps
-
-Press **Back** on Home, or hold **Back** for 600 ms while Luma is open.
-Use **Left/Right** to switch cards, **OK** to launch and **Up** to close the selected app immediately.
-**Back** returns to your previous screen.
-The switcher uses the TV's recent history and LG's own close behavior, with subtle transitions
-and the same app cards as the Apps view. Reduced motion is supported. Its private TV services
-need verification on each firmware.
-
 ## Compatibility
 
 The following TV configurations have been reported working with Luma:
