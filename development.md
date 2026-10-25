@@ -225,6 +225,12 @@ draws with a texture-free GLES2 shader. No SVG parser runs on the TV. The shared
 handles font outlines. Installed app PNG/JPEG/WebP artwork, wallpaper photos, tile-background
 images and the webOS installation icon remain raster assets. See [assets.md](assets.md) for licenses.
 
+On webOS the window is created without MSAA, so text and logos use their analytic edge filters,
+which stay sharper through a TV's 2x scale-up of a 1080p graphics plane than 4x sample coverage
+at the same cost. Desktop previews keep multisampling; `LUMA_MSAA=4` or `0` overrides either.
+Text up to 16 physical pixels is emboldened by 0.25 px per edge (fading out by 28 px) so thin
+stems get an opaque core; `LUMA_EMBOLDEN` sets the strength.
+
 ### Installed app artwork
 
 TV inventory retains each app's `folderPath`, `largeIcon` and `icon`. Visible cards resolve artwork
@@ -289,12 +295,13 @@ are tessellated in font-em coordinates. Complete text runs are cached in static 
 independent of position/color/drawable density, avoiding a draw call per letter. CJK fonts open
 only when needed; there are no glyph bitmap atlases or full-font mesh exports.
 
-The window requests 4× MSAA, with 2×/single-sample fallbacks if EGL rejects a configuration.
-Multisampled text draws intact glyph fills without inward offsets/fringe triangles, which can
-cross on very thin small-text strokes. Single-sample targets use a narrower half-pixel boundary
-fringe. Glyph origins/baselines are pixel-aligned per drawable axis. There is no LCD subpixel
-rendering, font hinting or complex-script shaping. Inspect `multisample_samples` and
-`font_antialiasing`: offscreen captures can be single-sample while the actual window uses MSAA.
+Desktop windows request 4× MSAA, with 2×/single-sample fallbacks if EGL rejects a configuration;
+webOS windows are single-sample unless `LUMA_MSAA=4` asks for samples. Multisampled text draws
+intact glyph fills without inward offsets/fringe triangles, which can cross on very thin
+small-text strokes. Single-sample targets use a narrower half-pixel boundary fringe. Glyph
+origins/baselines are pixel-aligned per drawable axis. There is no LCD subpixel rendering, font
+hinting or complex-script shaping. Inspect `multisample_samples` and `font_antialiasing`:
+offscreen captures can be single-sample while the actual window uses MSAA.
 
 Glyph geometry has an 8 MiB/4096-entry CPU cache target and text runs a 32 MiB/512-entry GPU
 target. Eviction preserves the current frame, which can temporarily exceed those targets.
