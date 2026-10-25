@@ -1,6 +1,6 @@
 # Near-o7's Luma fork
 
-This fork adds **Settings → Interface → Favorite rows → One row / Two rows**.
+This fork adds **Settings → General → Favorite rows → One row / Two rows**.
 The default remains the official one-row layout, and existing favorites keep their order.
 Two rows fill six cards from left to right, followed by the second row. Further favorites
 continue horizontally in groups of twelve. Up/Down moves between rows; reordering works
