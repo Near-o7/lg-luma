@@ -500,6 +500,19 @@ fn log_home_output() {
     unsafe { sdl2::sys::SDL_LogSetAllPriority(sdl2::sys::SDL_LogPriority::SDL_LOG_PRIORITY_INFO) };
 }
 
+/// The next page to prepare while the screen is idle. Jobs wait while the scene would not
+/// contain their page (fully shown Recents replaces it), rather than preparing Recents again.
+fn next_prewarm(
+    prewarm: &mut Vec<state::Page>,
+    state: &state::State,
+    idle: bool,
+) -> Option<state::Page> {
+    if !idle || state.dirty || view::recents_replaces_page(state) {
+        return None;
+    }
+    prewarm.pop()
+}
+
 fn run() -> Result<(), String> {
     let startup = Instant::now();
     // In place of LG's Home, before parsing, so option errors are kept too.
@@ -710,6 +723,10 @@ fn run() -> Result<(), String> {
             .map_or("off", egl_damage::PartialUpdate::describe)
     );
     let mut damage_tracker = damage::Tracker::default();
+    // Pages to prepare while the screen is idle (text, logos, icons), after each inventory.
+    let mut prewarm: Vec<state::Page> = Vec::new();
+    let mut prewarm_now = false;
+    let mut last_present = Instant::now();
     let verify_damage = std::env::var("LUMA_DAMAGE_VERIFY").as_deref() == Ok("1");
     // Partial frames: verified, mismatched, worst pixels, largest difference; full frames alike.
     let mut damage_report = (0usize, 0usize, 0usize, 0u8);
@@ -866,6 +883,7 @@ fn run() -> Result<(), String> {
         while let Ok(response) = platform.receiver.try_recv() {
             match response {
                 Response::Inventory(Ok((mut inventory, warning))) => {
+                    prewarm = vec![state::Page::Settings, state::Page::Apps];
                     if std::mem::take(&mut state.reload_artwork) {
                         assets.artwork.reset();
                     } else {
@@ -1306,6 +1324,8 @@ fn run() -> Result<(), String> {
         {
             if let Some(position) = action.strip_prefix("click:") {
                 scripted_click(&sdl, &window, position)?;
+            } else if action == "prewarm" {
+                prewarm_now = true;
             } else {
                 let pending = script(&action, &mut state, &scene.controls)?;
                 running &= effects(
@@ -1435,6 +1455,7 @@ fn run() -> Result<(), String> {
                     }
                 }
                 presented += 1;
+                last_present = Instant::now();
                 if options.profile_frames.is_some() {
                     profile.record(
                         Instant::now(),
@@ -1446,6 +1467,9 @@ fn run() -> Result<(), String> {
                             render_ms: renderer.stats().cpu_submission_ms,
                             swap_ms,
                             redrawn: renderer.stats().redrawn_fraction,
+                            glyph_ms: renderer.stats().glyph_ms,
+                            vector_ms: renderer.stats().vector_load_ms,
+                            image_ms: renderer.stats().image_load_ms,
                         },
                     );
                 }
@@ -1483,6 +1507,31 @@ fn run() -> Result<(), String> {
             }
             end_registration();
         }
+        // Prepare other pages one at a time once the screen has been still for a while, so
+        // their first appearance does not pay for text layout, logo meshes and icon uploads.
+        let idle = visible
+            && (prewarm_now
+                || (!state.animating() && last_present.elapsed() > Duration::from_millis(1500)));
+        while let Some(page) = next_prewarm(&mut prewarm, &state, idle) {
+            if page != state.page {
+                let started = Instant::now();
+                let current = std::mem::replace(&mut state.page, page);
+                let hidden = view::scene_with_pill(&state, &assets, pill, pill_width, now);
+                state.page = current;
+                let (width, height) = window.drawable_size();
+                renderer.prepare(&hidden.draw, width, height);
+                if webos {
+                    eprintln!(
+                        "Luma prewarm: {page:?} in {} ms",
+                        started.elapsed().as_millis()
+                    );
+                }
+            }
+            if !prewarm_now {
+                break;
+            }
+        }
+        prewarm_now = false;
         // Block until input instead of polling at frame rate on idle screens.
         // VSync paces animation; holds, scripted checks and icons still being
         // decoded need short timed wakes.
@@ -1500,6 +1549,8 @@ fn run() -> Result<(), String> {
             || assets.artwork.pending()
         {
             8
+        } else if !prewarm.is_empty() {
+            500
         } else {
             100
         };
