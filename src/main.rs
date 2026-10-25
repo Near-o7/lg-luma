@@ -559,6 +559,10 @@ fn run() -> Result<(), String> {
         // Magic Remotes send the separate Exit key for a long Back press.
         // Claim it before video init so the compositor does not close Luma.
         sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_EXIT", "true");
+        // SDL-webOS answers tvpower's screen saver requests with `ack: !suspend_screensaver`, and
+        // SDL suspends the screen saver unless this hint allows it: LG's screen saver never
+        // started while Luma was in front. A launcher has no video to protect.
+        sdl2::hint::set("SDL_VIDEO_ALLOW_SCREENSAVER", "1");
         // In place of LG's Home executable, SDL's own registration cannot reach the bus under
         // LG's Home role; Luma registers with sam itself below (lifecycle v2).
         if platform::runs_as_lg_home() {
