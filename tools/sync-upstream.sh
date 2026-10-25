@@ -24,5 +24,5 @@ git rev-parse --verify "refs/tags/$RELEASE^{commit}" >/dev/null
 git merge --no-edit "$RELEASE"
 printf '\n%s\n' \
   'Official release merged locally. Resolve any conflicts before continuing.' \
-  'Run the documented checks, push personal/home-grid, and build it with CI workflow_dispatch.' \
+  'Run the documented checks and push personal/home-grid to run CI and build the package.' \
   'Install the new IPK only after the checks pass. The TV is never updated by this script.'

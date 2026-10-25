@@ -28,10 +28,9 @@ Then run the checks in `development.md`, commit any conflict resolutions, and pu
 
 ```sh
 git push origin personal/home-grid
-gh workflow run ci.yml --repo Near-o7/lg-luma --ref personal/home-grid
 ```
 
-The existing CI checks formatting, lint, unit tests and rendered previews, then builds
+Pushing the personal branch runs CI automatically. It checks formatting, lint, unit tests and rendered previews, then builds
 the ARM IPK. Download the `luma-release` artifact from the successful run. A manual run
 does not publish an official release. Test the package before installing it on the TV.
 
