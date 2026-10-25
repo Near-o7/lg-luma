@@ -1762,6 +1762,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 Some(Subpage::WeatherLocation) => language.t("location"),
                 Some(Subpage::Temperature) => language.t("temperature"),
                 Some(Subpage::Language) => language.t("language"),
+                Some(Subpage::TextRendering) => language.t("textRendering"),
                 None => "",
             };
             let parent_width = assets.width(label, text(20.8, 550, -0.02)) + 2.;
@@ -1889,6 +1890,16 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 .into_iter()
                 .map(|option| (option.name(), None, option == language))
                 .collect(),
+            Subpage::TextRendering => crate::text_rendering::TextRendering::ALL
+                .into_iter()
+                .map(|mode| {
+                    (
+                        language.t(mode.label_key()),
+                        Some(language.t("textRenderingRestart")),
+                        mode == state.preferences.text_rendering,
+                    )
+                })
+                .collect(),
         };
         for (index, (title, description, selected)) in options.into_iter().enumerate() {
             let h = if description.is_some() { 90.7 } else { 72. };
@@ -2007,7 +2018,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         }
         WEATHER_SECTION => weather_settings(out, state, assets),
         SYSTEM_SECTION => {
-            for (position, (index, title, icon)) in [
+            for (position, (index, title, icon, value, chevron)) in [
                 (
                     3,
                     language.t(if state.loading {
@@ -2016,8 +2027,17 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                         "refreshApps"
                     }),
                     "refresh",
+                    None,
+                    false,
                 ),
-                (5, language.t("quitApp"), "power"),
+                (
+                    7,
+                    language.t("textRendering"),
+                    "type",
+                    Some(language.t(state.preferences.text_rendering.label_key())),
+                    true,
+                ),
+                (5, language.t("quitApp"), "power", None, false),
             ]
             .into_iter()
             .enumerate()
@@ -2031,10 +2051,10 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                         rect: Rect::new(640., 164.8 + position as f32 * 84. - s, 1120., 72.),
                         title,
                         icon: Some(icon),
-                        value: None,
+                        value,
                         description: None,
                         selected: false,
-                        chevron: false,
+                        chevron,
                     },
                 );
             }

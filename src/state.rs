@@ -3,6 +3,7 @@ use crate::model::{
     App, BACKGROUNDS, CATEGORIES, INPUT_NAME_LIMIT, InputMode, Inventory, Preferences,
     clean_input_name,
 };
+use crate::text_rendering::TextRendering;
 use crate::weather::{self, Unit};
 use serde::Serialize;
 use std::time::{Duration, Instant};
@@ -121,6 +122,7 @@ pub enum Subpage {
     WeatherLocation,
     Temperature,
     Language,
+    TextRendering,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -647,6 +649,7 @@ impl State {
             Some(Subpage::WeatherLocation) => Target::WeatherLocation,
             Some(Subpage::Temperature) => Target::WeatherTemperature,
             Some(Subpage::Language) => Target::Setting(4),
+            Some(Subpage::TextRendering) => Target::Setting(7),
             None => Target::Sidebar(self.section),
         };
         self.scroll = 0.;
@@ -770,7 +773,12 @@ impl State {
             }
             if let Target::Choice(index) = self.focus {
                 let count = match self.subpage {
-                    Some(Subpage::ClockFormat | Subpage::TimeFormat | Subpage::Temperature) => 2,
+                    Some(
+                        Subpage::ClockFormat
+                        | Subpage::TimeFormat
+                        | Subpage::Temperature
+                        | Subpage::TextRendering,
+                    ) => 2,
                     Some(Subpage::Language) => Language::ALL.len(),
                     _ => 3,
                 };
@@ -839,7 +847,7 @@ impl State {
             }
             if matches!(
                 self.focus,
-                Target::Setting(0 | 1 | 4 | 6)
+                Target::Setting(0 | 1 | 4 | 6 | 7)
                     | Target::InputMode(_)
                     | Target::WeatherLocation
                     | Target::WeatherTemperature
@@ -1474,6 +1482,15 @@ impl State {
                         return vec![];
                     }
                     5 => return vec![Effect::Quit],
+                    7 => {
+                        self.subpage = Some(Subpage::TextRendering);
+                        self.focus = Target::Choice(self.preferences.text_rendering.index());
+                        self.scroll = 0.;
+                        if !self.preferences.reduced_motion {
+                            self.panel_started = Some(Instant::now());
+                        }
+                        return vec![];
+                    }
                     6 => {
                         self.subpage = Some(Subpage::Greeting);
                         self.focus = Target::GreetingName;
@@ -1535,6 +1552,13 @@ impl State {
                         self.preferences.language =
                             Language::ALL[index.min(Language::ALL.len() - 1)];
                         self.weather.cancel_search();
+                    }
+                    Some(Subpage::TextRendering) => {
+                        let mode = TextRendering::ALL[index.min(TextRendering::ALL.len() - 1)];
+                        if mode != self.preferences.text_rendering {
+                            self.preferences.text_rendering = mode;
+                            self.notify(self.preferences.language.t("textRenderingRestart"));
+                        }
                     }
                     Some(
                         Subpage::WeatherLocation
