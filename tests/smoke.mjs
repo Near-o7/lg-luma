@@ -334,6 +334,32 @@ try {
     'settings,down,enter,down,down,down,down,down,enter,up,enter,home',
   );
   assert.equal(oneRowAgain.preferences.home_rows, 1);
+  const shadeBrightness = [];
+  for (const home_shading of [0, 50, 100]) {
+    await fs.writeFile(
+      preferences,
+      JSON.stringify({ favorites: edgeFavorites, home_rows: 2, show_weather: false, home_shading }),
+    );
+    const shaded = await scenario(`home-shading-${home_shading}`, 'home');
+    assert.equal(shaded.preferences.home_shading, home_shading);
+    const region = await sharp(path.join(out, `home-shading-${home_shading}.png`))
+      .extract({ left: 1400, top: 300, width: 300, height: 180 })
+      .stats();
+    shadeBrightness.push(
+      region.channels.slice(0, 3).reduce((sum, channel) => sum + channel.mean, 0),
+    );
+  }
+  assert.ok(shadeBrightness[0] > shadeBrightness[1] + 5);
+  assert.ok(shadeBrightness[1] > shadeBrightness[2] + 5);
+  const shadingEditor = 'settings,down,enter,down,down,down,down,down,down,enter';
+  const shadingSetting = await scenario('home-shading-setting', shadingEditor);
+  assert.equal(shadingSetting.subpage, 'HomeShading');
+  assert.ok(shadingSetting.ui_text.includes('Wallpaper shading'));
+  assert.ok(shadingSetting.ui_text.includes('Off'));
+  assert.ok(shadingSetting.ui_text.includes('100%'));
+  const halfShading = await scenario('home-shading-saved', `${shadingEditor},up,up,enter,home`);
+  assert.equal(halfShading.preferences.home_shading, 50);
+  assert.equal(halfShading.preferences.home_rows, 2);
   console.log(
     'Native smoke checks passed: rendering/alpha, navigation, persistence, SDL pointer input, DPI-aware glyphs, 4K capture and presentation profiling.',
   );

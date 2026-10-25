@@ -1791,5 +1791,16 @@
     "ru": "Два ряда",
     "pl": "Dwa wiersze",
     "fr": "Deux rangées"
+  },
+  "homeShading": {
+    "en": "Wallpaper shading",
+    "de": "Hintergrundabdunklung",
+    "es": "Sombreado del fondo",
+    "zh": "壁纸遮罩",
+    "pt": "Sombreamento do fundo",
+    "it": "Ombreggiatura sfondo",
+    "ru": "Затемнение обоев",
+    "pl": "Przyciemnienie tła",
+    "fr": "Assombrissement du fond"
   }
 }

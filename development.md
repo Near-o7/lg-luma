@@ -105,6 +105,10 @@ General has an **App names** subpage with independent **Show on Home** and **Sho
 Home captions default to off and Apps captions default to on, stored independently in `show_home_names`
 and `show_app_names`. The legacy `show_names` preference does not override these defaults. Hidden
 captions do not reserve layout space.
+This fork's General → Wallpaper shading setting stores `home_shading` as 0–100 (default 100).
+Home blends matching plain and originally shaded wallpaper crops. The endpoints draw a
+single image, preserving the original asset at 100%; intermediate levels and wallpaper
+crossfades preserve total opacity. Other pages and static launch splashes are unchanged.
 The **Greeting** subpage contains **Name** and **Clear name**. Selecting Name opens the text keyboard
 (the system keyboard on the TV) and the name is appended to the Home greeting ("Good evening, Ana.").
 The keyboard starts empty; closing it without a name preserves the saved value. Clear name removes

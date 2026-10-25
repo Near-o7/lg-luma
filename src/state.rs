@@ -115,6 +115,7 @@ pub enum Overlay {
 pub enum Subpage {
     AppNames,
     HomeRows,
+    HomeShading,
     Greeting,
     Clock,
     ClockFormat,
@@ -686,6 +687,7 @@ impl State {
         self.focus = match self.subpage.take() {
             Some(Subpage::AppNames) => Target::Setting(0),
             Some(Subpage::HomeRows) => Target::Setting(7),
+            Some(Subpage::HomeShading) => Target::Setting(8),
             Some(Subpage::Greeting) => Target::Setting(6),
             Some(Subpage::Clock) => Target::Setting(1),
             Some(Subpage::ClockFormat) => {
@@ -845,6 +847,7 @@ impl State {
                         | Subpage::HomeRows,
                     ) => 2,
                     Some(Subpage::Language) => Language::ALL.len(),
+                    Some(Subpage::HomeShading) => 5,
                     _ => 3,
                 };
                 match direction {
@@ -912,7 +915,7 @@ impl State {
             }
             if matches!(
                 self.focus,
-                Target::Setting(0 | 1 | 4 | 6 | 7)
+                Target::Setting(0 | 1 | 4 | 6 | 7 | 8)
                     | Target::InputMode(_)
                     | Target::WeatherLocation
                     | Target::WeatherTemperature
@@ -1562,6 +1565,14 @@ impl State {
                         self.scroll = 0.;
                         return vec![];
                     }
+                    8 => {
+                        self.subpage = Some(Subpage::HomeShading);
+                        self.focus = Target::Choice(
+                            usize::from(self.preferences.home_shading.min(100)) / 25,
+                        );
+                        self.scroll = 0.;
+                        return vec![];
+                    }
                     _ => return vec![Effect::Reload],
                 }
                 return vec![Effect::Save];
@@ -1595,6 +1606,9 @@ impl State {
             }
             Target::Choice(index) => {
                 match self.subpage.clone() {
+                    Some(Subpage::HomeShading) => {
+                        self.preferences.home_shading = (index.min(4) * 25) as u8;
+                    }
                     Some(Subpage::HomeRows) => {
                         self.preferences.home_rows = if index == 1 { 2 } else { 1 };
                         self.home_scroll = 0.;

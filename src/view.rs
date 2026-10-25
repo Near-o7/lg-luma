@@ -276,6 +276,40 @@ pub fn recents_replaces_page(state: &State) -> bool {
     state.recents_open() && state.recents.visibility == 1.
 }
 
+fn wallpaper(out: &mut Scene, state: &State, assets: &Assets, id: &str, alpha: f32) {
+    let shading = if state.page == Page::Home {
+        f32::from(state.preferences.home_shading.min(100)) / 100.
+    } else {
+        1.
+    };
+    let shaded_alpha = alpha * shading;
+    // Give the two images together exactly `alpha` coverage during a wallpaper
+    // crossfade, rather than fading each independently and darkening the transition.
+    let plain_alpha = if shaded_alpha < 1. {
+        (alpha - shaded_alpha) / (1. - shaded_alpha)
+    } else {
+        0.
+    };
+    for (suffix, opacity) in [("-plain", plain_alpha), ("", shaded_alpha)] {
+        if opacity <= 0. {
+            continue;
+        }
+        let path = assets.path(format!("wallpapers/{id}{suffix}.jpg"));
+        let screen = Rect::new(0., 0., 1920., 1080.);
+        if opacity >= 1. {
+            out.image(path, screen, 0., false);
+        } else {
+            out.draw.push(Draw::TintedImage(
+                path,
+                screen,
+                0.,
+                false,
+                [1., 1., 1., opacity],
+            ));
+        }
+    }
+}
+
 pub fn scene_with_pill(
     state: &State,
     assets: &Assets,
@@ -285,27 +319,17 @@ pub fn scene_with_pill(
 ) -> Scene {
     let mut out = Scene::new();
     if let Some((previous, start)) = &state.previous_background {
-        out.image(
-            assets.path(format!("wallpapers/{previous}.jpg")),
-            Rect::new(0., 0., 1920., 1080.),
-            0.,
-            false,
-        );
+        wallpaper(&mut out, state, assets, previous, 1.);
         let alpha = (start.elapsed().as_secs_f32() / 0.4).min(1.);
-        out.draw.push(Draw::TintedImage(
-            assets.path(format!("wallpapers/{}.jpg", state.preferences.background)),
-            Rect::new(0., 0., 1920., 1080.),
-            0.,
-            false,
-            [1., 1., 1., alpha],
-        ));
-    } else {
-        out.image(
-            assets.path(format!("wallpapers/{}.jpg", state.preferences.background)),
-            Rect::new(0., 0., 1920., 1080.),
-            0.,
-            false,
+        wallpaper(
+            &mut out,
+            state,
+            assets,
+            &state.preferences.background,
+            alpha,
         );
+    } else {
+        wallpaper(&mut out, state, assets, &state.preferences.background, 1.);
     }
     let content_start = out.draw.len();
     if recents_replaces_page(state) {
@@ -1722,6 +1746,11 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
 
 fn settings(out: &mut Scene, state: &State, assets: &Assets) {
     let language = state.preferences.language;
+    let shading_value = if state.preferences.home_shading == 0 {
+        language.t("stateOff").to_owned()
+    } else {
+        format!("{}%", state.preferences.home_shading.min(100))
+    };
     let s = state.scroll;
     for (index, key) in ["interface", "background", "weather", "inputs", "system"]
         .into_iter()
@@ -1755,6 +1784,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             let sub = match &state.subpage {
                 Some(Subpage::AppNames) => language.t("appNames"),
                 Some(Subpage::HomeRows) => language.t("homeRows"),
+                Some(Subpage::HomeShading) => language.t("homeShading"),
                 Some(Subpage::Greeting) => language.t("greeting"),
                 Some(Subpage::Clock) => language.t("clock"),
                 Some(Subpage::ClockFormat | Subpage::TimeFormat) => clock_path.as_deref().unwrap(),
@@ -1844,6 +1874,17 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             return;
         }
         let options: Vec<(&str, Option<&str>, bool)> = match subpage {
+            Subpage::HomeShading => vec![
+                (
+                    language.t("stateOff"),
+                    None,
+                    state.preferences.home_shading == 0,
+                ),
+                ("25%", None, state.preferences.home_shading == 25),
+                ("50%", None, state.preferences.home_shading == 50),
+                ("75%", None, state.preferences.home_shading == 75),
+                ("100%", None, state.preferences.home_shading == 100),
+            ],
             Subpage::HomeRows => vec![
                 (language.t("oneRow"), None, state.home_rows() == 1),
                 (language.t("twoRows"), None, state.home_rows() == 2),
@@ -1964,6 +2005,13 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     } else {
                         "oneRow"
                     })),
+                    true,
+                ),
+                (
+                    8,
+                    "homeShading",
+                    "weather-sun",
+                    Some(shading_value.as_str()),
                     true,
                 ),
             ]
