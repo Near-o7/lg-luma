@@ -19,6 +19,15 @@ git switch personal/home-grid
 sh tools/sync-upstream.sh
 ```
 
+For a fresh checkout, clone this fork and add the official remote first:
+
+```sh
+git clone https://github.com/Near-o7/lg-luma.git
+cd lg-luma
+git remote add upstream https://github.com/ecklf/lg-luma.git
+git switch personal/home-grid
+```
+
 Pass a tag to select a specific release, for example `sh tools/sync-upstream.sh v2.8.5`.
 The script requires a clean working tree, updates the fork's `main` without force, fetches
 the official history and merges the release into the personal branch. If Git reports
@@ -33,6 +42,7 @@ git push origin personal/home-grid
 Pushing the personal branch runs CI automatically. It checks formatting, lint, unit tests and rendered previews, then builds
 the ARM IPK. Download the `luma-release` artifact from the successful run. A manual run
 does not publish an official release. Test the package before installing it on the TV.
+The upstream PR/comment and release-PR workflows are disabled on this fork; CI remains enabled.
 
 Fork synchronization does not update an installed TV app. Installing an official IPK
 would replace the customized executable and remove this layout option; use a package
