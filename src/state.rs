@@ -21,6 +21,7 @@ pub const HOME_STRIP_LEFT: f32 = 84.;
 pub const HOME_STRIP_RIGHT: f32 = 1748.;
 pub const HOME_TILE_WIDTH: f32 = 256.;
 pub const HOME_TILE_PITCH: f32 = 281.6;
+pub const HOME_COLUMNS: usize = 6;
 pub const HOME_FADE_LEFT: f32 = 8.;
 pub const HOME_FADE_RIGHT: f32 = 1910.;
 
@@ -113,6 +114,7 @@ pub enum Overlay {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Subpage {
     AppNames,
+    HomeRows,
     Greeting,
     Clock,
     ClockFormat,
@@ -361,6 +363,47 @@ impl State {
         Rect::new(64., 108.8, 1792., bottom - 108.8)
     }
 
+    pub fn home_rows(&self) -> usize {
+        usize::from(self.preferences.home_rows.clamp(1, 2))
+    }
+
+    /// Saved order fills each six-column page from left to right, then its second row.
+    pub fn home_position(&self, index: usize) -> (usize, usize) {
+        let rows = self.home_rows();
+        let page_size = HOME_COLUMNS * rows;
+        (
+            index / page_size * HOME_COLUMNS + index % HOME_COLUMNS,
+            index % page_size / HOME_COLUMNS,
+        )
+    }
+
+    fn home_index(&self, column: usize, row: usize) -> usize {
+        column / HOME_COLUMNS * HOME_COLUMNS * self.home_rows()
+            + row * HOME_COLUMNS
+            + column % HOME_COLUMNS
+    }
+
+    fn home_neighbor(&self, index: usize, count: usize, direction: Direction) -> Option<usize> {
+        let (column, row) = self.home_position(index);
+        let (column, row) = match direction {
+            Direction::Left => (column.checked_sub(1)?, row),
+            Direction::Right => (column + 1, row),
+            Direction::Up => (column, row.checked_sub(1)?),
+            Direction::Down if row + 1 < self.home_rows() => (column, row + 1),
+            Direction::Down => return None,
+        };
+        let next = self.home_index(column, row);
+        if next < count {
+            Some(next)
+        } else if matches!(direction, Direction::Up | Direction::Down)
+            && self.home_index(column / HOME_COLUMNS * HOME_COLUMNS, row) < count
+        {
+            Some(count - 1)
+        } else {
+            None
+        }
+    }
+
     pub fn favorites_viewport(&self) -> Rect {
         let content = self.content_viewport();
         let left = if self.home_scroll > 0. {
@@ -429,10 +472,16 @@ impl State {
                     && self.inventory.apps.iter().any(|app| &app.id == *id)
             })
             .count();
-        let content = if count == 0 {
+        let columns = if self.home_rows() == 1 {
+            count
+        } else {
+            count / (HOME_COLUMNS * 2) * HOME_COLUMNS
+                + (count % (HOME_COLUMNS * 2)).min(HOME_COLUMNS)
+        };
+        let content = if columns == 0 {
             0.
         } else {
-            (count - 1) as f32 * HOME_TILE_PITCH + HOME_TILE_WIDTH
+            (columns - 1) as f32 * HOME_TILE_PITCH + HOME_TILE_WIDTH
         };
         let max = (content - (HOME_STRIP_RIGHT - HOME_STRIP_LEFT)).max(0.);
         let next = (self.home_scroll + delta).clamp(0., max);
@@ -496,7 +545,10 @@ impl State {
         match self.page {
             Page::Home => self
                 .apps()
-                .get(((self.home_scroll - 0.01).max(0.) / HOME_TILE_PITCH).ceil() as usize)
+                .get(self.home_index(
+                    ((self.home_scroll - 0.01).max(0.) / HOME_TILE_PITCH).ceil() as usize,
+                    0,
+                ))
                 .map(|app| Target::App(app.id.clone()))
                 .unwrap_or(if self.error.is_some() {
                     Target::Retry
@@ -633,6 +685,7 @@ impl State {
         self.pointer = false;
         self.focus = match self.subpage.take() {
             Some(Subpage::AppNames) => Target::Setting(0),
+            Some(Subpage::HomeRows) => Target::Setting(7),
             Some(Subpage::Greeting) => Target::Setting(6),
             Some(Subpage::Clock) => Target::Setting(1),
             Some(Subpage::ClockFormat) => {
@@ -675,10 +728,15 @@ impl State {
                 })
                 .collect();
             if let Some(index) = slots.iter().position(|slot| ids[*slot] == id) {
-                let next = match direction {
-                    Direction::Left => index.saturating_sub(1),
-                    Direction::Right => (index + 1).min(slots.len() - 1),
-                    _ => index,
+                let next = if self.home_rows() == 2 {
+                    self.home_neighbor(index, slots.len(), direction)
+                        .unwrap_or(index)
+                } else {
+                    match direction {
+                        Direction::Left => index.saturating_sub(1),
+                        Direction::Right => (index + 1).min(slots.len() - 1),
+                        _ => index,
+                    }
                 };
                 if next != index {
                     ids.swap(slots[index], slots[next]);
@@ -695,6 +753,16 @@ impl State {
             {
                 let apps = self.apps();
                 if let Some(index) = apps.iter().position(|app| &app.id == id) {
+                    if self.home_rows() == 2 {
+                        if let Some(next) = self.home_neighbor(index, apps.len(), direction) {
+                            let id = apps[next].id.clone();
+                            self.focus(Target::App(id), controls);
+                            return vec![];
+                        }
+                        if matches!(direction, Direction::Left | Direction::Right) {
+                            return vec![];
+                        }
+                    }
                     match direction {
                         Direction::Left | Direction::Right => {
                             let next = if matches!(direction, Direction::Left) {
@@ -770,7 +838,12 @@ impl State {
             }
             if let Target::Choice(index) = self.focus {
                 let count = match self.subpage {
-                    Some(Subpage::ClockFormat | Subpage::TimeFormat | Subpage::Temperature) => 2,
+                    Some(
+                        Subpage::ClockFormat
+                        | Subpage::TimeFormat
+                        | Subpage::Temperature
+                        | Subpage::HomeRows,
+                    ) => 2,
                     Some(Subpage::Language) => Language::ALL.len(),
                     _ => 3,
                 };
@@ -839,7 +912,7 @@ impl State {
             }
             if matches!(
                 self.focus,
-                Target::Setting(0 | 1 | 4 | 6)
+                Target::Setting(0 | 1 | 4 | 6 | 7)
                     | Target::InputMode(_)
                     | Target::WeatherLocation
                     | Target::WeatherTemperature
@@ -1483,6 +1556,12 @@ impl State {
                         }
                         return vec![];
                     }
+                    7 => {
+                        self.subpage = Some(Subpage::HomeRows);
+                        self.focus = Target::Choice(self.home_rows() - 1);
+                        self.scroll = 0.;
+                        return vec![];
+                    }
                     _ => return vec![Effect::Reload],
                 }
                 return vec![Effect::Save];
@@ -1516,6 +1595,11 @@ impl State {
             }
             Target::Choice(index) => {
                 match self.subpage.clone() {
+                    Some(Subpage::HomeRows) => {
+                        self.preferences.home_rows = if index == 1 { 2 } else { 1 };
+                        self.home_scroll = 0.;
+                        self.scroll = 0.;
+                    }
                     Some(Subpage::ClockFormat) => self.preferences.hour_24 = index == 1,
                     Some(Subpage::TimeFormat) => self.preferences.show_seconds = index == 1,
                     Some(Subpage::Input(id)) => {

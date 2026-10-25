@@ -10,6 +10,9 @@ use std::{collections::BTreeMap, path::PathBuf};
 #[path = "recents-tests.rs"]
 mod recent_tests;
 
+#[path = "home-rows-tests.rs"]
+mod home_rows_tests;
+
 fn ready() -> State {
     let mut state = State::new(Preferences::default());
     state.set_inventory(demo_inventory(), None);

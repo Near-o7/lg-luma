@@ -112,7 +112,11 @@ it. Preferences are saved when the keyboard closes, including automatic system-k
 Back from either subpage restores its General row. Input name removal also uses **Clear name**.
 Choice checkmarks identify saved values, while the bright row fill identifies only the current focus.
 
-Home favorites form one horizontal strip, never a second row. Left/Right follows saved order,
+Home favorites default to one horizontal strip. This fork adds Interface → Favorite rows,
+with an optional two-row layout that fills six-column pages in saved order. Up/Down moves
+between rows, including reorder mode; the last row leads to inputs. Additional pages scroll
+horizontally. See `FORK.md` for updating this patch from official stable releases.
+In the default single row, Left/Right follows saved order,
 including reorder mode, and reveals complete cards. Up returns to Home navigation; Down enters
 the nearest input in the first row. The strip position survives page changes. Wheel movement over
 favorites scrolls horizontally; elsewhere it scrolls vertically. Pointer hover/down never moves

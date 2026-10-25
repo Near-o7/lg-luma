@@ -95,6 +95,8 @@ pub struct Preferences {
     pub hidden: Vec<String>,
     pub background: String,
     pub show_home_names: bool,
+    /// One horizontal strip, or two rows with six favorites per row before scrolling.
+    pub home_rows: u8,
     pub show_app_names: bool,
     pub hour_24: bool,
     pub reduced_motion: bool,
@@ -121,6 +123,7 @@ impl Default for Preferences {
             hidden: vec![],
             background: "dunes".into(),
             show_home_names: false,
+            home_rows: 1,
             show_app_names: true,
             hour_24: false,
             reduced_motion: false,
@@ -195,6 +198,7 @@ impl Preferences {
     }
 
     pub fn sanitize(&mut self) {
+        self.home_rows = self.home_rows.clamp(1, 2);
         if !BACKGROUNDS.iter().any(|(id, _)| *id == self.background) {
             self.background = "dunes".into();
         }

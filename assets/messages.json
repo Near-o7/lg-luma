@@ -1758,5 +1758,38 @@
     "ru": "Тестовая карточка для прокрутки; приложение не запускается.",
     "pl": "Karta testowa do przewijania; brak aplikacji do uruchomienia.",
     "fr": "Carte de test pour le défilement ; aucune application à lancer."
+  },
+  "homeRows": {
+    "en": "Favorite rows",
+    "de": "Favoritenzeilen",
+    "es": "Filas de favoritos",
+    "zh": "收藏行数",
+    "pt": "Linhas de favoritos",
+    "it": "Righe dei preferiti",
+    "ru": "Ряды избранного",
+    "pl": "Wiersze ulubionych",
+    "fr": "Rangées de favoris"
+  },
+  "oneRow": {
+    "en": "One row",
+    "de": "Eine Zeile",
+    "es": "Una fila",
+    "zh": "一行",
+    "pt": "Uma linha",
+    "it": "Una riga",
+    "ru": "Один ряд",
+    "pl": "Jeden wiersz",
+    "fr": "Une rangée"
+  },
+  "twoRows": {
+    "en": "Two rows",
+    "de": "Zwei Zeilen",
+    "es": "Dos filas",
+    "zh": "两行",
+    "pt": "Duas linhas",
+    "it": "Due righe",
+    "ru": "Два ряда",
+    "pl": "Dwa wiersze",
+    "fr": "Deux rangées"
   }
 }

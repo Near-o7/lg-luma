@@ -855,6 +855,9 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     }
     let apps = state.apps();
     let names = state.preferences.show_home_names;
+    let rows = state
+        .home_rows()
+        .min(apps.len().div_ceil(crate::state::HOME_COLUMNS).max(1));
     let mut grid_height = FACE_HEIGHT;
     if state.loading && state.inventory.apps.is_empty() {
         for index in 0..6 {
@@ -904,6 +907,8 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
                 0.
             };
     }
+    let row_pitch = grid_height + 24.;
+    grid_height = grid_height * rows as f32 + 24. * (rows - 1) as f32;
     // Like Apple TV's rows, the favourites run to the screen edge: the next tile shows cut off
     // at the right (and a scrolled-away one at the left), so it is clear the row continues.
     out.draw.push(Draw::Clip(Some(state.favorites_viewport())));
@@ -921,14 +926,15 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         HOME_FADE_RIGHT,
     ])));
     for (index, app) in apps.iter().enumerate() {
+        let (column, row) = state.home_position(index);
         tile(
             out,
             state,
             assets,
             app,
             Rect::new(
-                84. + index as f32 * HOME_TILE_PITCH - state.home_scroll,
-                544.8 - s,
+                84. + column as f32 * HOME_TILE_PITCH - state.home_scroll,
+                544.8 + row as f32 * row_pitch - s,
                 HOME_TILE_WIDTH,
                 FACE_HEIGHT,
             ),
@@ -1748,6 +1754,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             };
             let sub = match &state.subpage {
                 Some(Subpage::AppNames) => language.t("appNames"),
+                Some(Subpage::HomeRows) => language.t("homeRows"),
                 Some(Subpage::Greeting) => language.t("greeting"),
                 Some(Subpage::Clock) => language.t("clock"),
                 Some(Subpage::ClockFormat | Subpage::TimeFormat) => clock_path.as_deref().unwrap(),
@@ -1837,6 +1844,10 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             return;
         }
         let options: Vec<(&str, Option<&str>, bool)> = match subpage {
+            Subpage::HomeRows => vec![
+                (language.t("oneRow"), None, state.home_rows() == 1),
+                (language.t("twoRows"), None, state.home_rows() == 2),
+            ],
             Subpage::ClockFormat => vec![
                 (language.t("hour12"), None, !state.preferences.hour_24),
                 (language.t("hour24"), None, state.preferences.hour_24),
@@ -1942,6 +1953,17 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     } else {
                         state.preferences.greeting_name.as_str()
                     }),
+                    true,
+                ),
+                (
+                    7,
+                    "homeRows",
+                    "grid",
+                    Some(language.t(if state.home_rows() == 2 {
+                        "twoRows"
+                    } else {
+                        "oneRow"
+                    })),
                     true,
                 ),
             ]

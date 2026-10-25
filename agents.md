@@ -58,7 +58,8 @@ native process, not `luna-send-pub -a` impersonation. Inventory failure must nev
 data on TV. Explicit `--test-extra-apps` is a labeled manual preview applied only after successful
 inventory reads, with separate preferences and no placeholder launch requests.
 
-Pointer hover/down must not move a clicked control. Home favorites use one horizontal strip;
+Pointer hover/down must not move a clicked control. Home favorites default to one horizontal strip;
+this fork optionally uses two rows, filling six-column pages in saved order.
 remote focus/reordering reveals the whole selected card. Apps Up/Down follows six-column grid
 indices, including offscreen rows, so headers cannot steal mid-grid navigation. Back restores
 setting subpage parents and supports SDL-webOS Back. OK finishes move mode without launching.
