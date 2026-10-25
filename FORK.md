@@ -9,8 +9,8 @@ with the same arrows. Inputs remain below the favorites and can be reached with 
 **Settings → General → Wallpaper shading** controls Home's wallpaper treatment:
 Off, 25%, 50%, 75%, or the original 100%. Existing preferences default to 100%.
 Off shows the matching unshaded wallpaper crop; intermediate levels blend it with the
-original shaded asset. Apps, Settings, modal dimming, and static launch splashes keep
-their existing appearance. The two-row favorites setting remains independent.
+original shaded asset. Apps, Settings, and static launch splashes keep their existing
+wallpapers; modal dimming retains its original opacity. The two-row favorites setting remains independent.
 
 ## Branches and updates
 
