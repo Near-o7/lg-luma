@@ -1,5 +1,12 @@
 # lg-luma
 
+## 2.8.5
+
+### Patch Changes
+
+- b1dcbcf: Let LG's screen saver start while Luma is in front. SDL-webOS answers the TV's screen saver requests on Luma's behalf and declined them, because SDL suspends the screen saver unless `SDL_VIDEO_ALLOW_SCREENSAVER` allows it.
+- e353196: Add Polish (`pl`) translation: full `messages.json` catalog, locale registration in `i18n.rs` (language list, display name, and localized date formatting with genitive month names), and Latin Extended-A glyphs in the bundled Inter font so Polish letters such as ą, ę, ł, ś and ż no longer fall back to the CJK font.
+
 ## 2.8.4
 
 ### Patch Changes
