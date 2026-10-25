@@ -1,4 +1,4 @@
-//! Bundled English, German, Spanish, Chinese, Brazilian Portuguese, Italian and Russian message catalog.
+//! Bundled English, German, Spanish, Chinese, Brazilian Portuguese, Italian, Russian and Polish message catalog.
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{collections::BTreeMap, sync::OnceLock};
 use time::OffsetDateTime;
@@ -23,9 +23,10 @@ pub enum Language {
     Pt,
     It,
     Ru,
+    Pl,
 }
 impl Language {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::En,
         Self::De,
         Self::Zh,
@@ -33,6 +34,7 @@ impl Language {
         Self::Pt,
         Self::It,
         Self::Ru,
+        Self::Pl,
     ];
     pub fn code(self) -> &'static str {
         match self {
@@ -43,6 +45,7 @@ impl Language {
             Self::Pt => "pt",
             Self::It => "it",
             Self::Ru => "ru",
+            Self::Pl => "pl",
         }
     }
     pub fn name(self) -> &'static str {
@@ -54,6 +57,7 @@ impl Language {
             Self::Pt => "Português (Brasil)",
             Self::It => "Italiano",
             Self::Ru => "Русский",
+            Self::Pl => "Polski",
         }
     }
     pub fn index(self) -> usize {
@@ -65,6 +69,7 @@ impl Language {
             Self::Pt => 4,
             Self::It => 5,
             Self::Ru => 6,
+            Self::Pl => 7,
         }
     }
     pub fn t(self, key: &str) -> &str {
@@ -290,6 +295,34 @@ impl Language {
                 ][month]
             )
             .to_uppercase(),
+            Self::Pl => format!(
+                "{}, {} {}",
+                [
+                    "poniedziałek",
+                    "wtorek",
+                    "środa",
+                    "czwartek",
+                    "piątek",
+                    "sobota",
+                    "niedziela"
+                ][weekday],
+                now.day(),
+                [
+                    "stycznia",
+                    "lutego",
+                    "marca",
+                    "kwietnia",
+                    "maja",
+                    "czerwca",
+                    "lipca",
+                    "sierpnia",
+                    "września",
+                    "października",
+                    "listopada",
+                    "grudnia"
+                ][month]
+            )
+            .to_uppercase(),
         }
     }
     pub fn clock(self, now: OffsetDateTime, hour24: bool, seconds: bool) -> String {
@@ -341,6 +374,7 @@ pub fn deserialize_language<'de, D: Deserializer<'de>>(
             Some("pt") => Language::Pt,
             Some("it") => Language::It,
             Some("ru") => Language::Ru,
+            Some("pl") => Language::Pl,
             _ => Language::En,
         },
     )
@@ -410,6 +444,10 @@ mod tests {
             Language::Ru.format("favoriteAdded", &[("app", "Netflix")]),
             "Netflix: добавлено в избранное."
         );
+        assert_eq!(
+            Language::Pl.format("favoriteAdded", &[("app", "Netflix")]),
+            "Dodano Netflix do ulubionych."
+        );
         assert_eq!(Language::De.category("Gaming"), "Spiele");
         assert_eq!(Language::En.greeting(15, ""), "Good afternoon.");
         assert_eq!(Language::En.greeting(15, "  Ana "), "Good afternoon, Ana.");
@@ -429,6 +467,8 @@ mod tests {
         assert_eq!(Language::Zh.date(now), "10月21日星期三");
         assert_eq!(Language::Ru.date(now), "СРЕДА, 21 ОКТЯБРЯ");
         assert_eq!(Language::Ru.clock(now, true, false), "20:41");
+        assert_eq!(Language::Pl.date(now), "ŚRODA, 21 PAŹDZIERNIKA");
+        assert_eq!(Language::Pl.clock(now, true, false), "20:41");
         assert_eq!(Language::Zh.clock(now, false, false), "下午8:41");
         assert_eq!(Language::Zh.clock(now, false, true), "下午8:41:00");
         assert_eq!(Language::En.clock(now, true, false), "20:41");
