@@ -561,9 +561,6 @@ fn run() -> Result<(), String> {
         // Magic Remotes send the separate Exit key for a long Back press.
         // Claim it before video init so the compositor does not close Luma.
         sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_EXIT", "true");
-        // webOS 8+ routes remote meta/menu keys to the focused surface only
-        // when it opts in. Older firmware ignores this supported SDL hint.
-        sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_META", "true");
         // SDL-webOS answers tvpower's screen saver requests with `ack: !suspend_screensaver`, and
         // SDL suspends the screen saver unless this hint allows it: LG's screen saver never
         // started while Luma was in front. A launcher has no video to protect.
@@ -1167,9 +1164,7 @@ fn run() -> Result<(), String> {
                             let length = state.editing_text().len() as i32;
                             state.delete_surrounding_text(-length, length);
                         }
-                        Keycode::M | Keycode::Menu | Keycode::Application
-                            if !repeat && state.overlay.is_none() =>
-                        {
+                        Keycode::M | Keycode::Menu if !repeat && state.overlay.is_none() => {
                             press = None;
                             state.options();
                         }

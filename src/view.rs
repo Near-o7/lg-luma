@@ -2404,7 +2404,7 @@ fn keycap(out: &mut Scene, label: &str, x: f32, y: f32, w: f32, small: bool) {
 fn footer(out: &mut Scene, state: &State, assets: &Assets) {
     let language = state.preferences.language;
     let style = text(14.4, 400, 0.005);
-    if state.page == Page::Home && state.moving.is_none() {
+    if matches!(state.page, Page::Home | Page::Apps) && state.moving.is_none() {
         return;
     }
     let color = c(0xeeeeee, 0.37);
@@ -2430,7 +2430,7 @@ fn footer(out: &mut Scene, state: &State, assets: &Assets) {
         let label = language.t(if state.page == Page::Settings {
             "select"
         } else {
-            "open"
+            "options"
         });
         let second_x = 119. + assets.width(label, style) + 25.6;
         keycap(out, "OK", 84., 1030.4, 27., false);
@@ -2455,29 +2455,6 @@ fn footer(out: &mut Scene, state: &State, assets: &Assets) {
                 Rect::new(1775., 1037., 61., 16.),
                 text(12.48, 400, 0.),
                 c(0xf5f5f5, 0.56),
-                false,
-            );
-        } else {
-            out.icon(
-                assets,
-                "more",
-                Rect::new(second_x, 1032., 19.2, 19.2),
-                c(0xeeeeee, 0.26),
-            );
-            out.icon(
-                assets,
-                "settings",
-                Rect::new(second_x + 40., 1032., 19.2, 19.2),
-                c(0xeeeeee, 0.37),
-            );
-            for x in [second_x + 26.4, second_x + 66.4] {
-                out.text("|", Rect::new(x, 1033., 8., 20.), style, color, false);
-            }
-            out.text(
-                language.t("options"),
-                Rect::new(second_x + 80., 1033., 600., 20.),
-                text(14.4, 400, 0.005),
-                color,
                 false,
             );
         }
@@ -2566,7 +2543,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
         .iter()
         .any(|item| item == id);
     let deletable = crate::platform::can_uninstall(id);
-    let height = if deletable { 252.8 } else { 176. };
+    let height = if deletable { 329.6 } else { 252.8 };
     let card = anchor.unwrap_or(Rect::new(460., 380., 256., 153.6));
     let x = if card.x + card.w + 32. + 520. <= 1836. {
         card.x + card.w + 32.
@@ -2597,29 +2574,37 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     ));
     out.border(panel, 27.2, 1., c(0xffffff, 0.12));
     let hidden = state.preferences.hidden.iter().any(|item| item == id);
-    for (index, label) in [
-        if favorite {
-            language.t("removeFavorite")
-        } else {
-            language.t("addFavorite")
-        },
-        language.t(if hidden { "showApp" } else { "hideApp" }),
-        language.t("deleteApp"),
+    for (row, (target, label)) in [
+        (Target::OpenApp, language.t("open")),
+        (
+            Target::Option(0),
+            if favorite {
+                language.t("removeFavorite")
+            } else {
+                language.t("addFavorite")
+            },
+        ),
+        (
+            Target::Option(1),
+            language.t(if hidden { "showApp" } else { "hideApp" }),
+        ),
+        (Target::Option(2), language.t("deleteApp")),
     ]
     .into_iter()
-    .take(if deletable { 3 } else { 2 })
+    .take(if deletable { 4 } else { 3 })
     .enumerate()
     {
         let rect = Rect::new(
             panel.x + 16.,
-            panel.y + 16. + index as f32 * 76.8,
+            panel.y + 16. + row as f32 * 76.8,
             panel.w - 32.,
             67.2,
         );
-        let focused = state.focus == Target::Option(index);
+        let focused = state.focus == target;
+        let destructive = target == Target::Option(2);
         let label_style = text(20.8, 600, -0.02);
         let label_height = label_style.size * label_style.line_height;
-        let label_color = if index == 2 || !focused {
+        let label_color = if destructive || !focused {
             WHITE
         } else {
             c(0x242424, 1.)
@@ -2627,7 +2612,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
         out.shape(
             rect,
             12.,
-            if index == 2 {
+            if destructive {
                 c(0xd63b35, if focused { 1. } else { 0.25 })
             } else {
                 c(0xffffff, if focused { 0.96 } else { 0.10 })
@@ -2647,15 +2632,16 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
         );
         out.icon(
             assets,
-            match index {
-                0 => {
+            match &target {
+                Target::OpenApp => "arrow",
+                Target::Option(0) => {
                     if favorite {
                         "heart-filled"
                     } else {
                         "heart"
                     }
                 }
-                1 => {
+                Target::Option(1) => {
                     if hidden {
                         "eye"
                     } else {
@@ -2667,7 +2653,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
             Rect::new(rect.x + rect.w - 45.6, rect.y + 22.8, 21.6, 21.6),
             label_color,
         );
-        out.control(Target::Option(index), rect, false);
+        out.control(target, rect, false);
     }
     if let Some(opened) = state.panel_started {
         out.fade(

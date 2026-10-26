@@ -214,9 +214,68 @@ impl Platform {
                     }),
                     Request::Uninstall(id) => {
                         // Validate again at the worker boundary, not just in the UI.
-                        let result = uninstall_request(&id).and_then(|(uri, payload)| {
+                        let result = uninstall_request(&id).and_then(|(_, _)| {
                             if webos {
-                                call(uri, payload).map(|_| ())
+                                let quote =
+                                    |value: &str| format!("'{}'", value.replace('\'', "'\\''"));
+                                let command = format!(
+                                    "/usr/bin/node -e {} {}",
+                                    quote(include_str!("../tv/uninstall-app.cjs")),
+                                    quote(&id)
+                                );
+                                #[cfg(all(
+                                    feature = "webos",
+                                    target_os = "linux",
+                                    target_arch = "arm"
+                                ))]
+                                let result = crate::luna::call_with_timeout(
+                                    "luna://org.webosbrew.hbchannel.service/exec",
+                                    &json!({"command": command}),
+                                    std::time::Duration::from_secs(20),
+                                );
+                                #[cfg(not(all(
+                                    feature = "webos",
+                                    target_os = "linux",
+                                    target_arch = "arm"
+                                )))]
+                                let result = raw_call(
+                                    "luna://org.webosbrew.hbchannel.service/exec",
+                                    &json!({"command": command}),
+                                );
+                                let result = result
+                                    .and_then(checked_response)
+                                    .and_then(|envelope| command_reply(&envelope))
+                                    .map(|_| ());
+                                if let Err(error) = result {
+                                    // A lost completion reply does not imply the mutation
+                                    // failed. Reconcile against complete inventory reads,
+                                    // never by issuing the uninstall a second time.
+                                    let mut confirmed = false;
+                                    for attempt in 0..3 {
+                                        if attempt > 0 {
+                                            thread::sleep(std::time::Duration::from_millis(500));
+                                        }
+                                        let check = inventory_read(
+                                            "luna://com.webos.applicationManager/listApps",
+                                            "apps",
+                                        )
+                                        .and_then(|apps| inventory_confirms_removal(&apps, &id));
+                                        match check {
+                                            Ok(true) => {
+                                                confirmed = true;
+                                                break;
+                                            }
+                                            Ok(false) => {}
+                                            Err(read_error) => {
+                                                eprintln!("Luma uninstall inventory: {read_error}");
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if confirmed { Ok(()) } else { Err(error) }
+                                } else {
+                                    Ok(())
+                                }
                             } else {
                                 desktop_inventory.apps.retain(|app| app.id != id);
                                 desktop_recents.retain(|entry| entry.app.id != id);
@@ -321,28 +380,53 @@ pub fn uninstall_request(id: &str) -> Result<(&'static str, Value), String> {
     if !can_uninstall(id) {
         return Err("This application is protected from deletion".into());
     }
-    // Homebrew subscribes to appInstallService/dev/remove and only responds
-    // after statusValue 31 (complete), rather than treating acceptance as success.
+    // The elevated helper subscribes to normal remove and waits for status 31.
+    // Homebrew's uninstall uses dev/remove, which rejects Content Store apps.
     // Send once: an ambiguous timeout must never automatically retry a mutation.
     Ok((
-        "luna://org.webosbrew.hbchannel.service/uninstall",
-        json!({"id": id}),
+        "luna://com.webos.appInstallService/remove",
+        json!({"id": id, "subscribe": true}),
     ))
 }
 
-fn call(uri: &str, payload: Value) -> Result<Value, String> {
+/// Use the unfiltered inventory: a hidden/system app must not look uninstalled
+/// merely because it would be excluded from Luma's visible catalogue.
+pub fn inventory_confirms_removal(apps: &Value, id: &str) -> Result<bool, String> {
+    let apps = apps
+        .as_array()
+        .filter(|apps| apps.len() <= 1000)
+        .ok_or("Invalid app inventory while confirming deletion")?;
+    let mut present = false;
+    for app in apps {
+        let app_id = app
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| valid_app_id(id))
+            .ok_or("Incomplete app inventory while confirming deletion")?;
+        present |= app_id == id;
+    }
+    Ok(!present)
+}
+
+fn raw_call(uri: &str, payload: &Value) -> Result<Value, String> {
     #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
-    let response = crate::luna::call(uri, &payload);
+    let response = crate::luna::call(uri, payload);
     #[cfg(not(all(feature = "webos", target_os = "linux", target_arch = "arm")))]
     let response: Result<Value, String> = {
-        let _ = payload;
+        let _ = (uri, payload);
         Err("Native Luna services are only available in an ARM webOS build".into())
     };
-    response.and_then(checked_response).map_err(|error| {
-        let error = format!("{uri}: {error}");
-        eprintln!("Luma TV service: {error}");
-        error
-    })
+    response
+}
+
+fn call(uri: &str, payload: Value) -> Result<Value, String> {
+    raw_call(uri, &payload)
+        .and_then(checked_response)
+        .map_err(|error| {
+            let error = format!("{uri}: {error}");
+            eprintln!("Luma TV service: {error}");
+            error
+        })
 }
 
 fn checked_response(value: Value) -> Result<Value, String> {

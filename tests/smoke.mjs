@@ -129,24 +129,27 @@ try {
   assert.deepEqual(recentHomeBack.focus, { Recent: 'netflix' });
   const recentYoutube = await scenario('recents-youtube', 'recents,await-recents,right');
   assert.deepEqual(recentYoutube.focus, { Recent: 'youtube.leanback.v4' });
-  const appOptions = await scenario('app-options', 'apps,down,menu');
-  assert.deepEqual(appOptions.focus, { Option: 0 });
+  const appOptions = await scenario('app-options', 'apps,down,enter');
+  assert.deepEqual(appOptions.focus, 'OpenApp');
   assert.ok(appOptions.ui_text.includes('Delete app'));
-  const deleteFocused = await scenario('delete-focused', 'apps,down,menu,down,down');
+  const deleteFocused = await scenario('delete-focused', 'apps,down,enter,down,down,down');
   assert.deepEqual(deleteFocused.focus, { Option: 2 });
-  const deleteConfirm = await scenario('delete-confirm', 'apps,down,menu,down,down,enter');
+  const deleteConfirm = await scenario('delete-confirm', 'apps,down,enter,down,down,down,enter');
   assert.deepEqual(deleteConfirm.focus, 'CancelDelete');
   assert.ok(deleteConfirm.ui_text.some((value) => value.includes('uninstall “Netflix”')));
-  const deleteCancel = await scenario('delete-cancel', 'apps,down,menu,down,down,enter,enter');
+  const deleteCancel = await scenario(
+    'delete-cancel',
+    'apps,down,enter,down,down,down,enter,enter',
+  );
   assert.deepEqual(deleteCancel.focus, { Option: 2 });
   assert.ok(deleteCancel.apps.includes('netflix'));
-  const hidden = await scenario('apps', 'apps,down,menu,down,enter');
+  const hidden = await scenario('apps', 'apps,down,enter,down,down,enter');
   assert.ok(hidden.preferences.hidden.includes('netflix'));
   assert.deepEqual(hidden.focus, { App: 'youtube.leanback.v4' });
   // Reload from disk, find Netflix in Hidden, and restore it.
   const restored = await scenario(
     'restored',
-    'apps,down,up,right,right,right,right,enter,down,menu,down,enter',
+    'apps,down,up,right,right,right,right,enter,down,enter,down,down,enter',
   );
   assert.deepEqual(restored.preferences.hidden, []);
   const searched = await scenario('search', 'apps,type:YouTube,back');
@@ -338,12 +341,12 @@ try {
     preferences,
     JSON.stringify({ favorites: edgeFavorites, show_weather: false }),
   );
-  const edgeRight = await scenario('favorites-edge-right', 'home,click:1860:600');
+  const edgeRight = await scenario('favorites-edge-right', 'home,click:1860:600,back');
   assert.deepEqual(edgeRight.focus, { App: edgeFavorites[6] });
   assert.equal(edgeRight.home_scroll, 0, 'Clicking the fragment must not move it');
   const edgeLeft = await scenario(
     'favorites-edge-left',
-    `home,down,${Array(6).fill('right').join(',')},click:40:600`,
+    `home,down,${Array(6).fill('right').join(',')},click:40:600,back`,
   );
   assert.deepEqual(edgeLeft.focus, { App: edgeFavorites[0] });
   assert.ok(

@@ -1089,15 +1089,15 @@
     "fr": "Accueil"
   },
   "options": {
-    "en": "Hold OK for Options",
-    "de": "OK halten für Optionen",
-    "es": "Mantén OK para ver opciones",
-    "zh": "长按 OK 查看选项",
-    "pt": "Segure OK para opções",
-    "it": "Tieni premuto OK per le opzioni",
-    "ru": "Удерживайте OK для параметров",
-    "pl": "Przytrzymaj OK, aby wyświetlić opcje",
-    "fr": "Maintenez OK pour les options"
+    "en": "Options",
+    "de": "Optionen",
+    "es": "Opciones",
+    "zh": "选项",
+    "pt": "Opções",
+    "it": "Opzioni",
+    "ru": "Параметры",
+    "pl": "Opcje",
+    "fr": "Options"
   },
   "deleteApp": {
     "en": "Delete app",

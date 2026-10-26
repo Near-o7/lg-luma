@@ -63,6 +63,7 @@ pub enum Target {
     Retry,
     DismissNotice,
     Option(usize),
+    OpenApp,
     ConfirmDelete,
     CancelDelete,
     Key(usize),
@@ -1105,7 +1106,7 @@ impl State {
                 id: id.clone(),
                 restore: self.focus.clone(),
             });
-            self.focus = Target::Option(0);
+            self.focus = Target::OpenApp;
             if !self.preferences.reduced_motion {
                 self.panel_started = Some(Instant::now());
             }
@@ -1122,11 +1123,20 @@ impl State {
         if let Err(error) = result {
             eprintln!("Luma uninstall: {error}");
             self.notify(self.preferences.language.t("deleteAppError"));
-            if matches!(&self.overlay, Some(Overlay::Delete { id: current, .. }) if current == &id)
+            if matches!(&self.overlay, Some(Overlay::Delete { id: current, .. } | Overlay::Options { id: current, .. }) if current == &id)
             {
-                self.focus = Target::CancelDelete;
+                if let Some(Overlay::Delete { restore, .. } | Overlay::Options { restore, .. }) =
+                    self.overlay.take()
+                {
+                    self.focus = restore;
+                }
+                self.panel_started = None;
+                self.pressed = None;
+                self.reconcile_focus();
             }
-            return vec![];
+            // Even an uncertain/failed mutation may have changed TV inventory.
+            // Refresh is read-only, and also clears a stale card after late removal.
+            return vec![Effect::Refresh];
         }
         let old_ids: Vec<_> = self.apps().iter().map(|app| app.id.clone()).collect();
         let index = old_ids.iter().position(|item| item == &id).unwrap_or(0);
@@ -1391,8 +1401,18 @@ impl State {
             Target::DismissNotice => self.notice = None,
             Target::CloseDialog => return self.back(),
             Target::TvSettings => return vec![Effect::Launch("com.palm.app.settings".into())],
-            Target::App(id) | Target::Input(id) if !self.launching => {
+            Target::App(_) if !self.launching => self.options(),
+            Target::Input(id) if !self.launching => {
                 return vec![Effect::Launch(id)];
+            }
+            Target::OpenApp if !self.launching => {
+                if let Some(Overlay::Options { id, .. }) = &self.overlay
+                    && self.inventory.apps.iter().any(|app| &app.id == id)
+                {
+                    let id = id.clone();
+                    self.back();
+                    return vec![Effect::Launch(id)];
+                }
             }
             Target::Filter(index) => {
                 self.filter = if self.filter == index { 0 } else { index };

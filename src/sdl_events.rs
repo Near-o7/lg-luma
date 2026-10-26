@@ -16,12 +16,7 @@ pub fn decode(mut raw: sys::SDL_Event, webos: bool) -> Event {
             let scancode = std::ptr::addr_of!(raw.key.keysym.scancode)
                 .cast::<u32>()
                 .read();
-            if webos && matches!(scancode, 101 | 118) {
-                // SDL-webOS names APPLICATION "Menu". Remote Settings/More
-                // can use it instead of MENU, sometimes with no keycode.
-                raw.key.keysym.scancode = sys::SDL_Scancode::SDL_SCANCODE_MENU;
-                raw.key.keysym.sym = i32::from(Keycode::Menu);
-            } else if webos && scancode == 482 {
+            if webos && scancode == 482 {
                 raw.key.keysym.scancode = sys::SDL_Scancode::SDL_SCANCODE_AC_BACK;
                 raw.key.keysym.sym = i32::from(Keycode::AcBack);
             } else if webos && scancode == 505 {

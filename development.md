@@ -67,15 +67,6 @@ Desktop pkg-config paths are isolated from the ARM build. `WEBOS_NATIVE_LIBS` ca
 explicitly selected ARM webOS shared libraries; SDL overrides must have a real webOS/Wayland
 backend. Avoid copying the whole SDK library directory or the TV's graphics drivers/libc.
 
-Remote Settings/More support uses the same checksum-pinned SDL-webOS `.5` source with
-`tools/sdl-remote-keys.patch`, cross-built with `WEBOS_NDK`, CMake and patch. The patch maps the
-observed uinput/evdev codes 139 and 994 before SDL's Wayland keymap discards vendor keys, and
-repairs the Menu keycode for down/up/repeat events. These are not SDL scancode values. Generated
-libraries are cached under `.build/sdl-webos/remote-keys` with source/patch and output checksums.
-The native window also opts into webOS's meta-key access policy (webOS 8+). Verify physical
-Settings/More delivery on TV, including older firmware and Home takeover. Rust decoder tests
-cover normalized SDL events, not the compositor-to-SDL path.
-
 ## Controls and navigation
 
 ### Documentation screenshots
@@ -89,24 +80,27 @@ It does not execute the test suites. A desktop display is required; on headless 
 
 ### Input
 
-| Input                                 | Action                                                        |
-| ------------------------------------- | ------------------------------------------------------------- |
-| Arrows                                | Move focus, revealing remote-focused content                  |
-| OK / Enter                            | Activate on release                                           |
-| Hold OK for 600 ms                    | Reorder Home favorite or open app options                     |
-| OK or Back in move mode               | Finish reordering without launching                           |
-| Escape / Back / Backspace             | Parent navigation, overlay dismissal or Recent apps from Home |
-| Hold Back / Escape for 600 ms         | Open Recent apps while Luma is focused                        |
-| Settings / … / Menu / M / right-click | App options side popup                                        |
-| Pointer / wheel                       | Hover, click, hold and scrolling                              |
-| F5                                    | Refresh inventory                                             |
+| Input                         | Action                                                        |
+| ----------------------------- | ------------------------------------------------------------- |
+| Arrows                        | Move focus, revealing remote-focused content                  |
+| OK / Enter                    | Activate on release                                           |
+| Hold OK for 600 ms            | Reorder Home favorite or open app options                     |
+| OK or Back in move mode       | Finish reordering without launching                           |
+| Escape / Back / Backspace     | Parent navigation, overlay dismissal or Recent apps from Home |
+| Hold Back / Escape for 600 ms | Open Recent apps while Luma is focused                        |
+| Menu / M / right-click        | App options side popup                                        |
+| Pointer / wheel               | Hover, click, hold and scrolling                              |
+| F5                            | Refresh inventory                                             |
 
 Backspace deletes while editing. Native Back uses SDL's webOS-specific keycode. Back dismisses
 the keyboard first; Weather Location then returns to its parent Location row, HDMI choices to
 that HDMI row, and the Background gallery to Background in the sidebar. Back from the sidebar
 focuses the Settings tab, then returns Home. **System** in the sidebar groups **Refresh apps & inputs**
 and the vector power-icon **Quit app** action separately from General preferences.
-App options appear beside the selected card, with favorite, hide/show and **Delete app** actions.
+OK or a normal pointer click on an app opens its side popup, with **Open** first and focused by
+default, followed by favorite, hide/show and **Delete app** actions. A second OK launches the app.
+Inputs and Recent apps still launch directly. Hold OK on Home still reorders favorites.
+LG's Settings and More buttons retain their system menus, with no custom key interception.
 Deletion opens a separate confirmation with **Cancel** focused by default. Cancel or Back returns
 to the side popup. Once deletion is sent, dismissal does not cancel the platform operation.
 The popup has action icons on the far right, without a title, close button or embedded shortcut hints. The
@@ -115,10 +109,19 @@ Luma (including former app IDs and the Home identity), Homebrew Channel, test-pr
 all apps in the `com.webos.*`, `com.palm.*` and `com.lge.*` namespaces cannot be deleted. This
 conservative vendor protection includes Live TV, Web Browser, Settings and potentially removable
 LG apps, rather than relying on firmware to reject unsafe removals. The worker calls
-`org.webosbrew.hbchannel.service/uninstall` once, checks completion and refreshes inventory after
-success. Failed or timed-out requests retain the app and preferences and are not automatically
-retried. Desktop deletion changes only in-memory sample inventory. Verify Settings/More delivery
-and real deletion, denial and focus restoration manually on a TV, including Home-takeover mode.
+`org.webosbrew.hbchannel.service/exec` once to run the embedded Node 8-compatible
+`tv/uninstall-app.cjs` helper. It sends one `com.webos.appInstallService/remove` subscription with
+`{"id":"APP_ID","subscribe":true}` and waits for status 31, not the initial acceptance reply.
+The normal endpoint was manually verified removing Content Store DAZN on webOS 26, whereas
+Homebrew's `uninstall` endpoint (`dev/remove`) returned `FAILED_REMOVE` for that app. The helper
+rechecks protected IDs, bounds output to 64 KiB/64 replies, terminates luna-send after completion
+or a 15-second deadline and has a separate 20-second native transport budget. Luma refreshes inventory after
+success. After a failed or timed-out request the worker makes up to three bounded, read-only
+inventory checks. An app absent from a complete inventory confirms removal even if its completion
+reply was lost. Otherwise the error closes the popup and refreshes inventory without deleting
+preferences. Uninstall mutations are never automatically retried. Desktop deletion changes only
+in-memory sample inventory. Verify app opening, real deletion, denial and focus restoration
+manually on a TV, including Home-takeover mode.
 The **Clock** subpage contains **Clock format** (12-hour or 24-hour) and **Time format** (`HH:MM`
 or `HH:MM:SS`, defaulting to `HH:MM`). Choosing a format returns to its row in Clock, and Back
 from Clock restores its General row. With seconds shown, the header clock redraws once per second

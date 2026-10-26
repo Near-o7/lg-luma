@@ -161,27 +161,6 @@ fn native_back_and_exit_survive_an_unmapped_or_layout_dependent_keycode() {
 }
 
 #[test]
-fn native_menu_scancodes_survive_unmapped_keycodes() {
-    use sdl2::{event::Event, keyboard::Keycode};
-    for scancode in [101, 118] {
-        for down in [true, false] {
-            for keycode in [0, i32::from(Keycode::Application), i32::from(Keycode::Menu)] {
-                assert!(matches!(
-                    native_key(scancode, keycode, down),
-                    Event::KeyDown {
-                        keycode: Some(Keycode::Menu),
-                        ..
-                    } | Event::KeyUp {
-                        keycode: Some(Keycode::Menu),
-                        ..
-                    }
-                ));
-            }
-        }
-    }
-}
-
-#[test]
 fn back_dismissal_consumes_repeats_native_exit_and_release_without_quitting() {
     use sdl2::keyboard::Keycode;
     let mut state = ready();

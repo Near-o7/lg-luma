@@ -2,6 +2,8 @@
 'lg-luma': minor
 ---
 
-Open app options with the remote Settings or More button and show a side popup beside the selected app. Add app deletion with a Cancel-focused confirmation, protecting Luma, Homebrew Channel and apps in the webOS, Palm and LG system namespaces from removal.
+Open a side popup beside the selected app with a normal OK press or click, with Open first and focused by default. Add app deletion with a Cancel-focused confirmation, protecting Luma, Homebrew Channel and apps in the webOS, Palm and LG system namespaces from removal. LG's Settings and More buttons retain their system behavior.
 
-Map remote Settings and More uinput codes in the pinned SDL-webOS Wayland runtime before unmapped keys are discarded, and opt into the meta-key access policy.
+Reconcile uncertain uninstall replies with the TV's installed-app inventory and refresh after errors so completed removals do not leave stale cards in Luma.
+
+Use the normal appInstallService/remove endpoint through an elevated, completion-aware helper so Content Store apps can be removed instead of failing through Homebrew's developer-only removal path.

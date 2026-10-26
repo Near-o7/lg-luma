@@ -888,7 +888,7 @@ fn a_notice_does_not_escape_modal_focus_and_closing_restores_the_app() {
     assert!(
         controls(&state)
             .iter()
-            .all(|c| matches!(c.target, Target::Option(_) | Target::CloseDialog))
+            .all(|c| matches!(c.target, Target::OpenApp | Target::Option(_)))
     );
     state.focus = Target::Option(1);
     state.direction(Direction::Down, &controls(&state));
@@ -916,7 +916,7 @@ fn delete_confirmation_defaults_to_cancel_and_back_restores_side_popup() {
         popup_scene
             .controls
             .iter()
-            .all(|control| matches!(control.target, Target::Option(_)))
+            .all(|control| matches!(control.target, Target::OpenApp | Target::Option(_)))
     );
     assert!(!popup_scene.draw[parent_draw_count..].iter().any(|draw| matches!(draw,
         crate::renderer::Draw::Text(value, rect, ..) if popup.contains(rect.x, rect.y)
@@ -933,7 +933,7 @@ fn delete_confirmation_defaults_to_cancel_and_back_restores_side_popup() {
             _ => None,
         })
         .collect();
-    assert_eq!(action_icons.len(), 3);
+    assert_eq!(action_icons.len(), 4);
     assert!(
         action_icons
             .iter()
@@ -1081,8 +1081,8 @@ fn protected_apps_cannot_be_deleted_through_ui_or_worker() {
     assert_eq!(
         crate::platform::uninstall_request("netflix").unwrap(),
         (
-            "luna://org.webosbrew.hbchannel.service/uninstall",
-            json!({"id": "netflix"})
+            "luna://com.webos.appInstallService/remove",
+            json!({"id": "netflix", "subscribe": true})
         )
     );
     for id in [
@@ -1144,15 +1144,19 @@ fn deletion_is_single_flight_and_only_success_cleans_up_preferences() {
     assert!(state.activate().is_empty());
     assert!(state.uninstall_response("other".into(), Ok(())).is_empty());
     assert_eq!(state.uninstalling.as_deref(), Some("netflix"));
-    assert!(
-        state
-            .uninstall_response("netflix".into(), Err("denied".into()))
-            .is_empty()
+    assert_eq!(
+        state.uninstall_response("netflix".into(), Err("denied".into())),
+        vec![Effect::Refresh]
     );
     assert!(state.inventory.apps.iter().any(|a| a.id == "netflix"));
     assert!(state.preferences.hidden.contains(&"netflix".into()));
     assert_eq!(state.preferences.favorites.as_ref().unwrap().len(), 2);
-    assert_eq!(state.focus, Target::CancelDelete);
+    assert_eq!(state.focus, state.first_content());
+    assert!(state.overlay.is_none());
+    state.focus = Target::App("netflix".into());
+    state.options();
+    state.focus = Target::Option(2);
+    state.activate();
     state.focus = Target::ConfirmDelete;
     state.activate();
     assert_eq!(
@@ -1178,6 +1182,60 @@ fn deletion_completion_does_not_steal_focus_after_dismissal() {
     assert_eq!(state.page, Page::Settings);
     assert_eq!(state.focus, Target::Nav(2));
     assert!(state.overlay.is_none());
+}
+
+#[test]
+fn app_activation_opens_options_with_open_focused_and_next_ok_launches() {
+    for page in [0, 1] {
+        let mut state = ready();
+        state.open(page);
+        state.focus = Target::App("netflix".into());
+        assert!(state.activate().is_empty());
+        assert!(matches!(state.overlay, Some(Overlay::Options { .. })));
+        assert_eq!(state.focus, Target::OpenApp);
+        assert_eq!(state.activate(), vec![Effect::Launch("netflix".into())]);
+        assert!(state.overlay.is_none());
+        assert_eq!(state.focus, Target::App("netflix".into()));
+    }
+}
+
+#[test]
+fn uncertain_deletion_uses_complete_inventory_instead_of_visible_app_filtering() {
+    use crate::platform::inventory_confirms_removal;
+    assert_eq!(inventory_confirms_removal(&json!([]), "netflix"), Ok(true));
+    assert_eq!(
+        inventory_confirms_removal(&json!([{"id": "youtube.leanback.v4"}]), "netflix"),
+        Ok(true)
+    );
+    assert_eq!(
+        inventory_confirms_removal(&json!([{"id": "netflix", "visible": false}]), "netflix"),
+        Ok(false)
+    );
+    assert!(inventory_confirms_removal(&json!({}), "netflix").is_err());
+    assert!(inventory_confirms_removal(&json!([{}]), "netflix").is_err());
+}
+
+#[test]
+fn failed_deletion_refreshes_inventory_and_closes_stale_confirmation() {
+    let mut state = ready();
+    state.open(1);
+    state.focus = Target::App("netflix".into());
+    state.options();
+    state.focus = Target::Option(2);
+    state.activate();
+    state.focus = Target::ConfirmDelete;
+    state.activate();
+    assert_eq!(
+        state.uninstall_response("netflix".into(), Err("timeout".into())),
+        vec![Effect::Refresh]
+    );
+    assert!(state.overlay.is_none());
+    assert_eq!(state.focus, Target::App("netflix".into()));
+    let mut inventory = demo_inventory();
+    inventory.apps.retain(|app| app.id != "netflix");
+    state.set_inventory(inventory, None);
+    assert!(!state.apps().iter().any(|app| app.id == "netflix"));
+    assert_ne!(state.focus, Target::App("netflix".into()));
 }
 
 #[test]

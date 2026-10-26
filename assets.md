@@ -27,10 +27,7 @@
   user; the brand marks belong to Sony/Apple. Spotify/Kodi symbol treatments use the original
   native artwork. Logos identify third-party apps; Luma is unaffiliated with their owners.
 - SDL-webOS 2.30.12 (`release-2.30.12-webos.5`, standard SDL ABI), zlib license.
-  `tools/webos-runtime.mjs` records archive/library and source SHA-256. The shipped runtime is
-  rebuilt from that pinned source with Luma's `tools/sdl-remote-keys.patch` to preserve remote
-  Settings/More keys. This is a modified SDL-webOS build, not the unmodified upstream binary.
-  Notice at `assets/licenses/sdl2.txt`.
+  `tools/webos-runtime.mjs` records archive/library SHA-256. Notice at `assets/licenses/sdl2.txt`.
 
 The bundled icon/logo SVG sources are compiled into derived `.lvec` triangles with the same
 source licenses. Apple TV, Disney+, Prime Video and Das Erste retain the white display treatment.
