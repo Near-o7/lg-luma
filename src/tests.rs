@@ -1190,6 +1190,11 @@ fn app_activation_opens_options_with_open_focused_and_next_ok_launches() {
         let mut state = ready();
         state.open(page);
         state.focus = Target::App("netflix".into());
+        if page == 0 {
+            assert_eq!(state.activate(), vec![Effect::Launch("netflix".into())]);
+            assert!(state.overlay.is_none());
+            continue;
+        }
         assert!(state.activate().is_empty());
         assert!(matches!(state.overlay, Some(Overlay::Options { .. })));
         assert_eq!(state.focus, Target::OpenApp);

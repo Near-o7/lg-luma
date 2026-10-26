@@ -97,9 +97,9 @@ the keyboard first; Weather Location then returns to its parent Location row, HD
 that HDMI row, and the Background gallery to Background in the sidebar. Back from the sidebar
 focuses the Settings tab, then returns Home. **System** in the sidebar groups **Refresh apps & inputs**
 and the vector power-icon **Quit app** action separately from General preferences.
-OK or a normal pointer click on an app opens its side popup, with **Open** first and focused by
+On Apps, OK or a normal pointer click on an app opens its side popup, with **Open** first and focused by
 default, followed by favorite, hide/show and **Delete app** actions. A second OK launches the app.
-Inputs and Recent apps still launch directly. Hold OK on Home still reorders favorites.
+Home favorites, Inputs and Recent apps launch directly. Hold OK on Home still reorders favorites.
 LG's Settings and More buttons retain their system menus, with no custom key interception.
 Deletion opens a separate confirmation with **Cancel** focused by default. Cancel or Back returns
 to the side popup. Once deletion is sent, dismissal does not cancel the platform operation.

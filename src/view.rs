@@ -2842,16 +2842,18 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
 fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
     let start = out.draw.len();
     let notice = notice.trim_end_matches(['.', '。']);
-    let style = text(20.8, 550, -0.02).leading(1.5);
-    let width = (assets.width(notice, style) + 32.).clamp(0., 1856.);
-    let height = 34. + assets.lines(notice, style, width - 32.) as f32 * 31.2;
+    let style = text(20.8, 550, -0.02);
+    let width = (assets.width(notice, style).ceil() + 42.).clamp(42., 1856.);
+    let text_height =
+        assets.lines(notice, style, width - 40.) as f32 * style.size * style.line_height;
+    let height = 20. + text_height;
     let rect = Rect::new(960. - width / 2., 1080. - 51.2 - height, width, height);
     out.shadow(rect, 16., 18., 4., 0.06);
     out.shape(rect, 16., c(0x171c20, 0.72));
     out.border(rect, 16., 1., c(0xffffff, 0.07));
     out.text(
         notice,
-        Rect::new(rect.x + 16., rect.y + 17., width - 32., height - 34.),
+        Rect::new(rect.x + 20., rect.y + 10., width - 40., text_height),
         style,
         WHITE,
         true,

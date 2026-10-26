@@ -1401,8 +1401,8 @@ impl State {
             Target::DismissNotice => self.notice = None,
             Target::CloseDialog => return self.back(),
             Target::TvSettings => return vec![Effect::Launch("com.palm.app.settings".into())],
-            Target::App(_) if !self.launching => self.options(),
-            Target::Input(id) if !self.launching => {
+            Target::App(_) if self.page == Page::Apps && !self.launching => self.options(),
+            Target::App(id) | Target::Input(id) if !self.launching => {
                 return vec![Effect::Launch(id)];
             }
             Target::OpenApp if !self.launching => {
