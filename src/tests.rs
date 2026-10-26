@@ -85,7 +85,11 @@ fn widening_favorites_does_not_widen_apps_or_unclip_offscreen_rows() {
     let controls = [control];
     assert!(state.hit_test(&controls, 40., 600.).is_none());
     assert!(state.hit_test(&controls, 1860., 600.).is_none());
-    assert!(state.hit_test(&controls, 100., 1000.).is_none());
+    assert_eq!(
+        state.hit_test(&controls, 100., 1000.),
+        Some(Target::App("sample".into()))
+    );
+    assert!(state.hit_test(&controls, 100., 1080.).is_none());
     assert_eq!(
         state.hit_test(&controls, 100., 600.),
         Some(Target::App("sample".into()))
@@ -1296,6 +1300,8 @@ fn pinning_a_hidden_app_restores_it_and_leaves_hidden_when_empty() {
     state.preferences.hidden.push("org.jellyfin.webos".into());
     state.focus = Target::App("org.jellyfin.webos".into());
     state.options();
+    assert_eq!(state.focus, Target::OpenApp);
+    state.focus = Target::Option(0);
     state.activate();
     assert!(state.preferences.hidden.is_empty());
     assert_eq!(state.filter, 0);
