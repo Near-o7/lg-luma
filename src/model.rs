@@ -95,6 +95,9 @@ pub struct Preferences {
     pub hidden: Vec<String>,
     pub background: String,
     pub show_home_names: bool,
+    /// One horizontal strip, or two rows with six favorites per row before scrolling.
+    #[serde(deserialize_with = "deserialize_home_rows")]
+    pub home_rows: u8,
     pub show_app_names: bool,
     pub hour_24: bool,
     pub reduced_motion: bool,
@@ -124,6 +127,7 @@ impl Default for Preferences {
             hidden: vec![],
             background: "dunes".into(),
             show_home_names: false,
+            home_rows: 1,
             show_app_names: true,
             hour_24: false,
             reduced_motion: false,
@@ -199,6 +203,9 @@ impl Preferences {
     }
 
     pub fn sanitize(&mut self) {
+        if self.home_rows != 2 {
+            self.home_rows = 1;
+        }
         if !BACKGROUNDS.iter().any(|(id, _)| *id == self.background) {
             self.background = "dunes".into();
         }
@@ -220,6 +227,13 @@ impl Preferences {
             .take(128)
             .collect();
     }
+}
+
+fn deserialize_home_rows<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<u8, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(if value.as_u64() == Some(2) { 2 } else { 1 })
 }
 
 pub const INPUT_NAME_LIMIT: usize = 40;
