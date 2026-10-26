@@ -55,7 +55,11 @@ impl Tween {
         if !paused {
             let t = (self.elapsed.as_secs_f32() / self.duration.as_secs_f32().max(0.001)).min(1.);
             let eased = 1. - (1. - t).powi(3);
-            self.value = self.from + (self.target - self.from) * eased;
+            self.value = if t >= 1. {
+                self.target
+            } else {
+                self.from + (self.target - self.from) * eased
+            };
         }
     }
 }
@@ -324,6 +328,22 @@ mod tests {
             false,
         );
         assert_eq!(tween.value(0.), frozen);
+    }
+    #[test]
+    fn fractional_destinations_settle_exactly_after_a_large_reverse_scroll() {
+        let now = Instant::now();
+        let mut tween = Tween::default();
+        tween.snap(10000.1, now);
+        tween.sync(0.1, now, Duration::from_millis(180), false, false);
+        tween.sync(
+            0.1,
+            now + Duration::from_millis(180),
+            Duration::from_millis(180),
+            false,
+            false,
+        );
+        assert_eq!(tween.value(0.), 0.1);
+        assert!(!tween.active());
     }
     #[test]
     fn rapid_focus_changes_keep_a_bounded_fading_history() {
