@@ -134,7 +134,7 @@ fn an_active_source_is_visible_before_signal_but_a_powered_empty_dongle_stays_hi
     let inputs = normalize_inputs(&json!([
         {"appId":"com.webos.app.hdmi1","hdmiPlugIn":true,"hdmiSignalExist":false,"activate":true},
         {"appId":"com.webos.app.hdmi2","hdmiPlugIn":true,"hdmiSignalExist":false,"activate":false},
-        {"appId":"com.webos.app.hdmi3","hdmiPlugIn":true,"hdmiSignalExist":false,"activate":"true"},
+        {"appId":"com.webos.app.hdmi3","hdmiPlugIn":false,"hdmiSignalExist":false,"activate":true},
         {"appId":"com.webos.app.hdmi4","hdmiPlugIn":false,"hdmiSignalExist":true,"activate":false}
     ]))
     .unwrap();
@@ -147,7 +147,11 @@ fn an_active_source_is_visible_before_signal_but_a_powered_empty_dongle_stays_hi
         [true, false, false, true]
     );
     assert_eq!(inputs[0].active, Some(true));
-    assert_eq!(inputs[2].active, None);
+    assert_eq!(inputs[2].active, Some(true));
+    let malformed = normalize_inputs(&json!([{"appId":"com.webos.app.hdmi1","hdmiPlugIn":true,"hdmiSignalExist":false,"activate":"true"}])).unwrap();
+    assert_eq!(malformed[0].active, None);
+    assert!(!preferences.input_visible(&malformed[0]));
+    assert!(!inputs[2].awaiting_signal());
     assert_eq!(input_status(&inputs[0], false, Language::Es), "Sin señal");
     assert_eq!(input_status(&inputs[3], false, Language::Es), "Conectado");
     preferences

@@ -77,6 +77,16 @@ pub struct Input {
     pub active: Option<bool>,
 }
 
+impl Input {
+    pub fn detected(&self) -> bool {
+        self.active == Some(true) && self.connected == Some(true)
+    }
+
+    pub fn awaiting_signal(&self) -> bool {
+        self.detected() && self.signal == Some(false)
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Inventory {
     pub apps: Vec<App>,
@@ -181,9 +191,7 @@ impl Preferences {
         match self.input_modes.get(&input.id).copied().unwrap_or_default() {
             InputMode::On => true,
             InputMode::Off => false,
-            InputMode::Auto => {
-                input.active == Some(true) || input.signal.or(input.connected) == Some(true)
-            }
+            InputMode::Auto => input.detected() || input.signal.or(input.connected) == Some(true),
         }
     }
 

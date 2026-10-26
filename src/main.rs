@@ -913,11 +913,7 @@ fn run() -> Result<(), String> {
                     state.set_inventory(inventory, warning);
                     input_refresh.observe(
                         Instant::now(),
-                        state
-                            .inventory
-                            .inputs
-                            .iter()
-                            .any(|i| i.active == Some(true) && i.signal == Some(false)),
+                        state.inventory.inputs.iter().any(|i| i.awaiting_signal()),
                     );
                     // Decode every installed icon now, on the artwork worker, rather than when
                     // the Apps page first shows it: a long-running Home then opens Apps ready.
@@ -976,9 +972,7 @@ fn run() -> Result<(), String> {
                         Ok(inputs) => {
                             input_refresh.observe(
                                 Instant::now(),
-                                inputs
-                                    .iter()
-                                    .any(|i| i.active == Some(true) && i.signal == Some(false)),
+                                inputs.iter().any(|i| i.awaiting_signal()),
                             );
                             if state.set_inputs(inputs) {
                                 eprintln!("Luma HDMI status: {:?}", state.inventory.inputs);

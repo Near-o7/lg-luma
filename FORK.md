@@ -13,7 +13,7 @@ original shaded asset. Apps, Settings, and static launch splashes keep their exi
 wallpapers; modal dimming retains its original opacity. The two-row favorites setting remains independent.
 
 Root Home listens for EIM input notifications and immediately requests a fresh snapshot.
-Auto visibility accepts a detected active source before HDMI signal negotiation completes;
+Auto visibility accepts an active source with a cable present before signal negotiation completes;
 it still displays **No signal** until a real signal is reported. A powered empty dongle
 stays hidden. Forced On/Off preferences retain their behavior. Legacy firmware falls back
 to its existing signal/cable reports.
