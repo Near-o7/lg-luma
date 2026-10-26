@@ -267,7 +267,7 @@ impl State {
             },
             reduced: self.preferences.reduced_motion,
             blocked,
-            held: self.pressed.is_some() || self.moving.is_some(),
+            held: self.pressed.is_some(),
         };
         self.motion.sync(frame, now);
         self.dirty |= self.motion.animating();

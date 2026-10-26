@@ -148,7 +148,8 @@ and `Scene.layout_controls` update immediately for remote routing and reveal cal
 `Scene.controls` follows displayed geometry for pointer hits. Scroll eases for 180 ms, focus
 for 120 ms, press feedback for 85 ms, page content for 190 ms, and wallpaper shading for
 220 ms. Retargeting starts from the current displayed value. Pointer-down stops scroll at
-that value; held controls and reordering freeze geometry without accumulating time.
+that value; held controls freeze scroll and page geometry without accumulating time.
+Reordering can still scroll to reveal the moved card; adaptive HDMI spacing stays paused.
 Reduced motion snaps all new effects immediately.
 
 Page transitions retain only the last actually presented content, excluding wallpaper,

@@ -3,7 +3,7 @@ use crate::{
     model::demo_inventory,
     motion_view::Presenter,
     renderer::Draw,
-    state::{Page, State, Target},
+    state::{Direction, Page, State, Target},
     view::{self, Assets},
 };
 use std::{
@@ -141,6 +141,33 @@ fn a_pointer_down_stops_vertical_motion_at_the_displayed_position() {
         .find(|c| c.target == Target::App(id.clone()))
         .unwrap();
     assert!((card.rect.y - (y - displayed)).abs() < 0.01);
+}
+#[test]
+fn reordering_can_scroll_to_reveal_the_moved_card_while_hdmi_spacing_stays_paused() {
+    let (mut state, assets) = setup();
+    let id = state.preferences.favorites.as_ref().unwrap()[0].clone();
+    state.focus = Target::App(id.clone());
+    state.moving = Some(id.clone());
+    let now = Instant::now();
+    state.sync_motion(now);
+    for i in 0..6 {
+        let scene = frame(&state, &assets);
+        state.direction(Direction::Right, &scene.layout_controls);
+        let scene = frame(&state, &assets);
+        state.reveal_focus(&scene.layout_controls);
+        state.sync_motion(now + Duration::from_millis(i * 20 + 1));
+    }
+    assert!(state.home_scroll > 0.);
+    state.sync_motion(now + Duration::from_millis(400));
+    assert_eq!(state.moving.as_deref(), Some(id.as_str()));
+    assert_eq!(state.motion.horizontal.value(0.), state.home_scroll);
+    let scene = frame(&state, &assets);
+    let moved = scene
+        .controls
+        .iter()
+        .find(|c| c.target == state.focus)
+        .unwrap();
+    assert!(moved.rect.x >= 83.9 && moved.rect.x + moved.rect.w <= 1748.1);
 }
 #[test]
 fn focus_and_press_feedback_change_color_without_moving_the_control() {
