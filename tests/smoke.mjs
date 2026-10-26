@@ -330,9 +330,9 @@ try {
       show_weather: true,
       show_home_names: true,
       input_modes: {
-        'com.webos.app.hdmi1': 'on',
-        'com.webos.app.hdmi2': 'on',
-        'com.webos.app.hdmi3': 'on',
+        'com.webos.app.hdmi1': 'On',
+        'com.webos.app.hdmi2': 'On',
+        'com.webos.app.hdmi3': 'On',
       },
     }),
   );
