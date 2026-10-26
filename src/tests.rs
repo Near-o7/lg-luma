@@ -758,6 +758,8 @@ fn system_category_owns_refresh_and_quit_and_restores_sidebar_focus() {
     assert_eq!(state.focus, Target::Setting(3));
     assert_eq!(state.activate(), vec![Effect::Reload]);
     state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::Setting(9));
+    state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Setting(5));
     assert_eq!(state.activate(), vec![Effect::Quit]);
     state.back();
@@ -765,6 +767,62 @@ fn system_category_owns_refresh_and_quit_and_restores_sidebar_focus() {
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(0));
     assert_eq!(state.section, 0);
+}
+
+#[test]
+fn text_rendering_preferences_default_to_msaa_and_recover_invalid_values() {
+    use crate::text_rendering::TextRendering;
+    for value in [
+        json!({}),
+        json!({"text_rendering": "unknown"}),
+        json!({"text_rendering": null}),
+        json!({"text_rendering": 4}),
+    ] {
+        let mut value = value;
+        value["greeting_name"] = json!("Ana");
+        let preferences: Preferences = serde_json::from_value(value).unwrap();
+        assert_eq!(preferences.text_rendering, TextRendering::Msaa);
+        assert_eq!(preferences.greeting_name, "Ana");
+    }
+}
+
+#[test]
+fn text_rendering_choices_persist_and_back_restores_the_system_row() {
+    use crate::{state::Subpage, text_rendering::TextRendering};
+    let mut state = ready();
+    state.open(2);
+    state.section = crate::state::SYSTEM_SECTION;
+    state.focus = Target::Setting(9);
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.subpage, Some(Subpage::TextRendering));
+    assert_eq!(state.focus, Target::Choice(0));
+    assert!(scene(&state).draw.iter().any(|draw| matches!(
+        draw,
+        crate::renderer::Draw::Text(label, ..) if label == "Restart Luma to apply changes."
+    )));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::Choice(1));
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(state.preferences.text_rendering, TextRendering::Analytic);
+    assert_eq!(state.focus, Target::Setting(9));
+    assert!(state.subpage.is_none());
+    let saved = serde_json::to_value(&state.preferences).unwrap();
+    assert_eq!(saved["text_rendering"], "analytic");
+    let mut restored = State::new(serde_json::from_value(saved).unwrap());
+    restored.open(2);
+    restored.section = crate::state::SYSTEM_SECTION;
+    restored.focus = Target::Setting(9);
+    restored.activate();
+    assert_eq!(restored.focus, Target::Choice(1));
+    restored.direction(Direction::Down, &controls(&restored));
+    assert_eq!(restored.focus, Target::Choice(0));
+    restored.back();
+    assert_eq!(restored.focus, Target::Setting(9));
+    assert_eq!(restored.preferences.text_rendering, TextRendering::Analytic);
+    restored.activate();
+    restored.direction(Direction::Up, &controls(&restored));
+    assert_eq!(restored.activate(), vec![Effect::Save]);
+    assert_eq!(restored.preferences.text_rendering, TextRendering::Msaa);
 }
 
 #[test]

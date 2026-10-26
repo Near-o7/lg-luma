@@ -1,4 +1,48 @@
 {
+  "textRendering": {
+    "en": "Text rendering",
+    "de": "Textdarstellung",
+    "zh": "文字渲染",
+    "es": "Renderizado de texto",
+    "pt": "Renderização de texto",
+    "it": "Rendering del testo",
+    "ru": "Отрисовка текста",
+    "pl": "Renderowanie tekstu",
+    "fr": "Rendu du texte"
+  },
+  "textRenderingMsaa": {
+    "en": "MSAA (default)",
+    "de": "MSAA (Standard)",
+    "zh": "MSAA（默认）",
+    "es": "MSAA (predeterminado)",
+    "pt": "MSAA (padrão)",
+    "it": "MSAA (predefinito)",
+    "ru": "MSAA (по умолчанию)",
+    "pl": "MSAA (domyślne)",
+    "fr": "MSAA (par défaut)"
+  },
+  "textRenderingAnalytic": {
+    "en": "Analytic",
+    "de": "Analytisch",
+    "zh": "解析式",
+    "es": "Analítico",
+    "pt": "Analítico",
+    "it": "Analitico",
+    "ru": "Аналитическая",
+    "pl": "Analityczne",
+    "fr": "Analytique"
+  },
+  "textRenderingRestart": {
+    "en": "Restart Luma to apply changes.",
+    "de": "Luma neu starten, um Änderungen anzuwenden.",
+    "zh": "重启 Luma 以应用更改。",
+    "es": "Reinicia Luma para aplicar los cambios.",
+    "pt": "Reinicie o Luma para aplicar as alterações.",
+    "it": "Riavvia Luma per applicare le modifiche.",
+    "ru": "Перезапустите Luma, чтобы применить изменения.",
+    "pl": "Uruchom ponownie Luma, aby zastosować zmiany.",
+    "fr": "Redémarrez Luma pour appliquer les modifications."
+  },
   "recentEmpty": {
     "en": "No recent apps",
     "de": "Keine zuletzt verwendeten Apps",
