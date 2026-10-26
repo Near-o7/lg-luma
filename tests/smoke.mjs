@@ -157,7 +157,7 @@ try {
   const saved = await scenario('saved', 'down,hold,right,back');
   assert.equal(saved.preferences.background, 'forest');
   assert.deepEqual(saved.preferences.favorites.slice(0, 2), ['youtube.leanback.v4', 'netflix']);
-  const clock = await scenario('clock', 'settings,click:900:284');
+  const clock = await scenario('clock', 'settings,await-motion,click:900:284', [], 180);
   assert.equal(clock.subpage, 'Clock');
   assert.equal(clock.focus, 'ClockFormat');
   assert.ok(clock.ui_text.includes('Clock format'));
@@ -332,13 +332,45 @@ try {
   assert.equal(edgeRight.home_scroll, 0, 'Clicking the fragment must not move it');
   const edgeLeft = await scenario(
     'favorites-edge-left',
-    `home,down,${Array(6).fill('right').join(',')},click:40:600`,
+    `home,down,${Array(6).fill('right').join(',')},await-motion,click:40:600`,
+    [],
+    180,
   );
   assert.deepEqual(edgeLeft.focus, { App: edgeFavorites[0] });
   assert.ok(
     Math.abs(edgeLeft.home_scroll - 281.6) < 0.01,
     'Pointer focus preserves strip position',
   );
+  const stoppedScroll = await scenario(
+    'favorites-pointer-stops-motion',
+    `home,down,${Array(6).fill('right').join(',')},click:400:600,await-motion`,
+    [],
+    180,
+  );
+  assert.ok(typeof stoppedScroll.focus.App === 'string');
+  assert.ok(Math.abs(stoppedScroll.presented_scroll[1] - stoppedScroll.home_scroll) < 0.01);
+  const rapidPages = await scenario(
+    'motion-rapid-pages',
+    'apps,settings,home,apps,down,down,down,await-motion',
+    ['--test-extra-apps', '48'],
+    240,
+  );
+  assert.equal(rapidPages.page, 'Apps');
+  assert.equal(rapidPages.motion_active, false);
+  assert.ok(rapidPages.scroll > 0);
+  assert.ok(Math.abs(rapidPages.presented_scroll[0] - rapidPages.scroll) < 0.01);
+  await fs.writeFile(
+    preferences,
+    JSON.stringify({ favorites: edgeFavorites, show_weather: false, reduced_motion: true }),
+  );
+  const reducedMotion = await scenario(
+    'motion-reduced',
+    'apps,settings,home,down,right,right,right,right,right,right,await-motion',
+    [],
+    180,
+  );
+  assert.equal(reducedMotion.motion_active, false);
+  assert.equal(reducedMotion.presented_scroll[1], reducedMotion.home_scroll);
   await fs.writeFile(
     preferences,
     JSON.stringify({ favorites: edgeFavorites, home_rows: 2, show_weather: false }),

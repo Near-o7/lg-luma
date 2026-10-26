@@ -22,6 +22,9 @@ mod input_status_tests;
 #[path = "adaptive-home-tests.rs"]
 mod adaptive_home_tests;
 
+#[path = "motion-tests.rs"]
+mod motion_tests;
+
 fn ready() -> State {
     let mut state = State::new(Preferences::default());
     state.set_inventory(demo_inventory(), None);
