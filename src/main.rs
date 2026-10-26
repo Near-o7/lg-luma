@@ -17,6 +17,8 @@ mod input_refresh;
 #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
 mod luna;
 mod model;
+#[path = "motion-view.rs"]
+mod motion_view;
 mod platform;
 mod raster;
 mod recents;
@@ -27,6 +29,8 @@ mod sdl_events;
 mod state;
 mod storage;
 mod text_rendering;
+#[path = "ui-motion.rs"]
+mod ui_motion;
 mod vector;
 mod view;
 mod weather;
@@ -109,7 +113,7 @@ impl Options {
                     "\n  --test-extra-apps N  Explicit scroll preview with up to 300 non-launchable extra cards; separate preferences"
                 );
                 println!(
-                    "\n  Press Back / Escape on Home, or hold for 600 ms, to open Recent apps.\n  --script recents,await-recents  Open the desktop recent-app preview."
+                    "\n  Press Back / Escape on Home, or hold for 600 ms, to open Recent apps.\n  --script recents,await-recents  Open the desktop recent-app preview.\n  --script apps,await-motion    Wait for presentation motion before a coordinate click."
                 );
                 std::process::exit(0);
             }
@@ -390,7 +394,7 @@ fn script(
         }
         "await-search" => vec![],
         "await-weather" => vec![],
-        "await-recents" => vec![],
+        "await-recents" | "await-motion" => vec![],
         _ => return Err(format!("Unknown scripted action: {action}")),
     })
 }
@@ -408,13 +412,16 @@ fn compose(
     pill: f32,
     width: f32,
     now: OffsetDateTime,
+    presenter: &mut motion_view::Presenter,
 ) -> view::Scene {
-    let scene = view::scene_with_pill(state, assets, pill, width, now);
-    if !state.pointer && state.overlay.is_none() && state.reveal_focus(&scene.controls) {
-        view::scene_with_pill(state, assets, pill, width, now)
-    } else {
-        scene
+    state.sync_motion(Instant::now());
+    let mut scene = view::scene_animated(state, assets, pill, width, now);
+    if !state.pointer && state.overlay.is_none() && state.reveal_focus(&scene.layout_controls) {
+        state.sync_motion(Instant::now());
+        scene = view::scene_animated(state, assets, pill, width, now);
     }
+    presenter.apply(&mut scene, state);
+    scene
 }
 
 fn weather_tick(state: &mut State, service: &weather_service::Service, visible: bool) {
@@ -873,12 +880,14 @@ fn run() -> Result<(), String> {
     let mut input_watch = input_refresh::Watch::default();
     let mut input_event_at: Option<Instant> = None;
     let scripted_input = !options.script.is_empty();
+    let mut presenter = motion_view::Presenter::default();
     let mut scene = compose(
         &mut state,
         &assets,
         pill,
         pill_width,
         options.time.unwrap_or_else(OffsetDateTime::now_utc),
+        &mut presenter,
     );
     while running {
         let now = options
@@ -1022,7 +1031,7 @@ fn run() -> Result<(), String> {
         weather_tick(&mut state, &weather_service, visible);
         // Rebuild hit regions before input whenever inventory/layout changed.
         if state.dirty {
-            scene = compose(&mut state, &assets, pill, pill_width, now);
+            scene = compose(&mut state, &assets, pill, pill_width, now, &mut presenter);
         }
         for event in queued_event
             .take()
@@ -1164,16 +1173,16 @@ fn run() -> Result<(), String> {
                             }
                         }
                         Keycode::Up if !repeat || !state.recents_open() => {
-                            pending = state.direction(Direction::Up, &scene.controls);
+                            pending = state.direction(Direction::Up, &scene.layout_controls);
                         }
                         Keycode::Down => {
-                            pending = state.direction(Direction::Down, &scene.controls)
+                            pending = state.direction(Direction::Down, &scene.layout_controls)
                         }
                         Keycode::Left => {
-                            pending = state.direction(Direction::Left, &scene.controls)
+                            pending = state.direction(Direction::Left, &scene.layout_controls)
                         }
                         Keycode::Right => {
-                            pending = state.direction(Direction::Right, &scene.controls)
+                            pending = state.direction(Direction::Right, &scene.layout_controls)
                         }
                         Keycode::Return | Keycode::KpEnter
                             if matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
@@ -1261,6 +1270,7 @@ fn run() -> Result<(), String> {
                         if matches!(state.overlay, Some(Overlay::SystemKeyboard)) {
                             pending = state.finish_text_input();
                         }
+                        state.stop_presented_scroll();
                         // Pointer-down must not normalize scroll and move the clicked control.
                         state.pointer_focus(target);
                         if mouse_btn == MouseButton::Right {
@@ -1320,7 +1330,9 @@ fn run() -> Result<(), String> {
                     mouse_y,
                     ..
                 } if state.overlay.is_none() => {
-                    if state.wheel_scroll(
+                    press = None;
+                    if state.wheel_scroll_presented(
+                        &scene.layout_controls,
                         &scene.controls,
                         pointer_position(&window, mouse_x, mouse_y),
                         x,
@@ -1351,7 +1363,7 @@ fn run() -> Result<(), String> {
             }
             // SDL may deliver several navigation events in a single poll.
             if state.dirty {
-                scene = compose(&mut state, &assets, pill, pill_width, now);
+                scene = compose(&mut state, &assets, pill, pill_width, now, &mut presenter);
             }
         }
         if back_button.held(Instant::now()) {
@@ -1379,6 +1391,7 @@ fn run() -> Result<(), String> {
                 (action == "await-search" && state.weather.searching)
                     || (action == "await-weather" && state.weather.fetching())
                     || (action == "await-recents" && state.recents.pending.is_some())
+                    || (action == "await-motion" && state.animating())
             })
             && let Some(action) = options.script.pop_front()
         {
@@ -1387,7 +1400,7 @@ fn run() -> Result<(), String> {
             } else if action == "prewarm" {
                 prewarm_now = true;
             } else {
-                let pending = script(&action, &mut state, &scene.controls)?;
+                let pending = script(&action, &mut state, &scene.layout_controls)?;
                 running &= effects(
                     pending,
                     &mut state,
@@ -1462,7 +1475,7 @@ fn run() -> Result<(), String> {
                     .is_some_and(|limit| presented + 1 >= limit));
         if ((state.dirty || options.profile_frames.is_some()) && visible) || final_frame {
             let compose_started = Instant::now();
-            scene = compose(&mut state, &assets, pill, pill_width, now);
+            scene = compose(&mut state, &assets, pill, pill_width, now, &mut presenter);
             let compose_ms = compose_started.elapsed().as_secs_f64() * 1000.;
             let (width, height) = window.drawable_size();
             if width > 0 && height > 0 {
@@ -1531,6 +1544,7 @@ fn run() -> Result<(), String> {
                         );
                     }
                 }
+                presenter.presented(&scene, &state);
                 presented += 1;
                 last_present = Instant::now();
                 if options.profile_frames.is_some() {
@@ -1640,12 +1654,22 @@ fn run() -> Result<(), String> {
         return Err("Frame budget ended before the input script completed".into());
     }
     if let Some(path) = options.dump {
+        // Outgoing page snapshots are decorative; diagnostics describe the current screen.
+        let semantic_scene = view::scene_with_pill(
+            &state,
+            &assets,
+            pill,
+            pill_width,
+            options.time.unwrap_or_else(OffsetDateTime::now_utc),
+        );
         let state = serde_json::json!({ "page": state.page, "focus": state.focus, "query": state.query,
             "filter": state.filter, "preferences": state.preferences, "apps": state.apps().iter().map(|a| &a.id).collect::<Vec<_>>(),
             "error": state.error, "scroll": state.scroll, "home_scroll": state.home_scroll, "subpage": state.subpage, "modal": state.overlay.is_some(), "weather": state.weather,
             "inventory": state.inventory.apps,
             "recents": state.recents.entries, "recents_pending": state.recents.pending, "recents_error": state.recents.error, "recents_visibility": state.recents.visibility,
-            "ui_text": scene.draw.iter().filter_map(|draw| match draw { renderer::Draw::Text(value, ..) => Some(value), _ => None }).collect::<Vec<_>>() });
+            "presented_scroll": [state.motion.vertical.value(state.scroll), state.motion.horizontal.value(state.home_scroll)],
+            "motion_active": state.motion.animating(),
+            "ui_text": semantic_scene.draw.iter().filter_map(|draw| match draw { renderer::Draw::Text(value, ..) => Some(value), _ => None }).collect::<Vec<_>>() });
         std::fs::write(
             path,
             serde_json::to_vec_pretty(&state).map_err(|e| e.to_string())?,

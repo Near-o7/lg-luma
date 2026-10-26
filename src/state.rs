@@ -178,6 +178,7 @@ pub struct State {
     pub scroll: f32,
     pub home_scroll: f32,
     pub home_layout: crate::home_layout::Layout,
+    pub motion: crate::ui_motion::Motion,
     pub overlay: Option<Overlay>,
     pub moving: Option<String>,
     pub loading: bool,
@@ -214,6 +215,7 @@ impl State {
             scroll: 0.,
             home_scroll: 0.,
             home_layout: crate::home_layout::Layout::default(),
+            motion: crate::ui_motion::Motion::default(),
             overlay: None,
             moving: None,
             loading: false,
@@ -251,7 +253,28 @@ impl State {
         self.pressed.is_some() || self.moving.is_some() || self.overlay.is_some()
     }
 
+    pub fn sync_motion(&mut self, now: Instant) {
+        let blocked = self.overlay.is_some() || self.recents.visibility > 0.;
+        let frame = crate::ui_motion::Frame {
+            screen: crate::ui_motion::Screen::of(self),
+            scroll: [self.scroll, self.home_scroll],
+            focus: &self.focus,
+            pressed: self.pressed.as_ref(),
+            shading: if self.page == Page::Home {
+                f32::from(self.preferences.home_shading) / 100.
+            } else {
+                1.
+            },
+            reduced: self.preferences.reduced_motion,
+            blocked,
+            held: self.pressed.is_some(),
+        };
+        self.motion.sync(frame, now);
+        self.dirty |= self.motion.animating();
+    }
+
     pub fn tick(&mut self) {
+        self.sync_motion(Instant::now());
         self.dirty |= self.home_layout.update(
             self.home_inputs_visible(),
             self.page == Page::Home && !self.preferences.reduced_motion,
@@ -314,6 +337,7 @@ impl State {
             || (self.page == Page::Home
                 && !self.home_layout_paused()
                 && self.home_layout.animating())
+            || self.motion.animating()
             || self.previous_background.is_some()
             || self.panel_started.is_some()
             || (!self.preferences.reduced_motion
@@ -457,8 +481,20 @@ impl State {
     }
 
     /// Returns whether this wheel event scrolled favorites, so a pending card press is cancelled.
+    #[cfg(test)]
     pub fn wheel_scroll(
         &mut self,
+        controls: &[Control],
+        position: Option<(f32, f32)>,
+        x: i32,
+        y: i32,
+    ) -> bool {
+        self.wheel_scroll_presented(controls, controls, position, x, y)
+    }
+
+    pub fn wheel_scroll_presented(
+        &mut self,
+        layout: &[Control],
         controls: &[Control],
         position: Option<(f32, f32)>,
         x: i32,
@@ -476,7 +512,7 @@ impl State {
             self.scroll_favorites((if x != 0 { x } else { -y }) as f32 * HOME_TILE_PITCH);
         } else {
             let bottom = self.content_viewport().y + self.content_viewport().h - 12.;
-            let max = controls
+            let max = layout
                 .iter()
                 .filter(|c| c.scrollable)
                 .map(|c| c.rect.y + c.rect.h + self.scroll - bottom)
@@ -626,9 +662,10 @@ impl State {
         let previous_home = self.home_scroll;
         if let Some(control) = controls.iter().find(|c| c.target == self.focus) {
             if self.page == Page::Home && matches!(self.focus, Target::App(_)) {
-                if control.rect.x < HOME_STRIP_LEFT {
+                // Ignore subpixel rounding so a settled card cannot restart its tween.
+                if control.rect.x < HOME_STRIP_LEFT - 0.1 {
                     self.home_scroll += control.rect.x - HOME_STRIP_LEFT;
-                } else if control.rect.x + control.rect.w > HOME_STRIP_RIGHT {
+                } else if control.rect.x + control.rect.w > HOME_STRIP_RIGHT + 0.1 {
                     self.home_scroll += control.rect.x + control.rect.w - HOME_STRIP_RIGHT;
                 }
             }
@@ -648,7 +685,7 @@ impl State {
                 } else {
                     120.8
                 };
-                if control.rect.y < top {
+                if control.rect.y < top - 0.1 {
                     self.scroll = (self.scroll + control.rect.y - top).max(0.);
                 }
                 let bottom = if self.page == Page::Home && self.moving.is_none() {
@@ -656,7 +693,7 @@ impl State {
                 } else {
                     982.4
                 };
-                if control.rect.y + control.rect.h > bottom {
+                if control.rect.y + control.rect.h > bottom + 0.1 {
                     self.scroll += control.rect.y + control.rect.h - bottom;
                 }
             }
@@ -668,6 +705,16 @@ impl State {
             self.dirty = true;
         }
         self.scroll != previous || self.home_scroll != previous_home
+    }
+
+    /// A pointer-down stops kinetic presentation at the actual displayed position.
+    pub fn stop_presented_scroll(&mut self) {
+        self.scroll = self.motion.vertical.value(self.scroll);
+        self.home_scroll = self.motion.horizontal.value(self.home_scroll);
+        let now = Instant::now();
+        self.motion.vertical.snap(self.scroll, now);
+        self.motion.horizontal.snap(self.home_scroll, now);
+        self.dirty = true;
     }
 
     /// Hover and pointer-down must not move the control before pointer-up.

@@ -143,6 +143,22 @@ and only the first row's Up route reaches the category toolbar. Scrolling Apps c
 the existing wallpaper at the header/footer, with one alpha mask for surfaces, shadows, rings,
 vector icons/logos and text. The wallpaper/header are unmasked; no blur texture is needed.
 
+Presentation motion lives in `ui-motion.rs` and `motion-view.rs`. Logical scroll destinations
+and `Scene.layout_controls` update immediately for remote routing and reveal calculations.
+`Scene.controls` follows displayed geometry for pointer hits. Scroll eases for 180 ms, focus
+for 120 ms, press feedback for 85 ms, page content for 190 ms, and wallpaper shading for
+220 ms. Retargeting starts from the current displayed value. Pointer-down stops scroll at
+that value; held controls freeze scroll and page geometry without accumulating time.
+Reordering can still scroll to reveal the moved card; adaptive HDMI spacing stays paused.
+Reduced motion snaps all new effects immediately.
+
+Page transitions retain only the last actually presented content, excluding wallpaper,
+navigation and footer. Interrupted transitions reuse that displayed composite. Snapshots
+are capped at 4096 draw commands and fading focus history at eight targets; overlays clear
+page snapshots. Clip and edge-fade boundaries stay fixed while content moves. Unit tests
+use explicit timestamps; native smoke scripts use `await-motion` before coordinate clicks
+that require settled layout, with separate coverage for clicks during movement.
+
 TV editing uses the system keyboard through SDL-webOS. Desktop editing uses the custom panel.
 System text events update app/location queries; Done/Back stops editing and restores focus.
 
