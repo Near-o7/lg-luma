@@ -5,6 +5,11 @@ on:
     branches: [main, personal/home-grid]
   pull_request:
   workflow_dispatch:
+    inputs:
+      package_only:
+        description: Build the native package without repeating checks or tests
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -65,14 +70,18 @@ jobs:
           sudo apt-get "${apt_options[@]}" install -y --no-install-recommends \
             libsdl2-dev pkg-config woff2 python3-fonttools libgl1-mesa-dri xvfb xauth
       - name: Check formatting
+        if: ${{ !inputs.package_only }}
         run: pnpm format:check
       - name: Lint Rust and packaging tools
+        if: ${{ !inputs.package_only }}
         run: pnpm check
       - name: Run unit tests
+        if: ${{ !inputs.package_only }}
         run: pnpm test
       - name: Generate native assets
         run: pnpm assets
       - name: Exercise desktop rendering and mocked weather
+        if: ${{ !inputs.package_only }}
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a -s '-screen 0 1920x1080x24' pnpm test:smoke

@@ -18,7 +18,9 @@ falling back to cable state on older firmware. A connected dongle without a sour
 **No signal**; forced On/Off preferences still take precedence. Failed reads preserve the
 last state and retry after ten seconds. Polls pause while Luma is hidden or unfocused.
 
-The two-row Home moves the greeting and favorites upward. Up to four HDMI ports share
+The two-row Home moves favorites slightly upward, keeping inputs near the bottom.
+With app captions enabled, it uses a more compact header to reserve the extra space.
+Up to four HDMI ports share
 one row below the favorites, including when app captions are enabled. Cable changes do
 not move the favorite grid or change input card widths.
 
@@ -59,6 +61,8 @@ Pushing the personal branch runs CI automatically. It checks formatting, lint, u
 the ARM IPK. Download the `luma-release` artifact from the successful run. A manual run
 does not publish an official release. Test the package before installing it on the TV.
 The upstream PR/comment and release-PR workflows are disabled on this fork; CI remains enabled.
+For a manually reviewed layout-only adjustment, CI also offers a manual `package_only` input
+that builds the IPK without repeating checks or tests. Ordinary pushes and PRs keep full checks.
 
 Fork synchronization does not update an installed TV app. Installing an official IPK
 would replace the customized executable and remove this layout option; use a package

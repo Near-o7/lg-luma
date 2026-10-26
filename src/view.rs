@@ -844,8 +844,12 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         .map_or(0., |summary| (summary.height + 18.4) / 2.);
     // Two favorite rows share the screen with inputs instead of pushing them
     // below the fold. Keep these anchors independent of cable hotplug state.
-    let compact = state.home_rows() == 2;
-    let top = if compact { 376. } else { 544.8 };
+    let compact = state.home_rows() == 2 && state.preferences.show_home_names;
+    let top = if state.home_rows() == 2 {
+        if compact { 376. } else { 484.8 }
+    } else {
+        544.8
+    };
     let greeting_y = if compact { 197. } else { 265. };
     let greeting_size = if compact { 72.4 } else { 90.4 };
     let greeting_height = greeting_size * 1.05;
