@@ -1085,8 +1085,16 @@ fn protected_apps_cannot_be_deleted_through_ui_or_worker() {
             json!({"id": "netflix"})
         )
     );
-    for id in ["com.example.app", "com.webosbrew.app", "com.palmtree.app", "com.lgeneric.app"] {
-        assert!(crate::platform::can_uninstall(id), "Unexpectedly protected: {id}");
+    for id in [
+        "com.example.app",
+        "com.webosbrew.app",
+        "com.palmtree.app",
+        "com.lgeneric.app",
+    ] {
+        assert!(
+            crate::platform::can_uninstall(id),
+            "Unexpectedly protected: {id}"
+        );
     }
 }
 
