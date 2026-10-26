@@ -254,6 +254,20 @@ try {
     'pt',
     'Geocoding must use the Portuguese locale',
   );
+  for (const language of Object.keys(messages.homeRows)) {
+    await fs.writeFile(
+      preferences,
+      JSON.stringify({ language, reduced_motion: true, show_weather: false }),
+    );
+    const rows = await scenario(
+      `favorite-rows-${language}`,
+      'settings,down,enter,down,down,down,down,down,enter',
+    );
+    assert.equal(rows.subpage, 'HomeRows');
+    assert.equal(rows.preferences.home_rows, 1);
+    contains(rows, 'oneRow', language);
+    contains(rows, 'twoRows', language);
+  }
   console.log(
     'Native translation checks passed: saved language selection, shared labels, Portuguese locale formatting and accented glyphs, localized geocoding/weather, unchanged app names, Chinese glyphs and 4K rendering.',
   );

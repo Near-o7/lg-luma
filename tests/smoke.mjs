@@ -339,6 +339,53 @@ try {
     Math.abs(edgeLeft.home_scroll - 281.6) < 0.01,
     'Pointer focus preserves strip position',
   );
+  await fs.writeFile(
+    preferences,
+    JSON.stringify({ favorites: edgeFavorites, home_rows: 2, show_weather: false }),
+  );
+  const twoRows = await scenario('home-two-rows', 'home,down,down');
+  assert.deepEqual(twoRows.focus, { App: edgeFavorites[6] });
+  assert.equal(twoRows.home_scroll, 0);
+  const rowChoice = await scenario(
+    'favorite-rows-setting',
+    'settings,down,enter,down,down,down,down,down,enter',
+  );
+  assert.equal(rowChoice.subpage, 'HomeRows');
+  assert.ok(rowChoice.ui_text.includes('One row'));
+  assert.ok(rowChoice.ui_text.includes('Two rows'));
+  const oneRowAgain = await scenario(
+    'home-one-row-restored',
+    'settings,down,enter,down,down,down,down,down,enter,up,enter,home',
+  );
+  assert.equal(oneRowAgain.preferences.home_rows, 1);
+  const twoRowsSaved = await scenario(
+    'home-two-row-preference-saved',
+    'settings,down,enter,down,down,down,down,down,enter,down,enter,home',
+  );
+  assert.equal(twoRowsSaved.preferences.home_rows, 2);
+  const twoRowsRestored = await scenario('home-two-row-preference-restored', 'home,down,down');
+  assert.equal(twoRowsRestored.preferences.home_rows, 2);
+  assert.deepEqual(twoRowsRestored.focus, { App: edgeFavorites[6] });
+  await fs.writeFile(
+    preferences,
+    JSON.stringify({
+      favorites: edgeFavorites,
+      home_rows: 2,
+      show_home_names: true,
+      show_weather: true,
+      input_modes: {
+        'com.webos.app.hdmi1': 'On',
+        'com.webos.app.hdmi2': 'On',
+        'com.webos.app.hdmi3': 'On',
+      },
+    }),
+  );
+  const captionedRows = await scenario(
+    'home-two-rows-captions-weather-inputs',
+    'home,down,down,down',
+  );
+  assert.ok(captionedRows.focus.Input);
+  assert.equal(captionedRows.scroll, 0, 'Input cards must fit completely without scrolling');
   console.log(
     'Native smoke checks passed: rendering/alpha, navigation, persistence, SDL pointer input, DPI-aware glyphs, 4K capture and presentation profiling.',
   );
