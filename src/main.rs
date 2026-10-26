@@ -318,6 +318,7 @@ fn effects(
                 }
             }
             Effect::Quit => return false,
+            Effect::Uninstall(id) => platform.send(Request::Uninstall(id)),
             Effect::Recent {
                 generation,
                 command,
@@ -948,6 +949,16 @@ fn run() -> Result<(), String> {
                         }
                     }
                 }
+                Response::Uninstalled { id, result } => {
+                    let pending = state.uninstall_response(id, result);
+                    running &= effects(
+                        pending,
+                        &mut state,
+                        &platform,
+                        &preferences_path,
+                        &weather_service,
+                    );
+                }
                 Response::Recent {
                     generation,
                     command,
@@ -1153,7 +1164,9 @@ fn run() -> Result<(), String> {
                             let length = state.editing_text().len() as i32;
                             state.delete_surrounding_text(-length, length);
                         }
-                        Keycode::M | Keycode::Menu if !repeat && state.overlay.is_none() => {
+                        Keycode::M | Keycode::Menu | Keycode::Application
+                            if !repeat && state.overlay.is_none() =>
+                        {
                             press = None;
                             state.options();
                         }

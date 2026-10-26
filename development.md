@@ -80,23 +80,34 @@ It does not execute the test suites. A desktop display is required; on headless 
 
 ### Input
 
-| Input                         | Action                                                        |
-| ----------------------------- | ------------------------------------------------------------- |
-| Arrows                        | Move focus, revealing remote-focused content                  |
-| OK / Enter                    | Activate on release                                           |
-| Hold OK for 600 ms            | Reorder Home favorite or open app options                     |
-| OK or Back in move mode       | Finish reordering without launching                           |
-| Escape / Back / Backspace     | Parent navigation, overlay dismissal or Recent apps from Home |
-| Hold Back / Escape for 600 ms | Open Recent apps while Luma is focused                        |
-| Menu / M / right-click        | App options                                                   |
-| Pointer / wheel               | Hover, click, hold and scrolling                              |
-| F5                            | Refresh inventory                                             |
+| Input                                 | Action                                                        |
+| ------------------------------------- | ------------------------------------------------------------- |
+| Arrows                                | Move focus, revealing remote-focused content                  |
+| OK / Enter                            | Activate on release                                           |
+| Hold OK for 600 ms                    | Reorder Home favorite or open app options                     |
+| OK or Back in move mode               | Finish reordering without launching                           |
+| Escape / Back / Backspace             | Parent navigation, overlay dismissal or Recent apps from Home |
+| Hold Back / Escape for 600 ms         | Open Recent apps while Luma is focused                        |
+| Settings / … / Menu / M / right-click | App options side popup                                        |
+| Pointer / wheel                       | Hover, click, hold and scrolling                              |
+| F5                                    | Refresh inventory                                             |
 
 Backspace deletes while editing. Native Back uses SDL's webOS-specific keycode. Back dismisses
 the keyboard first; Weather Location then returns to its parent Location row, HDMI choices to
 that HDMI row, and the Background gallery to Background in the sidebar. Back from the sidebar
 focuses the Settings tab, then returns Home. **System** in the sidebar groups **Refresh apps & inputs**
 and the vector power-icon **Quit app** action separately from General preferences.
+App options appear beside the selected card, with favorite, hide/show and **Delete app** actions.
+Deletion opens a separate confirmation with **Cancel** focused by default. Cancel or Back returns
+to the side popup. Once deletion is sent, dismissal does not cancel the platform operation.
+The popup has action icons on the far right, without a title, close button or embedded shortcut hints. The
+confirmation has no heading and identifies the app in its warning text.
+Luma (including former app IDs and the Home identity), Homebrew Channel and
+test-preview cards cannot be deleted. The worker calls
+`org.webosbrew.hbchannel.service/uninstall` once, checks completion and refreshes inventory after
+success. Failed or timed-out requests retain the app and preferences and are not automatically
+retried. Desktop deletion changes only in-memory sample inventory. Verify Settings/More delivery
+and real deletion, denial and focus restoration manually on a TV, including Home-takeover mode.
 The **Clock** subpage contains **Clock format** (12-hour or 24-hour) and **Time format** (`HH:MM`
 or `HH:MM:SS`, defaulting to `HH:MM`). Choosing a format returns to its row in Clock, and Back
 from Clock restores its General row. With seconds shown, the header clock redraws once per second

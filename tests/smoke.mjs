@@ -129,6 +129,17 @@ try {
   assert.deepEqual(recentHomeBack.focus, { Recent: 'netflix' });
   const recentYoutube = await scenario('recents-youtube', 'recents,await-recents,right');
   assert.deepEqual(recentYoutube.focus, { Recent: 'youtube.leanback.v4' });
+  const appOptions = await scenario('app-options', 'apps,down,menu');
+  assert.deepEqual(appOptions.focus, { Option: 0 });
+  assert.ok(appOptions.ui_text.includes('Delete app'));
+  const deleteFocused = await scenario('delete-focused', 'apps,down,menu,down,down');
+  assert.deepEqual(deleteFocused.focus, { Option: 2 });
+  const deleteConfirm = await scenario('delete-confirm', 'apps,down,menu,down,down,enter');
+  assert.deepEqual(deleteConfirm.focus, 'CancelDelete');
+  assert.ok(deleteConfirm.ui_text.some((value) => value.includes('uninstall “Netflix”')));
+  const deleteCancel = await scenario('delete-cancel', 'apps,down,menu,down,down,enter,enter');
+  assert.deepEqual(deleteCancel.focus, { Option: 2 });
+  assert.ok(deleteCancel.apps.includes('netflix'));
   const hidden = await scenario('apps', 'apps,down,menu,down,enter');
   assert.ok(hidden.preferences.hidden.includes('netflix'));
   assert.deepEqual(hidden.focus, { App: 'youtube.leanback.v4' });

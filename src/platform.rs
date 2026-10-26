@@ -136,6 +136,7 @@ pub fn redirect_to_home() -> Result<bool, String> {
 pub enum Request {
     Refresh,
     Launch(String),
+    Uninstall(String),
     SyncSplash(String),
     Recent {
         generation: u64,
@@ -145,6 +146,10 @@ pub enum Request {
 pub enum Response {
     Inventory(Result<(Inventory, Option<String>), String>),
     Launched(Result<(), String>),
+    Uninstalled {
+        id: String,
+        result: Result<(), String>,
+    },
     Recent {
         generation: u64,
         command: crate::recents::Command,
@@ -165,6 +170,7 @@ impl Platform {
         let (responses, receiver) = mpsc::channel();
         thread::spawn(move || {
             let mut splash_background = None;
+            let mut desktop_inventory = demo_inventory();
             let mut desktop_recents = if webos {
                 vec![]
             } else {
@@ -204,8 +210,21 @@ impl Platform {
                     Request::Refresh => Response::Inventory(if webos {
                         inventory()
                     } else {
-                        Ok((demo_inventory(), None))
+                        Ok((desktop_inventory.clone(), None))
                     }),
+                    Request::Uninstall(id) => {
+                        // Validate again at the worker boundary, not just in the UI.
+                        let result = uninstall_request(&id).and_then(|(uri, payload)| {
+                            if webos {
+                                call(uri, payload).map(|_| ())
+                            } else {
+                                desktop_inventory.apps.retain(|app| app.id != id);
+                                desktop_recents.retain(|entry| entry.app.id != id);
+                                Ok(())
+                            }
+                        });
+                        Response::Uninstalled { id, result }
+                    }
                     Request::Launch(id) => Response::Launched(if webos {
                         if crate::scroll_preview::is_placeholder(&id) {
                             Err("Scroll preview cards cannot be launched".into())
@@ -275,6 +294,35 @@ fn sync_splash(background: &str) -> Result<(), String> {
         return Err("Splash background was not updated".into());
     }
     Ok(())
+}
+
+/// Exact identities only. Never let a renamed app bypass protection.
+pub fn can_uninstall(id: &str) -> bool {
+    valid_app_id(id)
+        && !crate::scroll_preview::is_placeholder(id)
+        && !matches!(
+            id,
+            APP_ID
+                | HOME_ID
+                | "com.luma.native"
+                | "com.luma.launcher"
+                | "com.luma.launcher.native"
+                | "org.webosbrew.hbchannel"
+                | "org.webosbrew.hbchannel.service"
+        )
+}
+
+pub fn uninstall_request(id: &str) -> Result<(&'static str, Value), String> {
+    if !can_uninstall(id) {
+        return Err("This application is protected from deletion".into());
+    }
+    // Homebrew subscribes to appInstallService/dev/remove and only responds
+    // after statusValue 31 (complete), rather than treating acceptance as success.
+    // Send once: an ambiguous timeout must never automatically retry a mutation.
+    Ok((
+        "luna://org.webosbrew.hbchannel.service/uninstall",
+        json!({"id": id}),
+    ))
 }
 
 fn call(uri: &str, payload: Value) -> Result<Value, String> {
