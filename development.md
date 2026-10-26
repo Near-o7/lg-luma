@@ -67,6 +67,15 @@ Desktop pkg-config paths are isolated from the ARM build. `WEBOS_NATIVE_LIBS` ca
 explicitly selected ARM webOS shared libraries; SDL overrides must have a real webOS/Wayland
 backend. Avoid copying the whole SDK library directory or the TV's graphics drivers/libc.
 
+Remote Settings/More support uses the same checksum-pinned SDL-webOS `.5` source with
+`tools/sdl-remote-keys.patch`, cross-built with `WEBOS_NDK`, CMake and patch. The patch maps the
+observed uinput/evdev codes 139 and 994 before SDL's Wayland keymap discards vendor keys, and
+repairs the Menu keycode for down/up/repeat events. These are not SDL scancode values. Generated
+libraries are cached under `.build/sdl-webos/remote-keys` with source/patch and output checksums.
+The native window also opts into webOS's meta-key access policy (webOS 8+). Verify physical
+Settings/More delivery on TV, including older firmware and Home takeover. Rust decoder tests
+cover normalized SDL events, not the compositor-to-SDL path.
+
 ## Controls and navigation
 
 ### Documentation screenshots

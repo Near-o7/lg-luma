@@ -56,14 +56,14 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          key: webos-${{ hashFiles('tools/build-webos.sh', 'tools/setup-webos-sdk.mjs', 'tools/webos-runtime.mjs') }}
+          key: webos-${{ hashFiles('tools/build-webos.sh', 'tools/setup-webos-sdk.mjs', 'tools/webos-runtime.mjs', 'tools/sdl-remote-keys.patch') }}
       - name: Install desktop and asset dependencies
         run: |
           apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
           sudo apt-get "${apt_options[@]}" update
           # FontTools recommends large optional scientific Python packages. xauth is needed by xvfb-run.
           sudo apt-get "${apt_options[@]}" install -y --no-install-recommends \
-            libsdl2-dev pkg-config woff2 python3-fonttools libgl1-mesa-dri xvfb xauth
+            libsdl2-dev pkg-config woff2 python3-fonttools libgl1-mesa-dri xvfb xauth cmake patch
       - name: Check formatting
         run: pnpm format:check
       - name: Lint Rust and packaging tools

@@ -1,0 +1,32 @@
+--- a/src/video/wayland/SDL_waylandevents.c
++++ b/src/video/wayland/SDL_waylandevents.c
+@@ -1170,6 +1170,15 @@ static SDL_Scancode Wayland_get_scancode_from_key(struct SDL_WaylandInput *input, uint32_t key)
+ {
+     SDL_Scancode scancode = SDL_SCANCODE_UNKNOWN;
+ 
++#ifdef SDL_VIDEO_DRIVER_WAYLAND_WEBOS
++    /* Wayland supplies evdev codes, XKB adds 8. Map before the keymap can
++     * discard vendor keys or interpret them as a different standard key.
++     * Observed LG remote uinput: Settings=139, More=994. */
++    if (key == 139 + 8 || key == 994 + 8) {
++        return SDL_SCANCODE_MENU;
++    }
++#endif
++
+     if (!input->keyboard_is_virtual) {
+         scancode = SDL_GetScancodeFromTable(SDL_SCANCODE_TABLE_XFREE86_2, key - 8);
+     } else {
+@@ -1360,5 +1369,13 @@ static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
+ 
+     if (!handled_by_ime) {
+         scancode = Wayland_get_scancode_from_key(input, key + 8);
++#ifdef SDL_VIDEO_DRIVER_WAYLAND_WEBOS
++        if (key == 139 || key == 994) {
++            /* MENU's layout mapping may be SDLK_UNKNOWN. Repair it before
++             * SDL queues down/up and repeat events. */
++            const SDL_Keycode menu = SDLK_MENU;
++            SDL_SetKeymap(SDL_SCANCODE_MENU, &menu, 1, SDL_FALSE);
++        }
++#endif
+         SDL_SendKeyboardKey(state == WL_KEYBOARD_KEY_STATE_PRESSED ? SDL_PRESSED : SDL_RELEASED, scancode);
+     }

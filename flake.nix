@@ -61,6 +61,7 @@
               pkgs.woff2
               (pkgs.python3.withPackages (python: [ python.fonttools ]))
               pkgs.cmake
+              pkgs.patch
               pkgs.git
             ]
             ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [

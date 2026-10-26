@@ -161,7 +161,7 @@ fn native_back_and_exit_survive_an_unmapped_or_layout_dependent_keycode() {
 }
 
 #[test]
-fn native_settings_and_more_menu_scancodes_survive_unmapped_keycodes() {
+fn native_menu_scancodes_survive_unmapped_keycodes() {
     use sdl2::{event::Event, keyboard::Keycode};
     for scancode in [101, 118] {
         for down in [true, false] {
