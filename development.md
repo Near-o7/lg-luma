@@ -112,7 +112,22 @@ it. Preferences are saved when the keyboard closes, including automatic system-k
 Back from either subpage restores its General row. Input name removal also uses **Clear name**.
 Choice checkmarks identify saved values, while the bright row fill identifies only the current focus.
 
-Home favorites form one horizontal strip, never a second row. Left/Right follows saved order,
+Home favorites default to one horizontal strip. General → Favorite rows optionally enables two
+rows, filling six cards left to right before the second row and continuing horizontally in
+groups of twelve. The setting defaults to one row for new and existing preferences; invalid
+values recover to one row without discarding other preferences. Up/Down moves between rows
+and reordering follows the same grid. The last row leads to inputs. Choosing a row count
+resets the scroll position without changing favorite order.
+
+With two rows, visible inputs reserve space so up to four physical HDMI ports fit in one
+complete row near the bottom. Card widths depend on the inventory, not on which ports are
+visible. Captions use a more compact greeting. When input visibility changes, favorites
+move for 320 ms before the input cards fade in for 120 ms; hidden cards cannot receive input.
+No visible inputs releases the space. Startup and returning Home start settled. Reduced
+motion applies changes immediately, while holds, reordering and overlays pause layout movement.
+This uses the existing inventory reports and does not change input detection or refresh behavior.
+
+With one row, Left/Right follows saved order,
 including reorder mode, and reveals complete cards. Up returns to Home navigation; Down enters
 the nearest input in the first row. The strip position survives page changes. Wheel movement over
 favorites scrolls horizontally; elsewhere it scrolls vertically. Pointer hover/down never moves
