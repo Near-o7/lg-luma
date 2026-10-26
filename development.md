@@ -102,7 +102,7 @@ Deletion opens a separate confirmation with **Cancel** focused by default. Cance
 to the side popup. Once deletion is sent, dismissal does not cancel the platform operation.
 The popup has action icons on the far right, without a title, close button or embedded shortcut hints. The
 confirmation has no heading and identifies the app in its warning text.
-Luma (including former app IDs and the Home identity), Homebrew Channel and
+Luma (including former app IDs and the Home identity), Homebrew Channel, Live TV, Web Browser and
 test-preview cards cannot be deleted. The worker calls
 `org.webosbrew.hbchannel.service/uninstall` once, checks completion and refreshes inventory after
 success. Failed or timed-out requests retain the app and preferences and are not automatically

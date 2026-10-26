@@ -304,6 +304,8 @@ pub fn can_uninstall(id: &str) -> bool {
             id,
             APP_ID
                 | HOME_ID
+                | "com.webos.app.livetv"
+                | "com.webos.app.browser"
                 | "com.luma.native"
                 | "com.luma.launcher"
                 | "com.luma.launcher.native"

@@ -1042,6 +1042,8 @@ fn protected_apps_cannot_be_deleted_through_ui_or_worker() {
     for id in [
         crate::platform::APP_ID,
         crate::platform::HOME_ID,
+        "com.webos.app.livetv",
+        "com.webos.app.browser",
         "com.luma.launcher",
         "com.luma.native",
         "com.luma.launcher.native",
