@@ -842,16 +842,18 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let shift = summary
         .as_ref()
         .map_or(0., |summary| (summary.height + 18.4) / 2.);
-    // Two favorite rows share the screen with inputs instead of pushing them
-    // below the fold. Keep these anchors independent of cable hotplug state.
+    let reserved = state.home_layout.space(state.home_inputs_visible());
     let compact = state.home_rows() == 2 && state.preferences.show_home_names;
-    let top = if state.home_rows() == 2 {
+    let reserved_top = if state.home_rows() == 2 {
         if compact { 376. } else { 484.8 }
     } else {
         544.8
     };
-    let greeting_y = if compact { 197. } else { 265. };
-    let greeting_size = if compact { 72.4 } else { 90.4 };
+    // The connected endpoint is the approved layout. With no visible input,
+    // favorites regain the space; cable changes animate between those anchors.
+    let top = 544.8 + (reserved_top - 544.8) * reserved;
+    let greeting_y = 265. - if compact { 68. * reserved } else { 0. };
+    let greeting_size = 90.4 - if compact { 18. * reserved } else { 0. };
     let greeting_height = greeting_size * 1.05;
     let date = language.date(now);
     out.text(
@@ -980,7 +982,9 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     }
     out.draw.push(Draw::EdgeFadeX(None));
     out.draw.push(Draw::Clip(Some(state.content_viewport())));
-    let input_y = top + grid_height + if compact { 28. } else { 41.6 } - s;
+    let input_y = top + grid_height + 41.6 - if compact { 13.6 * reserved } else { 0. } - s;
+    let input_start = out.draw.len();
+    let input_controls = out.controls.len();
     // The four physical HDMI ports fit on one row. Reserve their columns even
     // when Auto hides a port, so hotplug does not change the card widths.
     let input_columns = state.inventory.inputs.len().clamp(3, 4);
@@ -1074,6 +1078,13 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             out.ring(rect, 18.4);
         }
         out.control(Target::Input(input.id.clone()), rect, true);
+    }
+    let alpha = state.home_layout.alpha();
+    out.fade(input_start, alpha, 1.);
+    // A newly inserted row cannot be clicked or remotely focused while it is
+    // transparent and space is still being made for the complete cards.
+    if alpha == 0. {
+        out.controls.truncate(input_controls);
     }
 }
 

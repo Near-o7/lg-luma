@@ -122,8 +122,12 @@ between rows, including reorder mode; the last row leads to inputs. Additional p
 horizontally. See `FORK.md` for updating this patch from official stable releases.
 In the default single row, Left/Right follows saved order,
 including reorder mode, and reveals complete cards. Up returns to Home navigation; Down enters
-the nearest input in the first row. The two-row layout uses a compact greeting/favorites header to leave complete inputs
-visible. Up to four physical HDMI ports share one row. While focused, including Settings,
+the nearest input in the first row. The two-row layout smoothly reserves HDMI space on the first visible input and releases
+it when the last disappears. Geometry moves for 320 ms before input cards fade in for
+120 ms, so transparent or clipped cards never become interactive. Initial inventory,
+returning Home and reduced motion start settled. Held controls, reordering and overlays
+pause geometry without accumulating a catch-up jump. With app names enabled, the
+greeting also compacts to leave complete inputs visible. Up to four physical HDMI ports share one row. While focused, including Settings,
 Luma polls only input status every two seconds with one request in flight. Auto mode uses
 signal availability where reported, then cable presence as a compatibility fallback;
 No signal distinguishes a powered adapter with no source. Failed reads retain previous

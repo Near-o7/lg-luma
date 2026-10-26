@@ -177,6 +177,7 @@ pub struct State {
     pub subpage: Option<Subpage>,
     pub scroll: f32,
     pub home_scroll: f32,
+    pub home_layout: crate::home_layout::Layout,
     pub overlay: Option<Overlay>,
     pub moving: Option<String>,
     pub loading: bool,
@@ -212,6 +213,7 @@ impl State {
             subpage: None,
             scroll: 0.,
             home_scroll: 0.,
+            home_layout: crate::home_layout::Layout::default(),
             overlay: None,
             moving: None,
             loading: false,
@@ -238,7 +240,24 @@ impl State {
         self.dirty = true;
     }
 
+    pub fn home_inputs_visible(&self) -> bool {
+        self.inventory
+            .inputs
+            .iter()
+            .any(|input| self.preferences.input_visible(input))
+    }
+
+    fn home_layout_paused(&self) -> bool {
+        self.pressed.is_some() || self.moving.is_some() || self.overlay.is_some()
+    }
+
     pub fn tick(&mut self) {
+        self.dirty |= self.home_layout.update(
+            self.home_inputs_visible(),
+            self.page == Page::Home && !self.preferences.reduced_motion,
+            self.page == Page::Home && self.home_layout_paused(),
+            Instant::now(),
+        );
         let recents_open = self.recents_open();
         if recents_open || self.recents.visibility > 0. {
             self.dirty |= self.recents.animate(
@@ -292,6 +311,9 @@ impl State {
         ((self.recents_open() || self.recents.visibility > 0.)
             && (self.recents.visibility != if self.recents_open() { 1. } else { 0. }
                 || self.recents.cards_animating(self.pointer)))
+            || (self.page == Page::Home
+                && !self.home_layout_paused()
+                && self.home_layout.animating())
             || self.previous_background.is_some()
             || self.panel_started.is_some()
             || (!self.preferences.reduced_motion
@@ -312,6 +334,7 @@ impl State {
         self.scroll = 0.;
         if self.page == Page::Home {
             self.scroll_favorites(0.);
+            self.home_layout.settle(self.home_inputs_visible());
         }
         self.query.clear();
         self.filter = 0;
@@ -495,6 +518,7 @@ impl State {
     }
 
     pub fn set_inventory(&mut self, next: Inventory, warning: Option<String>) {
+        let initial = self.inventory.apps.is_empty();
         self.inventory.apps = next.apps;
         if let Some(warning) = warning {
             self.notify(warning);
@@ -504,6 +528,9 @@ impl State {
         self.loading = false;
         self.error = None;
         self.inventory_failures = 0;
+        if initial {
+            self.home_layout.settle(self.home_inputs_visible());
+        }
         self.dirty = true;
         self.reconcile_focus();
     }

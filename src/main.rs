@@ -9,6 +9,8 @@ mod damage;
 mod diagnostics;
 mod egl_damage;
 mod font;
+#[path = "home-layout.rs"]
+mod home_layout;
 mod i18n;
 #[path = "input-refresh.rs"]
 mod input_refresh;

@@ -18,11 +18,17 @@ falling back to cable state on older firmware. A connected dongle without a sour
 **No signal**; forced On/Off preferences still take precedence. Failed reads preserve the
 last state and retry after ten seconds. Polls pause while Luma is hidden or unfocused.
 
-The two-row Home moves favorites slightly upward, keeping inputs near the bottom.
-With app captions enabled, it uses a more compact header to reserve the extra space.
-Up to four HDMI ports share
-one row below the favorites, including when app captions are enabled. Cable changes do
-not move the favorite grid or change input card widths.
+The two-row Home reserves space only while an input is visible. When the first input
+appears, favorites move smoothly upward over 320 ms, then the complete HDMI row fades
+in over 120 ms. When the last visible input disappears, favorites recover the space.
+The connected endpoint retains the approved small bottom margin; up to four HDMI ports
+share one row. App captions use a more compact header. Reduced motion makes the change
+immediate. Pointer holds, app reordering and overlays pause the movement. Returning Home
+starts settled, and adding another input does not move the favorite grid again.
+
+The personal branch currently includes official **v2.9.0**, including its System → Text
+rendering setting. The fork uses independent setting identifiers to preserve Favorite
+rows and Wallpaper shading alongside it.
 
 ## Branches and updates
 
