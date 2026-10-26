@@ -220,15 +220,15 @@
     "fr": "Ne jamais afficher"
   },
   "inputWhenConnected": {
-    "en": "Only show when a signal is available",
-    "de": "Nur bei vorhandenem Signal anzeigen",
-    "es": "Mostrar solo cuando haya señal",
-    "zh": "仅在有信号时显示",
-    "pt": "Mostrar só quando houver sinal",
-    "it": "Mostra solo quando è presente un segnale",
-    "ru": "Показывать только при наличии сигнала",
-    "pl": "Pokazuj tylko przy dostępnym sygnale",
-    "fr": "Afficher uniquement si un signal est présent"
+    "en": "Only show detected sources",
+    "de": "Nur erkannte Geräte anzeigen",
+    "es": "Mostrar solo fuentes detectadas",
+    "zh": "仅显示检测到的设备",
+    "pt": "Mostrar só fontes detectadas",
+    "it": "Mostra solo le sorgenti rilevate",
+    "ru": "Показывать только обнаруженные устройства",
+    "pl": "Pokazuj tylko wykryte urządzenia",
+    "fr": "Afficher uniquement les sources détectées"
   },
   "renameInput": {
     "en": "Rename",

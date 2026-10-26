@@ -138,6 +138,7 @@ fn compact_home_keeps_favorites_and_all_four_inputs_on_screen() {
                     port: "HDMI 4".into(),
                     connected: Some(false),
                     signal: Some(false),
+                    active: None,
                 });
                 for input in &state.inventory.inputs {
                     state

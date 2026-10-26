@@ -1,6 +1,6 @@
 //! Blocking platform work runs on one worker, never in the SDL/UI thread.
-//! TV calls originate from this native executable's LS2 connection, not a CLI
-//! process trying to impersonate its application identity.
+//! One-shot calls use the native LS2 connection. Root HDMI notifications use a
+//! fixed, read-only luna-send subscription without app-ID impersonation.
 use crate::{
     app_artwork,
     model::{App, Input, Inventory, demo_inventory, valid_app_id},
@@ -13,6 +13,7 @@ mod installation;
 
 pub const APP_ID: &str = "com.ecklf.luma";
 pub const HOME_ID: &str = "com.webos.app.home";
+const INPUT_URI: &str = "luna://com.webos.service.eim/getAllInputStatus";
 /// LG's Home executable. A root integration may bind-mount Luma over it, so sam starts Luma
 /// under LG's own Home manifest and LS2 role (lifecycle v2, keep-alive, no sam restart).
 pub const LG_HOME_EXE: &str = "/usr/bin/com.webos.app.home";
@@ -136,6 +137,10 @@ pub fn redirect_to_home() -> Result<bool, String> {
 pub enum Request {
     Refresh,
     RefreshInputs,
+    WatchInputs {
+        generation: u64,
+        enabled: bool,
+    },
     Launch(String),
     SyncSplash(String),
     Recent {
@@ -146,6 +151,17 @@ pub enum Request {
 pub enum Response {
     Inventory(Result<(Inventory, Option<String>), String>),
     Inputs(Result<Vec<Input>, String>),
+    #[cfg_attr(
+        not(all(feature = "webos", target_os = "linux", target_arch = "arm")),
+        allow(dead_code)
+    )]
+    InputEvent {
+        generation: u64,
+        observed: std::time::Instant,
+    },
+    InputWatchEnded {
+        generation: u64,
+    },
     Launched(Result<(), String>),
     Recent {
         generation: u64,
@@ -158,6 +174,7 @@ pub struct Platform {
     sender: mpsc::Sender<Request>,
     pub receiver: mpsc::Receiver<Response>,
     pub webos: bool,
+    pub input_events: bool,
     splash_enabled: bool,
 }
 
@@ -166,6 +183,10 @@ impl Platform {
         let (sender, requests) = mpsc::channel();
         let (responses, receiver) = mpsc::channel();
         thread::spawn(move || {
+            #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+            let mut input_subscription: Option<
+                crate::app_subscription::AppSubscription,
+            > = None;
             let mut splash_background = None;
             let mut desktop_recents = if webos {
                 vec![]
@@ -174,6 +195,36 @@ impl Platform {
             };
             while let Ok(request) = requests.recv() {
                 let response = match request {
+                    Request::WatchInputs {
+                        generation,
+                        enabled,
+                    } => {
+                        #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+                        {
+                            if let Some(subscription) = input_subscription.take() {
+                                subscription.end();
+                            }
+                            if enabled {
+                                match watch_inputs(generation, responses.clone()) {
+                                    Ok(subscription) => input_subscription = Some(subscription),
+                                    Err(error) => {
+                                        eprintln!("Luma HDMI events: {error}");
+                                        let _ = responses
+                                            .send(Response::InputWatchEnded { generation });
+                                    }
+                                }
+                            }
+                        }
+                        #[cfg(not(all(
+                            feature = "webos",
+                            target_os = "linux",
+                            target_arch = "arm"
+                        )))]
+                        if enabled {
+                            let _ = responses.send(Response::InputWatchEnded { generation });
+                        }
+                        continue;
+                    }
                     Request::Recent {
                         generation,
                         command,
@@ -245,11 +296,16 @@ impl Platform {
                     break;
                 }
             }
+            #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+            if let Some(subscription) = input_subscription {
+                subscription.end();
+            }
         });
         Self {
             sender,
             receiver,
             webos,
+            input_events: root_input_events(webos),
             splash_enabled,
         }
     }
@@ -263,6 +319,47 @@ impl Platform {
             self.send(Request::SyncSplash(background.to_owned()));
         }
     }
+}
+
+fn root_input_events(webos: bool) -> bool {
+    #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+    {
+        // SAFETY: geteuid has no preconditions; jailed tiles retain polling.
+        webos && unsafe { libc::geteuid() } == 0
+    }
+    #[cfg(not(all(feature = "webos", target_os = "linux", target_arch = "arm")))]
+    {
+        let _ = webos;
+        false
+    }
+}
+
+#[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+fn watch_inputs(
+    generation: u64,
+    responses: mpsc::Sender<Response>,
+) -> Result<crate::app_subscription::AppSubscription, String> {
+    let mut command = std::process::Command::new("/usr/bin/luna-send");
+    command.args(["-i", INPUT_URI, "{\"subscribe\":true}"]);
+    let ended = responses.clone();
+    crate::app_subscription::subscribe(
+        command,
+        std::time::Duration::from_secs(5),
+        move |value| {
+            if value.get("returnValue").and_then(Value::as_bool) == Some(true)
+                && value.get("devices").is_some_and(Value::is_array)
+            {
+                let _ = responses.send(Response::InputEvent {
+                    generation,
+                    observed: std::time::Instant::now(),
+                });
+            }
+        },
+        move |_| {
+            let _ = ended.send(Response::InputWatchEnded { generation });
+        },
+        crate::app_subscription::spawn_thread,
+    )
 }
 
 fn sync_splash(background: &str) -> Result<(), String> {
@@ -493,8 +590,7 @@ fn inventory() -> Result<(Inventory, Option<String>), String> {
 }
 
 fn input_inventory() -> Result<Vec<Input>, String> {
-    inventory_read("luna://com.webos.service.eim/getAllInputStatus", "devices")
-        .and_then(|raw| normalize_inputs(&raw))
+    inventory_read(INPUT_URI, "devices").and_then(|raw| normalize_inputs(&raw))
 }
 
 fn title(value: Option<&str>, fallback: &str) -> String {
@@ -597,6 +693,7 @@ pub fn normalize_inputs(raw: &Value) -> Result<Vec<Input>, String> {
             title: title(entry.get("label").and_then(Value::as_str), &port),
             port,
             signal: entry.get("hdmiSignalExist").and_then(Value::as_bool),
+            active: entry.get("activate").and_then(Value::as_bool),
             // A powered dongle can remain plugged in without a source. Keep
             // cable presence separate from signal availability. Some firmware
             // reports `connected: true` for every existing port.

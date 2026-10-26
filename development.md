@@ -128,10 +128,14 @@ it when the last disappears. Geometry moves for 320 ms before input cards fade i
 returning Home and reduced motion start settled. Held controls, reordering and overlays
 pause geometry without accumulating a catch-up jump. With app names enabled, the
 greeting also compacts to leave complete inputs visible. Up to four physical HDMI ports share one row. While focused, including Settings,
-Luma polls only input status every two seconds with one request in flight. Auto mode uses
-signal availability where reported, then cable presence as a compatibility fallback;
-No signal distinguishes a powered adapter with no source. Failed reads retain previous
-inputs, with a ten-second retry delay. Hidden or unfocused Home does not poll.
+Root Home holds a read-only EIM subscription while visible and focused. Notifications
+request a fresh snapshot on the worker, coalescing events that arrive during a pending read.
+Auto visibility accepts `activate: true` before `hdmiSignalExist` becomes true; the status
+stays No signal until then. Otherwise signal/cable compatibility behavior is preserved.
+The two-second polling fallback briefly uses 250 ms for at most ten seconds during signal
+negotiation, then returns to idle cadence. Errors retain inputs and retry after ten seconds;
+a failed subscription retries after thirty seconds. Hidden or unfocused Home does not poll
+or subscribe. Generation checks ignore late callbacks after visibility changes.
 The strip position survives page changes. Wheel movement over
 favorites scrolls horizontally; elsewhere it scrolls vertically. Pointer hover/down never moves
 the clicked control. Apps Up/Down follows the six-column grid order, including offscreen rows,

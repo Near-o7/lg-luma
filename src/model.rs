@@ -73,6 +73,8 @@ pub struct Input {
     pub port: String,
     pub connected: Option<bool>,
     pub signal: Option<bool>,
+    /// EIM can detect an active source before HDMI signal negotiation finishes.
+    pub active: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -179,7 +181,9 @@ impl Preferences {
         match self.input_modes.get(&input.id).copied().unwrap_or_default() {
             InputMode::On => true,
             InputMode::Off => false,
-            InputMode::Auto => input.signal.or(input.connected) == Some(true),
+            InputMode::Auto => {
+                input.active == Some(true) || input.signal.or(input.connected) == Some(true)
+            }
         }
     }
 
@@ -284,6 +288,7 @@ pub fn demo_inventory() -> Inventory {
                 port: "HDMI 1".into(),
                 connected: Some(true),
                 signal: None,
+                active: None,
             },
             Input {
                 id: "com.webos.app.hdmi2".into(),
@@ -291,6 +296,7 @@ pub fn demo_inventory() -> Inventory {
                 port: "HDMI 2".into(),
                 connected: Some(true),
                 signal: None,
+                active: None,
             },
             Input {
                 id: "com.webos.app.hdmi3".into(),
@@ -298,6 +304,7 @@ pub fn demo_inventory() -> Inventory {
                 port: "HDMI 3".into(),
                 connected: Some(false),
                 signal: None,
+                active: None,
             },
         ],
     };

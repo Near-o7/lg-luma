@@ -12,11 +12,19 @@ Off shows the matching unshaded wallpaper crop; intermediate levels blend it wit
 original shaded asset. Apps, Settings, and static launch splashes keep their existing
 wallpapers; modal dimming retains its original opacity. The two-row favorites setting remains independent.
 
-Home refreshes HDMI cable and signal status every two seconds while focused, including
-inside Settings. Auto visibility follows signal availability when reported by webOS,
-falling back to cable state on older firmware. A connected dongle without a source shows
-**No signal**; forced On/Off preferences still take precedence. Failed reads preserve the
-last state and retry after ten seconds. Polls pause while Luma is hidden or unfocused.
+Root Home listens for EIM input notifications and immediately requests a fresh snapshot.
+Auto visibility accepts a detected active source before HDMI signal negotiation completes;
+it still displays **No signal** until a real signal is reported. A powered empty dongle
+stays hidden. Forced On/Off preferences retain their behavior. Legacy firmware falls back
+to its existing signal/cable reports.
+
+EIM does not notify every signal transition on the tested TV. As a fallback, Home reads
+input status every two seconds and briefly uses a 250 ms interval for at most ten seconds
+while an active source is waiting for signal. Failed reads retain previous data and retry
+after ten seconds. A failed notification subscription retries after thirty seconds while
+polling continues. All of this pauses while Home is hidden or unfocused; returning messages
+from an old subscription are discarded. Jailed tiles retain polling when root events are
+unavailable. Events invalidate the cache instead of applying potentially stale snapshots.
 
 The two-row Home reserves space only while an input is visible. When the first input
 appears, favorites move smoothly upward over 320 ms, then the complete HDMI row fades

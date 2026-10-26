@@ -2439,6 +2439,7 @@ pub fn input_status(input: &Input, renamed: bool, language: Language) -> String 
     parts.push(match (input.signal, input.connected) {
         (Some(true), _) => language.t("connected"),
         (Some(false), Some(true)) => language.t("noSignal"),
+        (Some(false), _) if input.active == Some(true) => language.t("noSignal"),
         (Some(false), _) | (_, Some(false)) => language.t("noDevice"),
         (None, None) => language.t("externalInput"),
         (None, Some(true)) => language.t("connected"),

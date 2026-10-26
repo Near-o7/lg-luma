@@ -870,6 +870,8 @@ fn run() -> Result<(), String> {
     // When to ask for the inventory again after a failed load (State::inventory_failed).
     let mut inventory_retry: Option<Instant> = None;
     let mut input_refresh = input_refresh::Refresh::default();
+    let mut input_watch = input_refresh::Watch::default();
+    let mut input_event_at: Option<Instant> = None;
     let scripted_input = !options.script.is_empty();
     let mut scene = compose(
         &mut state,
@@ -909,6 +911,14 @@ fn run() -> Result<(), String> {
                         state.preferences.language,
                     );
                     state.set_inventory(inventory, warning);
+                    input_refresh.observe(
+                        Instant::now(),
+                        state
+                            .inventory
+                            .inputs
+                            .iter()
+                            .any(|i| i.active == Some(true) && i.signal == Some(false)),
+                    );
                     // Decode every installed icon now, on the artwork worker, rather than when
                     // the Apps page first shows it: a long-running Home then opens Apps ready.
                     assets.artwork.prefetch(
@@ -940,16 +950,43 @@ fn run() -> Result<(), String> {
                         initial_focus = false;
                     }
                 }
+                Response::InputEvent {
+                    generation,
+                    observed,
+                } => {
+                    if input_watch.accepts(generation) {
+                        input_event_at.get_or_insert(observed);
+                        input_refresh.request_now(Instant::now());
+                    }
+                }
+                Response::InputWatchEnded { generation } => {
+                    if input_watch.ended(Instant::now(), generation) {
+                        eprintln!("Luma HDMI events: ended; polling continues, retry in 30 s");
+                    }
+                }
                 Response::Inputs(result) => {
-                    input_refresh.completed(Instant::now(), result.is_ok());
+                    let success = result.is_ok();
+                    if let Some(observed) = input_event_at.take() {
+                        eprintln!(
+                            "Luma HDMI timing: event-to-refresh {} ms",
+                            observed.elapsed().as_millis()
+                        );
+                    }
                     match result {
                         Ok(inputs) => {
+                            input_refresh.observe(
+                                Instant::now(),
+                                inputs
+                                    .iter()
+                                    .any(|i| i.active == Some(true) && i.signal == Some(false)),
+                            );
                             if state.set_inputs(inputs) {
                                 eprintln!("Luma HDMI status: {:?}", state.inventory.inputs);
                             }
                         }
                         Err(error) => eprintln!("Luma HDMI refresh: {error}"),
                     }
+                    input_refresh.completed(Instant::now(), success);
                 }
                 Response::Launched(result) => {
                     state.launching = false;
@@ -1371,10 +1408,16 @@ fn run() -> Result<(), String> {
             inventory_retry = None;
             platform.send(Request::Refresh);
         }
-        if input_refresh.due(
-            Instant::now(),
-            webos && visible && focused && !state.loading,
-        ) {
+        let inputs_active = webos && visible && focused;
+        if let Some((generation, enabled)) =
+            input_watch.command(Instant::now(), inputs_active && platform.input_events)
+        {
+            platform.send(Request::WatchInputs {
+                generation,
+                enabled,
+            });
+        }
+        if input_refresh.due(Instant::now(), inputs_active && !state.loading) {
             platform.send(Request::RefreshInputs);
         }
         weather_tick(&mut state, &weather_service, visible);

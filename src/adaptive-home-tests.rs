@@ -119,3 +119,48 @@ fn reserving_input_space_does_not_dim_favorites_or_the_wallpaper() {
         |d| matches!(d, Draw::Text(label, _, _, color, _) if label == "Inputs" && color[3] == 0.)
     ));
 }
+
+#[test]
+fn early_source_activation_reserves_space_without_claiming_a_ready_signal() {
+    let mut state = ready();
+    state.preferences.home_rows = 2;
+    for input in &mut state.inventory.inputs {
+        input.active = Some(false);
+        input.signal = Some(false);
+    }
+    state.home_layout.settle(false);
+    let mut inputs = state.inventory.inputs.clone();
+    inputs[0].active = Some(true);
+    let id = inputs[0].id.clone();
+    state.set_inputs(inputs);
+    assert!(state.home_inputs_visible());
+    let now = Instant::now();
+    state.home_layout.update(true, true, false, now);
+    state
+        .home_layout
+        .update(true, true, false, now + Duration::from_millis(440));
+    assert!(
+        controls(&state)
+            .iter()
+            .any(|c| c.target == Target::Input(id.clone()))
+    );
+    assert_eq!(
+        crate::view::input_status(
+            &state.inventory.inputs[0],
+            false,
+            state.preferences.language
+        ),
+        "PlayStation 5 · No signal"
+    );
+    let mut inputs = state.inventory.inputs.clone();
+    inputs[0].signal = Some(true);
+    state.set_inputs(inputs);
+    state.home_layout.update(
+        state.home_inputs_visible(),
+        true,
+        false,
+        now + Duration::from_millis(500),
+    );
+    assert_eq!(state.home_layout.space(true), 1.);
+    assert!(!state.animating());
+}

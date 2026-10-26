@@ -297,6 +297,7 @@ fn auto_input_visibility_requires_a_positive_connection_report() {
         port: "HDMI 1".into(),
         connected: None,
         signal: None,
+        active: None,
     };
     assert!(!preferences.input_visible(&input));
     input.connected = Some(true);
@@ -1288,6 +1289,7 @@ fn custom_input_names_keep_the_label_port_and_status_as_detail() {
         port: "HDMI 2".into(),
         connected: Some(true),
         signal: None,
+        active: None,
     };
     let language = preferences.language;
     let status = |preferences: &Preferences| {

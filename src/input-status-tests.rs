@@ -128,3 +128,34 @@ fn live_status_also_changes_inside_settings() {
             .any(|d| matches!(d, Draw::Text(label, ..) if label.contains("Sin señal")))
     );
 }
+
+#[test]
+fn an_active_source_is_visible_before_signal_but_a_powered_empty_dongle_stays_hidden() {
+    let inputs = normalize_inputs(&json!([
+        {"appId":"com.webos.app.hdmi1","hdmiPlugIn":true,"hdmiSignalExist":false,"activate":true},
+        {"appId":"com.webos.app.hdmi2","hdmiPlugIn":true,"hdmiSignalExist":false,"activate":false},
+        {"appId":"com.webos.app.hdmi3","hdmiPlugIn":true,"hdmiSignalExist":false,"activate":"true"},
+        {"appId":"com.webos.app.hdmi4","hdmiPlugIn":false,"hdmiSignalExist":true,"activate":false}
+    ]))
+    .unwrap();
+    let mut preferences = Preferences::default();
+    assert_eq!(
+        inputs
+            .iter()
+            .map(|i| preferences.input_visible(i))
+            .collect::<Vec<_>>(),
+        [true, false, false, true]
+    );
+    assert_eq!(inputs[0].active, Some(true));
+    assert_eq!(inputs[2].active, None);
+    assert_eq!(input_status(&inputs[0], false, Language::Es), "Sin señal");
+    assert_eq!(input_status(&inputs[3], false, Language::Es), "Conectado");
+    preferences
+        .input_modes
+        .insert(inputs[0].id.clone(), InputMode::Off);
+    assert!(!preferences.input_visible(&inputs[0]));
+    preferences
+        .input_modes
+        .insert(inputs[1].id.clone(), InputMode::On);
+    assert!(preferences.input_visible(&inputs[1]));
+}
