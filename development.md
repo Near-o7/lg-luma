@@ -102,8 +102,10 @@ Deletion opens a separate confirmation with **Cancel** focused by default. Cance
 to the side popup. Once deletion is sent, dismissal does not cancel the platform operation.
 The popup has action icons on the far right, without a title, close button or embedded shortcut hints. The
 confirmation has no heading and identifies the app in its warning text.
-Luma (including former app IDs and the Home identity), Homebrew Channel, Live TV, Web Browser and
-test-preview cards cannot be deleted. The worker calls
+Luma (including former app IDs and the Home identity), Homebrew Channel, test-preview cards and
+all apps in the `com.webos.*`, `com.palm.*` and `com.lge.*` namespaces cannot be deleted. This
+conservative vendor protection includes Live TV, Web Browser, Settings and potentially removable
+LG apps, rather than relying on firmware to reject unsafe removals. The worker calls
 `org.webosbrew.hbchannel.service/uninstall` once, checks completion and refreshes inventory after
 success. Failed or timed-out requests retain the app and preferences and are not automatically
 retried. Desktop deletion changes only in-memory sample inventory. Verify Settings/More delivery

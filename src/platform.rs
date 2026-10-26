@@ -296,16 +296,19 @@ fn sync_splash(background: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Exact identities only. Never let a renamed app bypass protection.
+/// Protect launcher identities and vendor system namespaces, never titles.
+/// Conservatively includes removable vendor apps until firmware provides a
+/// reliable cross-version removability flag.
 pub fn can_uninstall(id: &str) -> bool {
     valid_app_id(id)
         && !crate::scroll_preview::is_placeholder(id)
+        && !["com.webos.", "com.palm.", "com.lge."]
+            .iter()
+            .any(|prefix| id.starts_with(prefix))
         && !matches!(
             id,
             APP_ID
                 | HOME_ID
-                | "com.webos.app.livetv"
-                | "com.webos.app.browser"
                 | "com.luma.native"
                 | "com.luma.launcher"
                 | "com.luma.launcher.native"

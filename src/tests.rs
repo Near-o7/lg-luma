@@ -1044,6 +1044,12 @@ fn protected_apps_cannot_be_deleted_through_ui_or_worker() {
         crate::platform::HOME_ID,
         "com.webos.app.livetv",
         "com.webos.app.browser",
+        "com.webos.app.settings",
+        "com.webos.service.applicationmanager",
+        "com.palm.app.settings",
+        "com.palm.app.input",
+        "com.lge.app.store",
+        "com.lge.service.example",
         "com.luma.launcher",
         "com.luma.native",
         "com.luma.launcher.native",
@@ -1079,6 +1085,9 @@ fn protected_apps_cannot_be_deleted_through_ui_or_worker() {
             json!({"id": "netflix"})
         )
     );
+    for id in ["com.example.app", "com.webosbrew.app", "com.palmtree.app", "com.lgeneric.app"] {
+        assert!(crate::platform::can_uninstall(id), "Unexpectedly protected: {id}");
+    }
 }
 
 #[test]
