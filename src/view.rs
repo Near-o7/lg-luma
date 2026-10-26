@@ -2662,7 +2662,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
                         "eye-off"
                     }
                 }
-                _ => "trash",
+                _ => "circle-minus",
             },
             Rect::new(rect.x + rect.w - 45.6, rect.y + 22.8, 21.6, 21.6),
             label_color,
