@@ -178,6 +178,7 @@ pub struct State {
     pub scroll: f32,
     pub home_scroll: f32,
     pub home_layout: crate::home_layout::Layout,
+    pub motion: crate::ui_motion::Motion,
     pub overlay: Option<Overlay>,
     pub moving: Option<String>,
     pub loading: bool,
@@ -214,6 +215,7 @@ impl State {
             scroll: 0.,
             home_scroll: 0.,
             home_layout: crate::home_layout::Layout::default(),
+            motion: crate::ui_motion::Motion::default(),
             overlay: None,
             moving: None,
             loading: false,
@@ -251,7 +253,28 @@ impl State {
         self.pressed.is_some() || self.moving.is_some() || self.overlay.is_some()
     }
 
+    pub fn sync_motion(&mut self, now: Instant) {
+        let blocked = self.overlay.is_some() || self.recents.visibility > 0.;
+        let frame = crate::ui_motion::Frame {
+            screen: crate::ui_motion::Screen::of(self),
+            scroll: [self.scroll, self.home_scroll],
+            focus: &self.focus,
+            pressed: self.pressed.as_ref(),
+            shading: if self.page == Page::Home {
+                f32::from(self.preferences.home_shading) / 100.
+            } else {
+                1.
+            },
+            reduced: self.preferences.reduced_motion,
+            blocked,
+            held: self.pressed.is_some() || self.moving.is_some(),
+        };
+        self.motion.sync(frame, now);
+        self.dirty |= self.motion.animating();
+    }
+
     pub fn tick(&mut self) {
+        self.sync_motion(Instant::now());
         self.dirty |= self.home_layout.update(
             self.home_inputs_visible(),
             self.page == Page::Home && !self.preferences.reduced_motion,
@@ -314,6 +337,7 @@ impl State {
             || (self.page == Page::Home
                 && !self.home_layout_paused()
                 && self.home_layout.animating())
+            || self.motion.animating()
             || self.previous_background.is_some()
             || self.panel_started.is_some()
             || (!self.preferences.reduced_motion

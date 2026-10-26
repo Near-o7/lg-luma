@@ -27,6 +27,8 @@ mod sdl_events;
 mod state;
 mod storage;
 mod text_rendering;
+#[path = "ui-motion.rs"]
+mod ui_motion;
 mod vector;
 mod view;
 mod weather;
