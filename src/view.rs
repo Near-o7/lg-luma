@@ -324,12 +324,8 @@ pub fn scene_with_pill(
     let main_bottom = viewport.y + viewport.h;
     out.draw.push(Draw::Clip(Some(viewport)));
     if state.page == Page::Apps {
-        out.draw.push(Draw::EdgeFade(Some([
-            MAIN_TOP,
-            152.8,
-            main_bottom - 24.,
-            main_bottom,
-        ])));
+        out.draw
+            .push(Draw::EdgeFade(Some([MAIN_TOP, 152.8, 1080., 1104.])));
     }
     match state.page {
         Page::Home => home(&mut out, state, assets, now),

@@ -362,7 +362,9 @@ impl State {
     }
 
     pub fn content_viewport(&self) -> Rect {
-        let bottom = if self.page == Page::Home && self.moving.is_none() {
+        let bottom = if self.page == Page::Apps {
+            1080.
+        } else if self.page == Page::Home && self.moving.is_none() {
             1053.6
         } else {
             994.4
