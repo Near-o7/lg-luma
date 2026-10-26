@@ -32,7 +32,9 @@ https://github.com/user-attachments/assets/0c3061bf-c158-417e-85a4-da3eb84ecf08
 
 ## Compatibility
 
-The following TV configurations have been reported working with Luma:
+> [!NOTE]
+> Luma should start on any TV running webOS 4 or newer. The following configurations have been
+> confirmed to work by the community. Home takeover support varies, as noted below:
 
 | TV        | Model identifier | webOS | Takeover Support |
 | --------- | ---------------- | ----- | ---------------- |
