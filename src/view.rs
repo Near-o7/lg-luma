@@ -126,6 +126,14 @@ impl Assets {
 pub struct Scene {
     pub draw: Vec<Draw>,
     pub controls: Vec<Control>,
+    pub layout_controls: Vec<Control>,
+    pub(crate) content_draw: std::ops::Range<usize>,
+    pub(crate) content_controls: std::ops::Range<usize>,
+    scroll_draw: std::ops::Range<usize>,
+    scroll_controls: std::ops::Range<usize>,
+    favorites_draw: std::ops::Range<usize>,
+    scroll_delta: [f32; 2],
+    animated: bool,
     pub modal: Option<Rect>,
 }
 impl Scene {
@@ -133,6 +141,14 @@ impl Scene {
         Self {
             draw: Vec::new(),
             controls: Vec::new(),
+            layout_controls: Vec::new(),
+            content_draw: 0..0,
+            content_controls: 0..0,
+            scroll_draw: 0..0,
+            scroll_controls: 0..0,
+            favorites_draw: 0..0,
+            scroll_delta: [0., 0.],
+            animated: false,
             modal: None,
         }
     }
@@ -166,11 +182,13 @@ impl Scene {
         ));
     }
     fn control(&mut self, target: Target, rect: Rect, scrollable: bool) {
-        self.controls.push(Control {
+        let control = Control {
             target,
             rect,
             scrollable,
-        });
+        };
+        self.controls.push(control.clone());
+        self.layout_controls.push(control);
     }
     fn ring(&mut self, rect: Rect, radius: f32) {
         self.border(rect.inset(-6.9), radius + 6.9, 3.7, c(0xffffff, 0.10));
@@ -206,34 +224,53 @@ impl Scene {
             self.border(rect, rect.h / 2., 1., c(0xffffff, 0.07));
         }
     }
+    fn smooth_pill(&mut self, state: &State, target: &Target, rect: Rect, selected: bool) -> f32 {
+        let focus = self.focus(state, target);
+        if focus <= 0. || focus >= 1. {
+            self.pill(rect, focus >= 1., selected);
+        } else {
+            self.pill(rect, false, selected);
+            self.draw.push(Draw::RoundedGradient(
+                rect,
+                rect.h / 2.,
+                c(0xfafafa, focus),
+                c(0xe5e5e5, focus),
+            ));
+        }
+        focus
+    }
     fn fade(&mut self, from: usize, alpha: f32, brightness: f32) {
-        for draw in &mut self.draw[from..] {
-            let apply = |color: &mut Color| {
-                for channel in &mut color[..3] {
-                    *channel *= brightness;
-                }
-                color[3] *= alpha;
-            };
-            match draw {
-                Draw::Shape(_, _, _, color)
-                | Draw::Shadow(_, _, _, color)
-                | Draw::Text(_, _, _, color, _)
-                | Draw::TintedImage(_, _, _, _, color)
-                | Draw::AppImage(_, _, color) => apply(color),
-                Draw::RoundedGradient(_, _, a, b) => {
-                    apply(a);
-                    apply(b);
-                }
-                Draw::Image(path, rect, radius, contain) => {
-                    *draw = Draw::TintedImage(
-                        path.clone(),
-                        *rect,
-                        *radius,
-                        *contain,
-                        [brightness, brightness, brightness, alpha],
-                    );
-                }
-                Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => {}
+        crate::motion_view::fade(&mut self.draw[from..], alpha, brightness);
+    }
+    fn focus(&self, state: &State, target: &Target) -> f32 {
+        if self.animated {
+            state.motion.focus(target, state.focus == *target)
+        } else {
+            f32::from(state.focus == *target)
+        }
+    }
+    fn pressed(&self, state: &State, target: &Target) -> f32 {
+        if self.animated {
+            state.motion.press(target)
+        } else {
+            f32::from(state.pressed.as_ref() == Some(target))
+        }
+    }
+    fn ring_alpha(&mut self, rect: Rect, radius: f32, alpha: f32) {
+        let start = self.draw.len();
+        self.ring(rect, radius);
+        self.fade(start, alpha, 1.);
+    }
+    fn present_scroll(&mut self, home: bool) {
+        let [dx, dy] = self.scroll_delta;
+        crate::motion_view::translate(&mut self.draw[self.scroll_draw.clone()], 0., dy);
+        if home {
+            crate::motion_view::translate(&mut self.draw[self.favorites_draw.clone()], dx, 0.);
+        }
+        for control in &mut self.controls[self.scroll_controls.clone()] {
+            control.rect.y += dy;
+            if home && matches!(control.target, Target::App(_)) {
+                control.rect.x += dx;
             }
         }
     }
@@ -282,6 +319,11 @@ fn wallpaper(out: &mut Scene, state: &State, assets: &Assets, id: &str, alpha: f
     } else {
         1.
     };
+    let shading = if out.animated {
+        state.motion.shading(shading)
+    } else {
+        shading
+    };
     let shaded_alpha = alpha * shading;
     // Give the two images together exactly `alpha` coverage during a wallpaper
     // crossfade, rather than fading each independently and darkening the transition.
@@ -317,7 +359,35 @@ pub fn scene_with_pill(
     pill_width: f32,
     now: OffsetDateTime,
 ) -> Scene {
+    build_scene(state, assets, pill_x, pill_width, now, false)
+}
+
+pub fn scene_animated(
+    state: &State,
+    assets: &Assets,
+    pill_x: f32,
+    pill_width: f32,
+    now: OffsetDateTime,
+) -> Scene {
+    build_scene(state, assets, pill_x, pill_width, now, true)
+}
+
+fn build_scene(
+    state: &State,
+    assets: &Assets,
+    pill_x: f32,
+    pill_width: f32,
+    now: OffsetDateTime,
+    animated: bool,
+) -> Scene {
     let mut out = Scene::new();
+    out.animated = animated;
+    if animated {
+        out.scroll_delta = [
+            state.home_scroll - state.motion.horizontal.value(state.home_scroll),
+            state.scroll - state.motion.vertical.value(state.scroll),
+        ];
+    }
     if let Some((previous, start)) = &state.previous_background {
         wallpaper(&mut out, state, assets, previous, 1.);
         let alpha = (start.elapsed().as_secs_f32() / 0.4).min(1.);
@@ -360,6 +430,8 @@ pub fn scene_with_pill(
         Page::Apps => library(&mut out, state, assets),
         Page::Settings => settings(&mut out, state, assets),
     }
+    out.scroll_draw = content_start..out.draw.len();
+    out.scroll_controls = 0..out.controls.len();
     if let Some(error) = &state.error
         && !state.inventory.apps.is_empty()
         && !out
@@ -398,10 +470,14 @@ pub fn scene_with_pill(
     }
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
+    out.content_draw = content_start..out.draw.len();
+    out.content_controls = 0..out.controls.len();
+    out.present_scroll(state.page == Page::Home);
     header(&mut out, state, assets, now, pill_x, pill_width);
     footer(&mut out, state, assets);
     if let Some(overlay @ (Overlay::Options { .. } | Overlay::Keyboard)) = &state.overlay {
         out.controls.clear();
+        out.layout_controls.clear();
         let start = out.draw.len();
         out.shape(Rect::new(0., 0., 1920., 1080.), 0., c(0x080b12, 0.70));
         match overlay {
@@ -418,6 +494,7 @@ pub fn scene_with_pill(
         // Retain outgoing visuals after dismissal, while input immediately
         // belongs to the restored parent. No geometry or hit targets move.
         let parent_controls = std::mem::take(&mut out.controls);
+        let parent_layout_controls = std::mem::take(&mut out.layout_controls);
         let parent_modal = out.modal;
         out.fade(content_start, 1. - state.recents.visibility, 1.);
         let start = out.draw.len();
@@ -440,6 +517,7 @@ pub fn scene_with_pill(
         out.draw.splice(content_start..content_start, moved);
         if !state.recents_open() {
             out.controls = parent_controls;
+            out.layout_controls = parent_layout_controls;
             out.modal = parent_modal;
         }
     }
@@ -482,10 +560,14 @@ fn header(
         c(0xfafafa, 1.),
         c(0xe5e5e5, 1.),
     ));
-    if matches!(state.focus, Target::Nav(_)) && !state.pointer {
+    let nav_focus: f32 = (0..3)
+        .map(|i| out.focus(state, &Target::Nav(i)))
+        .sum::<f32>()
+        .min(1.);
+    if nav_focus > 0. && !state.pointer {
         // Follow the pill's animated position and width instead of jumping to
         // the destination tab's control rectangle.
-        out.border(pill.inset(-5.), 37., 2., c(0xf0f0f0, 0.95));
+        out.border(pill.inset(-5.), 37., 2., c(0xf0f0f0, 0.95 * nav_focus));
     }
     for (index, key) in ["home", "apps", "settings"].into_iter().enumerate() {
         let rect = layout.items[index];
@@ -493,7 +575,7 @@ fn header(
             language.t(key),
             Rect::new(rect.x, 64.3, rect.w, 25.),
             text(20.8, 550, -0.02),
-            if state.page_index() == index {
+            if (pill.x + pill.w).min(rect.x + rect.w) - pill.x.max(rect.x) > rect.w * 0.45 {
                 c(0x2c2c2c, 1.)
             } else {
                 c(0xeeeeee, 0.73)
@@ -503,8 +585,8 @@ fn header(
         out.control(Target::Nav(index), rect, false);
     }
     let rect = Rect::new(1786.4, 52., 49.6, 49.6);
-    let focused = state.focus == Target::TvSettings;
-    out.pill(rect, focused, false);
+    let focus = out.smooth_pill(state, &Target::TvSettings, rect, false);
+    let focused = focus >= 0.45;
     out.icon(
         assets,
         "settings",
@@ -543,21 +625,30 @@ fn tile(
     } else {
         state.content_viewport()
     };
-    if rect.y + rect.h + label_height < MAIN_TOP
-        || rect.y > 1054.
-        || rect.x + rect.w + 40. < viewport.x
-        || rect.x - 40. > viewport.x + viewport.w
+    let visual_x = rect.x
+        + if state.page == Page::Home {
+            out.scroll_delta[0]
+        } else {
+            0.
+        };
+    let visual_y = rect.y + out.scroll_delta[1];
+    if visual_y + rect.h + label_height < MAIN_TOP
+        || visual_y > 1054.
+        || visual_x + rect.w + 40. < viewport.x
+        || visual_x - 40. > viewport.x + viewport.w
     {
         return;
     }
     let start = out.draw.len();
-    let focused = state.focus == Target::App(app.id.clone());
+    let target = Target::App(app.id.clone());
+    let focused = state.focus == target;
+    let focus = out.focus(state, &target);
     out.shadow(
         rect,
         19.2,
-        if focused { 34. } else { 22. },
-        if focused { 14. } else { 9. },
-        if focused { 0.4 } else { 0.165 },
+        22. + focus * 12.,
+        9. + focus * 5.,
+        0.165 + focus * 0.235,
     );
     app_face(out, assets, app, rect, state.preferences.language, 19.2);
     if pinned {
@@ -589,14 +680,15 @@ fn tile(
             c(0xededed, 1.),
         );
     }
-    if focused {
-        out.ring(rect, 19.2);
+    if focus > 0. {
+        out.ring_alpha(rect, 19.2, focus);
     }
     if state.page == Page::Apps && state.filter == 5 {
         out.fade(start, 0.45, 1.);
     }
-    if state.pressed.as_ref() == Some(&Target::App(app.id.clone())) {
-        out.fade(start, 1., 0.85);
+    let pressed = out.pressed(state, &target);
+    if pressed > 0. {
+        out.fade(start, 1., 1. - 0.15 * pressed);
     }
     if names {
         out.text(
@@ -616,11 +708,7 @@ fn tile(
                 caption_height,
             ),
             text(17.6, if focused { 550 } else { 450 }, -0.02).leading(1.4),
-            if focused {
-                c(0xffffff, 1.)
-            } else {
-                c(0xececec, 0.66)
-            },
+            crate::motion_view::mix(c(0xececec, 0.66), c(0xffffff, 1.), focus),
             true,
         );
     }
@@ -952,7 +1040,8 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     out.draw.push(Draw::Clip(Some(state.favorites_viewport())));
     // Soft edges: out to the right from the end of the sixth tile, and in from the left once
     // the row has scrolled.
-    let left = if state.home_scroll > 0. {
+    let favorites_start = out.draw.len();
+    let left = if state.home_scroll - out.scroll_delta[0] > 0. {
         [HOME_FADE_LEFT, HOME_STRIP_LEFT]
     } else {
         [0., 0.]
@@ -980,6 +1069,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             false,
         );
     }
+    out.favorites_draw = favorites_start..out.draw.len();
     out.draw.push(Draw::EdgeFadeX(None));
     out.draw.push(Draw::Clip(Some(state.content_viewport())));
     let input_y = top + grid_height + 41.6 - if compact { 13.6 * reserved } else { 0. } - s;
@@ -1011,34 +1101,21 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             input_width,
             104.,
         );
-        let focused = state.focus == Target::Input(input.id.clone());
+        let focus = out.focus(state, &Target::Input(input.id.clone()));
         out.shadow(
             rect,
             18.4,
-            if focused { 34. } else { 4. },
-            if focused { 14. } else { 1. },
-            if focused { 0.4 } else { 0.01 },
+            4. + focus * 30.,
+            1. + focus * 13.,
+            0.01 + focus * 0.39,
         );
         out.draw.push(Draw::RoundedGradient(
             rect,
             18.4,
-            if focused {
-                c(0x30363c, 0.70)
-            } else {
-                c(0x20252b, 0.60)
-            },
-            if focused {
-                c(0x242a30, 0.65)
-            } else {
-                c(0x171c22, 0.55)
-            },
+            crate::motion_view::mix(c(0x20252b, 0.60), c(0x30363c, 0.70), focus),
+            crate::motion_view::mix(c(0x171c22, 0.55), c(0x242a30, 0.65), focus),
         ));
-        out.border(
-            rect,
-            18.4,
-            1.,
-            c(0xffffff, if focused { 0.24 } else { 0.063 }),
-        );
+        out.border(rect, 18.4, 1., c(0xffffff, 0.063 + focus * (0.24 - 0.063)));
         let art = Rect::new(rect.x + 21., rect.y + 24., 56., 56.);
         out.draw.push(Draw::RoundedGradient(
             art,
@@ -1074,8 +1151,8 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             c(0xe8e8e8, 0.48),
             false,
         );
-        if focused {
-            out.ring(rect, 18.4);
+        if focus > 0. {
+            out.ring_alpha(rect, 18.4, focus);
         }
         out.control(Target::Input(input.id.clone()), rect, true);
     }
@@ -1085,6 +1162,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     // transparent and space is still being made for the complete cards.
     if alpha == 0. {
         out.controls.truncate(input_controls);
+        out.layout_controls.truncate(input_controls);
     }
 }
 
@@ -1404,8 +1482,9 @@ fn filter(out: &mut Scene, state: &State, target: Target, rect: Rect, label: &st
         out.shape(rect, 32., c(0xffffff, 0.11));
         out.border(rect, 32., 1., c(0xffffff, 0.07));
     }
-    if state.focus == target && !state.pointer {
-        out.border(rect.inset(-7.), 39., 2., c(0xf0f0f0, 0.95));
+    let focus = out.focus(state, &target);
+    if focus > 0. && !state.pointer {
+        out.border(rect.inset(-7.), 39., 2., c(0xf0f0f0, 0.95 * focus));
     }
     out.text(
         label,
@@ -1431,20 +1510,21 @@ struct Row<'a> {
     chevron: bool,
 }
 fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
-    let focused = state.focus == row.target;
-    let bright = focused;
+    let start = out.draw.len();
+    let focus = out.focus(state, &row.target);
+    let bright = focus >= 0.45;
     let radius = if row.description.is_some() { 20. } else { 48. };
-    if bright {
+    out.shape(row.rect, radius, c(0x171c20, 0.72));
+    out.border(row.rect, radius, 1., c(0xffffff, 0.07 * (1. - focus)));
+    if focus > 0. {
         out.draw.push(Draw::RoundedGradient(
             row.rect,
             radius,
-            c(0xfafafa, 1.),
-            c(0xe5e5e5, 1.),
+            c(0xfafafa, focus),
+            c(0xe5e5e5, focus),
         ));
-    } else {
-        out.shape(row.rect, radius, c(0x171c20, 0.72));
-        out.border(row.rect, radius, 1., c(0xffffff, 0.07));
     }
+    // Avoid a low-contrast midpoint between light-on-dark and dark-on-light.
     let color = if bright {
         c(0x2c2c2c, 1.)
     } else {
@@ -1535,6 +1615,10 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
                 c(0xe4e4e4, 0.61)
             },
         );
+    }
+    let pressed = out.pressed(state, &row.target);
+    if pressed > 0. {
+        out.fade(start, 1., 1. - 0.1 * pressed);
     }
     out.control(row.target, row.rect, true);
 }
@@ -1785,8 +1869,8 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
     {
         let label = language.t(key);
         let rect = Rect::new(160., 164.8 + index as f32 * 84. - s, 403.2, 72.);
-        let focused = state.focus == Target::Sidebar(index);
-        out.pill(rect, focused, state.section == index);
+        let focus = out.smooth_pill(state, &Target::Sidebar(index), rect, state.section == index);
+        let focused = focus >= 0.45;
         let color = if focused {
             c(0x2c2c2c, 1.)
         } else if state.section == index {
@@ -2096,8 +2180,9 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     out.shape(check, 10.8, c(0xf3f3f3, 1.));
                     out.icon(assets, "check", check.inset(3.6), c(0x333333, 1.));
                 }
-                if state.focus == Target::Background(index) {
-                    out.ring(rect, 16.);
+                let focus = out.focus(state, &Target::Background(index));
+                if focus > 0. {
+                    out.ring_alpha(rect, 16., focus);
                 }
                 out.text(
                     language.wallpaper(id),
@@ -2788,8 +2873,8 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
             101.6,
             60.,
         );
-        let focused = state.focus == Target::Key(index);
-        out.pill(rect, focused, false);
+        let focus = out.smooth_pill(state, &Target::Key(index), rect, false);
+        let focused = focus >= 0.45;
         let mut style = text(18.4, 550, -0.02);
         let width = assets.width(label, style);
         if width > rect.w - 12. {

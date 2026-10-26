@@ -38,10 +38,19 @@ The personal branch currently includes official **v2.9.0**, including its System
 rendering setting. The fork uses independent setting identifiers to preserve Favorite
 rows and Wallpaper shading alongside it.
 
+Screen changes use a short, interruptible fade and slide. Favorites and vertical lists
+ease into position, while focus rings, card lighting and press feedback fade between
+states. Wallpaper shading also transitions between Home and other screens. These effects
+honor **Settings → General → Reduced motion**. Clicking during a scroll stops it at the
+displayed position so the selected card stays under the pointer.
+
 ## Branches and updates
 
 - `main` mirrors `ecklf/lg-luma`. Keep personal changes out of it.
 - `personal/home-grid` contains this optional layout and its tests.
+- Feature branches target `personal/home-grid` through reviewed pull requests; keep commits
+  scoped to each change. Build previews from the PR before merging, and retain the official
+  release on `main` for future synchronization.
 - `origin` points to `Near-o7/lg-luma`; `upstream` points to `ecklf/lg-luma`.
 
 To incorporate the latest stable official release:

@@ -200,6 +200,8 @@ impl Motion {
         let changed = self.screen.as_ref() != Some(&screen);
         let first = self.screen.is_none();
         if changed {
+            self.focus.0.clear();
+            self.press.0.clear();
             self.direction = self
                 .screen
                 .as_ref()
