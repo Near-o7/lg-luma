@@ -506,6 +506,17 @@ impl State {
         self.reconcile_focus();
     }
 
+    /// A lightweight input update leaves apps, artwork and saved preferences intact.
+    pub fn set_inputs(&mut self, inputs: Vec<crate::model::Input>) -> bool {
+        if self.inventory.inputs == inputs {
+            return false;
+        }
+        self.inventory.inputs = inputs;
+        self.dirty = true;
+        self.reconcile_focus();
+        true
+    }
+
     /// A failed inventory load. Right after a cold boot, or when the TV is short of memory, the
     /// Homebrew service that reads the inventory can take longer than one request allows. While
     /// no apps are shown yet, the screen keeps loading and the caller retries after the returned

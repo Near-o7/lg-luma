@@ -176,15 +176,15 @@
     "fr": "Ne jamais afficher"
   },
   "inputWhenConnected": {
-    "en": "Only show when connected",
-    "de": "Nur anzeigen, wenn verbunden",
-    "es": "Mostrar solo cuando esté conectada",
-    "zh": "仅在连接时显示",
-    "pt": "Mostrar só quando conectada",
-    "it": "Mostra solo se connesso",
-    "ru": "Только при подключении",
-    "pl": "Pokazuj tylko po podłączeniu",
-    "fr": "Afficher uniquement si connecté"
+    "en": "Only show when a signal is available",
+    "de": "Nur bei vorhandenem Signal anzeigen",
+    "es": "Mostrar solo cuando haya señal",
+    "zh": "仅在有信号时显示",
+    "pt": "Mostrar só quando houver sinal",
+    "it": "Mostra solo quando è presente un segnale",
+    "ru": "Показывать только при наличии сигнала",
+    "pl": "Pokazuj tylko przy dostępnym sygnale",
+    "fr": "Afficher uniquement si un signal est présent"
   },
   "renameInput": {
     "en": "Rename",
@@ -1802,5 +1802,16 @@
     "ru": "Затемнение обоев",
     "pl": "Przyciemnienie tła",
     "fr": "Assombrissement du fond"
+  },
+  "noSignal": {
+    "en": "No signal",
+    "de": "Kein Signal",
+    "es": "Sin señal",
+    "zh": "无信号",
+    "pt": "Sem sinal",
+    "it": "Nessun segnale",
+    "ru": "Нет сигнала",
+    "pl": "Brak sygnału",
+    "fr": "Aucun signal"
   }
 }

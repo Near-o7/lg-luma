@@ -322,6 +322,28 @@ try {
   const twoRows = await scenario('home-two-rows', 'home,down,down');
   assert.deepEqual(twoRows.focus, { App: edgeFavorites[6] });
   assert.equal(twoRows.home_scroll, 0);
+  await fs.writeFile(
+    preferences,
+    JSON.stringify({
+      favorites: edgeFavorites.slice(0, 12),
+      home_rows: 2,
+      show_weather: true,
+      show_home_names: true,
+      input_modes: {
+        'com.webos.app.hdmi1': 'on',
+        'com.webos.app.hdmi2': 'on',
+        'com.webos.app.hdmi3': 'on',
+      },
+    }),
+  );
+  const compactHome = await scenario('home-two-rows-complete-inputs', 'home,down,down,down');
+  assert.deepEqual(compactHome.focus, { Input: 'com.webos.app.hdmi1' });
+  assert.equal(compactHome.scroll, 0);
+  assert.ok(compactHome.ui_text.includes('HDMI 3'));
+  await fs.writeFile(
+    preferences,
+    JSON.stringify({ favorites: edgeFavorites, home_rows: 2, show_weather: false }),
+  );
   const rowChoice = await scenario(
     'favorite-rows-setting',
     'settings,down,enter,down,down,down,down,down,enter',

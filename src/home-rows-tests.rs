@@ -121,3 +121,64 @@ fn old_preferences_keep_the_original_strip_and_row_count_is_bounded() {
     preferences.sanitize();
     assert_eq!(preferences.home_rows, 1);
 }
+
+#[test]
+fn compact_home_keeps_favorites_and_all_four_inputs_on_screen() {
+    use crate::model::{Input, InputMode};
+    for rows in [1, 2] {
+        for names in [false, true] {
+            for weather in [false, true] {
+                let mut state = with_favorites(12);
+                state.preferences.home_rows = rows;
+                state.preferences.show_home_names = names;
+                state.preferences.show_weather = weather;
+                state.inventory.inputs.push(Input {
+                    id: "com.webos.app.hdmi4".into(),
+                    title: "HDMI 4".into(),
+                    port: "HDMI 4".into(),
+                    connected: Some(false),
+                    signal: Some(false),
+                });
+                for input in &state.inventory.inputs {
+                    state
+                        .preferences
+                        .input_modes
+                        .insert(input.id.clone(), InputMode::On);
+                }
+                let layout = controls(&state);
+                let inputs: Vec<_> = layout
+                    .iter()
+                    .filter(|c| matches!(c.target, Target::Input(_)))
+                    .collect();
+                assert_eq!(inputs.len(), 4);
+                let viewport = state.content_viewport();
+                for input in &inputs {
+                    assert!(input.rect.y >= viewport.y);
+                    assert!(
+                        input.rect.y + input.rect.h <= viewport.y + viewport.h - 12.,
+                        "rows={rows} names={names} weather={weather}: {:?}",
+                        input.rect
+                    );
+                    assert_eq!(input.rect.y, inputs[0].rect.y);
+                    assert!(input.rect.x + input.rect.w <= 1836.1);
+                }
+                let favorites_bottom = layout
+                    .iter()
+                    .filter(|c| matches!(c.target, Target::App(_)))
+                    .map(|c| c.rect.y + c.rect.h)
+                    .fold(0., f32::max);
+                assert!(inputs[0].rect.y >= favorites_bottom + 60.);
+                state.focus = state.first_content();
+                if rows == 2 {
+                    state.direction(Direction::Down, &controls(&state));
+                }
+                state.direction(Direction::Down, &controls(&state));
+                assert!(matches!(state.focus, Target::Input(_)));
+                assert_eq!(state.scroll, 0.);
+                state.direction(Direction::Right, &controls(&state));
+                assert!(matches!(state.focus, Target::Input(_)));
+                assert_eq!(state.scroll, 0.);
+            }
+        }
+    }
+}

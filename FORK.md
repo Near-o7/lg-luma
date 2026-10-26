@@ -12,6 +12,16 @@ Off shows the matching unshaded wallpaper crop; intermediate levels blend it wit
 original shaded asset. Apps, Settings, and static launch splashes keep their existing
 wallpapers; modal dimming retains its original opacity. The two-row favorites setting remains independent.
 
+Home refreshes HDMI cable and signal status every two seconds while focused, including
+inside Settings. Auto visibility follows signal availability when reported by webOS,
+falling back to cable state on older firmware. A connected dongle without a source shows
+**No signal**; forced On/Off preferences still take precedence. Failed reads preserve the
+last state and retry after ten seconds. Polls pause while Luma is hidden or unfocused.
+
+The two-row Home moves the greeting and favorites upward. Up to four HDMI ports share
+one row below the favorites, including when app captions are enabled. Cable changes do
+not move the favorite grid or change input card widths.
+
 ## Branches and updates
 
 - `main` mirrors `ecklf/lg-luma`. Keep personal changes out of it.
@@ -55,6 +65,6 @@ would replace the customized executable and remove this layout option; use a pac
 built from `personal/home-grid` instead. Preferences remain under the same app ID.
 Package versions follow upstream and the checked commit identifies the custom build.
 
-The layout is isolated from Home takeover and the TV service code to reduce conflicts.
+Personal layout, settings and input refresh changes do not modify Home takeover.
 Future official Home/settings refactors can still require a manual merge. If the author
 adds an equivalent option, remove the personal patch and return to official packages.

@@ -135,6 +135,7 @@ pub fn redirect_to_home() -> Result<bool, String> {
 
 pub enum Request {
     Refresh,
+    RefreshInputs,
     Launch(String),
     SyncSplash(String),
     Recent {
@@ -144,6 +145,7 @@ pub enum Request {
 }
 pub enum Response {
     Inventory(Result<(Inventory, Option<String>), String>),
+    Inputs(Result<Vec<Input>, String>),
     Launched(Result<(), String>),
     Recent {
         generation: u64,
@@ -205,6 +207,11 @@ impl Platform {
                         inventory()
                     } else {
                         Ok((demo_inventory(), None))
+                    }),
+                    Request::RefreshInputs => Response::Inputs(if webos {
+                        input_inventory()
+                    } else {
+                        Ok(demo_inventory().inputs)
                     }),
                     Request::Launch(id) => Response::Launched(if webos {
                         if crate::scroll_preview::is_placeholder(&id) {
@@ -465,8 +472,7 @@ fn inventory() -> Result<(Inventory, Option<String>), String> {
         "luna://com.webos.applicationManager/listApps",
         "apps",
     )?)?;
-    let inputs = inventory_read("luna://com.webos.service.eim/getAllInputStatus", "devices")
-        .and_then(|raw| normalize_inputs(&raw));
+    let inputs = input_inventory();
     match inputs {
         Ok(inputs) => {
             eprintln!(
@@ -484,6 +490,11 @@ fn inventory() -> Result<(Inventory, Option<String>), String> {
             Some(format!("Inputs could not be refreshed: {error}")),
         )),
     }
+}
+
+fn input_inventory() -> Result<Vec<Input>, String> {
+    inventory_read("luna://com.webos.service.eim/getAllInputStatus", "devices")
+        .and_then(|raw| normalize_inputs(&raw))
 }
 
 fn title(value: Option<&str>, fallback: &str) -> String {
@@ -585,8 +596,10 @@ pub fn normalize_inputs(raw: &Value) -> Result<Vec<Input>, String> {
             id: id.into(),
             title: title(entry.get("label").and_then(Value::as_str), &port),
             port,
-            // Some firmware reports `connected: true` for every existing port;
-            // `hdmiPlugIn` is the actual cable state where it is provided.
+            signal: entry.get("hdmiSignalExist").and_then(Value::as_bool),
+            // A powered dongle can remain plugged in without a source. Keep
+            // cable presence separate from signal availability. Some firmware
+            // reports `connected: true` for every existing port.
             connected: entry
                 .get("hdmiPlugIn")
                 .and_then(Value::as_bool)

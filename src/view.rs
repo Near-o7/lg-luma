@@ -842,10 +842,17 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let shift = summary
         .as_ref()
         .map_or(0., |summary| (summary.height + 18.4) / 2.);
+    // Two favorite rows share the screen with inputs instead of pushing them
+    // below the fold. Keep these anchors independent of cable hotplug state.
+    let compact = state.home_rows() == 2;
+    let top = if compact { 376. } else { 544.8 };
+    let greeting_y = if compact { 197. } else { 265. };
+    let greeting_size = if compact { 72.4 } else { 90.4 };
+    let greeting_height = greeting_size * 1.05;
     let date = language.date(now);
     out.text(
         date,
-        Rect::new(84., 227.2 - shift - s, 1200., 17.),
+        Rect::new(84., greeting_y - 37.8 - shift - s, 1200., 17.),
         text(14.4, 600, 0.12),
         c(0xf5f5f5, 0.72),
         false,
@@ -853,17 +860,23 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let greeting = language.greeting(now.hour(), &state.preferences.greeting_name);
     out.text(
         &greeting,
-        Rect::new(84., 265. - shift - s, 1500., 95.),
-        text(90.4, 500, -0.065).leading(1.05),
+        Rect::new(84., greeting_y - shift - s, 1500., greeting_height),
+        text(greeting_size, 500, -0.065).leading(1.05),
         WHITE,
         false,
     );
     if let Some(summary) = summary {
-        weather_summary(out, state, assets, summary, 265. - shift + 94.92 + 18.4 - s);
+        weather_summary(
+            out,
+            state,
+            assets,
+            summary,
+            greeting_y - shift + greeting_height + 18.4 - s,
+        );
     }
     out.text(
         language.t("favorites"),
-        Rect::new(84., 478.5 - s, 1000., 31.),
+        Rect::new(84., top - 66.3 - s, 1000., 31.),
         text(23.2, 550, -0.035).leading(1.3),
         WHITE,
         false,
@@ -871,7 +884,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     if state.moving.is_some() {
         out.text(
             language.t("moveApps"),
-            Rect::new(1686., 485. - s, 150., 24.),
+            Rect::new(1686., top - 59.8 - s, 150., 24.),
             text(14.4, 400, 0.),
             c(0xdedede, 1.),
             true,
@@ -886,12 +899,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     if state.loading && state.inventory.apps.is_empty() {
         for index in 0..6 {
             out.shape(
-                Rect::new(
-                    84. + index as f32 * GRID_PITCH,
-                    544.8 - s,
-                    270.,
-                    FACE_HEIGHT,
-                ),
+                Rect::new(84. + index as f32 * GRID_PITCH, top - s, 270., FACE_HEIGHT),
                 19.2,
                 c(0xffffff, 0.06),
             );
@@ -903,7 +911,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             state,
             assets,
             EmptyState {
-                rect: Rect::new(84., 533.6 - s, 1752., 258.7),
+                rect: Rect::new(84., top - 11.2 - s, 1752., 258.7),
                 icon: if error { "alert" } else { "heart" },
                 title: if error {
                     language.t("aLittleHelp")
@@ -958,7 +966,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             app,
             Rect::new(
                 84. + column as f32 * HOME_TILE_PITCH - state.home_scroll,
-                544.8 + row as f32 * row_pitch - s,
+                top + row as f32 * row_pitch - s,
                 HOME_TILE_WIDTH,
                 FACE_HEIGHT,
             ),
@@ -968,7 +976,11 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     }
     out.draw.push(Draw::EdgeFadeX(None));
     out.draw.push(Draw::Clip(Some(state.content_viewport())));
-    let input_y = 544.8 + grid_height + 41.6 - s;
+    let input_y = top + grid_height + if compact { 28. } else { 41.6 } - s;
+    // The four physical HDMI ports fit on one row. Reserve their columns even
+    // when Auto hides a port, so hotplug does not change the card widths.
+    let input_columns = state.inventory.inputs.len().clamp(3, 4);
+    let input_width = (1752. - 22.4 * (input_columns - 1) as f32) / input_columns as f32;
     let inputs: Vec<_> = state
         .inventory
         .inputs
@@ -986,9 +998,9 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     }
     for (index, input) in inputs.iter().enumerate() {
         let rect = Rect::new(
-            84. + (index % 3) as f32 * 591.45,
-            input_y + 58.4 + (index / 3) as f32 * 126.4,
-            569.1,
+            84. + (index % input_columns) as f32 * (input_width + 22.4),
+            input_y + 58.4 + (index / input_columns) as f32 * 126.4,
+            input_width,
             104.,
         );
         let focused = state.focus == Target::Input(input.id.clone());
@@ -1042,14 +1054,14 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         );
         out.text(
             state.preferences.input_title(input),
-            Rect::new(rect.x + 93., rect.y + 24.3, 450., 28.8),
+            Rect::new(rect.x + 93., rect.y + 24.3, rect.w - 119., 28.8),
             text(24., 500, -0.03),
             WHITE,
             false,
         );
         out.text(
             input_status(input, name.is_some(), language),
-            Rect::new(rect.x + 93., rect.y + 58.7, 450., 20.),
+            Rect::new(rect.x + 93., rect.y + 58.7, rect.w - 119., 20.),
             text(13.12, 400, 0.).leading(1.5),
             c(0xe8e8e8, 0.48),
             false,
@@ -2389,10 +2401,12 @@ pub fn input_status(input: &Input, renamed: bool, language: Language) -> String 
     if renamed {
         parts.push(input.port.as_str());
     }
-    parts.push(match input.connected {
-        Some(false) => language.t("noDevice"),
-        None => language.t("externalInput"),
-        Some(true) => language.t("connected"),
+    parts.push(match (input.signal, input.connected) {
+        (Some(true), _) => language.t("connected"),
+        (Some(false), Some(true)) => language.t("noSignal"),
+        (Some(false), _) | (_, Some(false)) => language.t("noDevice"),
+        (None, None) => language.t("externalInput"),
+        (None, Some(true)) => language.t("connected"),
     });
     parts.join(" · ")
 }

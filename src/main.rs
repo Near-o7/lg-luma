@@ -10,6 +10,8 @@ mod diagnostics;
 mod egl_damage;
 mod font;
 mod i18n;
+#[path = "input-refresh.rs"]
+mod input_refresh;
 #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
 mod luna;
 mod model;
@@ -862,6 +864,7 @@ fn run() -> Result<(), String> {
     let mut initial_focus = options.script.is_empty();
     // When to ask for the inventory again after a failed load (State::inventory_failed).
     let mut inventory_retry: Option<Instant> = None;
+    let mut input_refresh = input_refresh::Refresh::default();
     let scripted_input = !options.script.is_empty();
     let mut scene = compose(
         &mut state,
@@ -930,6 +933,17 @@ fn run() -> Result<(), String> {
                     } else if initial_focus {
                         state.focus = state.first_content();
                         initial_focus = false;
+                    }
+                }
+                Response::Inputs(result) => {
+                    input_refresh.completed(Instant::now(), result.is_ok());
+                    match result {
+                        Ok(inputs) => {
+                            if state.set_inputs(inputs) {
+                                eprintln!("Luma HDMI status: {:?}", state.inventory.inputs);
+                            }
+                        }
+                        Err(error) => eprintln!("Luma HDMI refresh: {error}"),
                     }
                 }
                 Response::Launched(result) => {
@@ -1351,6 +1365,12 @@ fn run() -> Result<(), String> {
         if inventory_retry.is_some_and(|at| Instant::now() >= at) {
             inventory_retry = None;
             platform.send(Request::Refresh);
+        }
+        if input_refresh.due(
+            Instant::now(),
+            webos && visible && focused && !state.loading,
+        ) {
+            platform.send(Request::RefreshInputs);
         }
         weather_tick(&mut state, &weather_service, visible);
         // SDL-webOS disables text input when its own panel is dismissed, even

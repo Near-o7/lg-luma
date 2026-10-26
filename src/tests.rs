@@ -16,6 +16,9 @@ mod home_rows_tests;
 #[path = "home-shading-tests.rs"]
 mod home_shading_tests;
 
+#[path = "input-status-tests.rs"]
+mod input_status_tests;
+
 fn ready() -> State {
     let mut state = State::new(Preferences::default());
     state.set_inventory(demo_inventory(), None);
@@ -290,6 +293,7 @@ fn auto_input_visibility_requires_a_positive_connection_report() {
         title: "Console".into(),
         port: "HDMI 1".into(),
         connected: None,
+        signal: None,
     };
     assert!(!preferences.input_visible(&input));
     input.connected = Some(true);
@@ -1222,6 +1226,7 @@ fn custom_input_names_keep_the_label_port_and_status_as_detail() {
         title: "AVR-X1800H".into(),
         port: "HDMI 2".into(),
         connected: Some(true),
+        signal: None,
     };
     let language = preferences.language;
     let status = |preferences: &Preferences| {

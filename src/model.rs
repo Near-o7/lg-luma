@@ -66,12 +66,13 @@ impl App {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Input {
     pub id: String,
     pub title: String,
     pub port: String,
     pub connected: Option<bool>,
+    pub signal: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -174,7 +175,7 @@ impl Preferences {
         match self.input_modes.get(&input.id).copied().unwrap_or_default() {
             InputMode::On => true,
             InputMode::Off => false,
-            InputMode::Auto => input.connected == Some(true),
+            InputMode::Auto => input.signal.or(input.connected) == Some(true),
         }
     }
 
@@ -278,18 +279,21 @@ pub fn demo_inventory() -> Inventory {
                 title: "PlayStation 5".into(),
                 port: "HDMI 1".into(),
                 connected: Some(true),
+                signal: None,
             },
             Input {
                 id: "com.webos.app.hdmi2".into(),
                 title: "Apple TV".into(),
                 port: "HDMI 2".into(),
                 connected: Some(true),
+                signal: None,
             },
             Input {
                 id: "com.webos.app.hdmi3".into(),
                 title: "HDMI 3".into(),
                 port: "HDMI 3".into(),
                 connected: Some(false),
+                signal: None,
             },
         ],
     };

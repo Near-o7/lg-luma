@@ -122,7 +122,13 @@ between rows, including reorder mode; the last row leads to inputs. Additional p
 horizontally. See `FORK.md` for updating this patch from official stable releases.
 In the default single row, Left/Right follows saved order,
 including reorder mode, and reveals complete cards. Up returns to Home navigation; Down enters
-the nearest input in the first row. The strip position survives page changes. Wheel movement over
+the nearest input in the first row. The two-row layout uses a compact greeting/favorites header to leave complete inputs
+visible. Up to four physical HDMI ports share one row. While focused, including Settings,
+Luma polls only input status every two seconds with one request in flight. Auto mode uses
+signal availability where reported, then cable presence as a compatibility fallback;
+No signal distinguishes a powered adapter with no source. Failed reads retain previous
+inputs, with a ten-second retry delay. Hidden or unfocused Home does not poll.
+The strip position survives page changes. Wheel movement over
 favorites scrolls horizontally; elsewhere it scrolls vertically. Pointer hover/down never moves
 the clicked control. Apps Up/Down follows the six-column grid order, including offscreen rows,
 and only the first row's Up route reaches the category toolbar. Scrolling Apps content fades into
