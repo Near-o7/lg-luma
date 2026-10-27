@@ -16,9 +16,11 @@ dist/                        Generated ARM IPK, checksum and Homebrew feed
 .build/                      Generated assets, SDK/runtime caches and rendering diagnostics
 ```
 
-React, JSX, Vite, browser tests and web rendering are no longer part of the project. Node/pnpm
+The launcher is rendered natively, without React, JSX, Vite or a browser runtime. Node/pnpm
 remain build/deployment tools for Sharp, the webOS CLI and formatting/linting. The installed app
-is the Rust executable `luma`, with app ID `com.ecklf.luma`.
+is the Rust executable `luma`, with app ID `com.ecklf.luma`. The companion wallpaper-upload page
+in `assets/wallpaper-upload/` is plain HTML/CSS/JavaScript, embedded in the native executable
+and served temporarily to the owner's phone or computer; it does not render the TV interface.
 
 ## Toolchain and commands
 
@@ -88,7 +90,7 @@ It does not execute the test suites. A desktop display is required; on headless 
 | OK or Back in move mode       | Finish reordering without launching                           |
 | Escape / Back / Backspace     | Parent navigation, overlay dismissal or Recent apps from Home |
 | Hold Back / Escape for 600 ms | Open Recent apps while Luma is focused                        |
-| Menu / M / right-click        | App options side popup                                        |
+| Menu / M / right-click        | App or background options side popup                          |
 | Pointer / wheel               | Hover, click, hold and scrolling                              |
 | F5                            | Refresh inventory                                             |
 
@@ -100,6 +102,11 @@ and the vector power-icon **Quit app** action separately from General preference
 On Apps, OK or a normal pointer click on an app opens its side popup, with **Open** first and focused by
 default, followed by favorite, hide/show and **Delete app** actions. A second OK launches the app.
 Home favorites, Inputs and Recent apps launch directly. Hold OK on Home still reorders favorites.
+Background cards open the same side popup with **Use background** first and **Delete background**
+only for inactive backgrounds. Deletion requires confirmation with **Cancel** focused by default.
+Uploaded images are deleted on the wallpaper worker; bundled assets remain in the package, with
+their gallery removal persisted in preferences. The active background is protected in both the
+UI and deletion worker. Back restores the gallery card by identity even after catalog changes.
 LG's Settings and More buttons retain their system menus, with no custom key interception.
 Deletion opens a separate confirmation with **Cancel** focused by default. Cancel or Back returns
 to the side popup. Once deletion is sent, dismissal does not cancel the platform operation.
@@ -224,6 +231,57 @@ pnpm dev --script recents,await-recents
 `hold-back` is also a scripted opening action. Desktop smoke scenarios render normal, close-one,
 empty, launch, pointer and Home Back flows; unit tests cover hold timing, cancelled
 presses, stale responses, failures, navigation, reduced motion, reversible crossfades and consistent card artwork.
+
+## Custom wallpaper uploads
+
+**Settings → Background → Add a background** opens a native modal with a QR code and a
+temporary HTTP URL. On a phone or computer on the same network, choose a JPEG, PNG or WebP,
+enter a name, then drag the preview or use the zoom/position sliders to compose a 16:9 crop.
+**Add to TV** adds the named image to the gallery without selecting it. Close the TV modal
+and choose its thumbnail to use it. The upload page is currently English; the TV modal is localized.
+
+The phone accepts files up to 16 MiB and 32 megapixels, applies image orientation, and exports
+only the selected 1920×1080 JPEG crop. The native worker independently verifies the image format,
+exact output dimensions, a 12 MiB transport cap and a 32 MiB decoder allocation limit. It strips
+source metadata by re-encoding, generates a 480×270 thumbnail, and applies the same base opacity
+and readability gradients as bundled wallpapers. Processing and discovery run off the SDL thread;
+GPU uploads remain on SDL. Nothing is fetched from external services.
+
+The gallery holds up to 20 uploaded images under `wallpapers/custom-<random-id>/` beside the
+selected preferences file. The phone page shows this resolved absolute directory path. Names are
+trimmed, control-free and limited to 40 characters; they
+never become file paths. Files and metadata are committed in a new directory by atomic rename,
+with immutable paths so existing GPU texture caches cannot show an older upload. Root Home
+preserves the app storage owner's UID/GID for new directories and files. Preferences retain only
+the generated selected ID. Invalid metadata and entries with missing files are skipped; an unavailable selected image
+renders the bundled default without destroying the saved selection. These files survive app
+updates, and normal/takeover launches using the shared preferences location use the same gallery.
+Custom images are not used as LG's launch splash: runtime splash updates are skipped for them,
+and takeover boot staging uses a bundled fallback.
+
+The native process binds an ephemeral port on one private/link-local IPv4 interface only while
+the upload modal is open and focused, with a fixed ten-minute session lifetime. Closing the modal,
+losing focus, hiding Luma or exiting invalidates the session. An unpredictable 128-bit capability
+URL, exact Host/Origin checks, a custom upload header, no CORS, and restrictive browser security
+headers limit access. The 8-character case-sensitive base-58 token has about 47 bits of entropy;
+each session accepts at most 64 local requests and expires after ten minutes. HTTP is **not
+encrypted**; use a trusted local network. The URL is not logged.
+The branded code follows the small center-logo approach shown in
+[Vercel's QR example](https://github.com/vercel/examples/tree/main/container-images/demo/apps/qr):
+Luma uses high error correction, light modules on the modal's dark background, and a compact center
+mark. QR readers vary in their support for inverted polarity; the URL remains visible as a manual
+fallback.
+Requests are serialized and bounded by header/body sizes and a deadline, with cancellation checks
+while reading and before committing. No user-controlled path is opened by the server. No privileged
+helper or permanent system service is installed. Networks with client isolation, IPv6-only access
+or an inbound firewall may prevent the phone reaching the server; this needs manual TV verification.
+
+`pnpm test:wallpapers` checks browser crop/name math. Rust wallpaper tests use generated images,
+isolated temporary storage and loopback HTTP only. Scripted desktop runs bind the upload server
+to loopback rather than the real LAN; `await-upload` waits for the modal's link or error state.
+Verify the QR code, phone drag/zoom, upload,
+TV selection/restart, normal/takeover access, cancellation and timeout on real hardware; desktop
+checks do not establish webOS jail networking permissions or TV/browser behavior.
 
 ## Splash images
 

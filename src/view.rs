@@ -50,6 +50,18 @@ impl Assets {
         self.root.join(path).to_string_lossy().into_owned()
     }
 
+    fn background(&self, state: &State, id: &str) -> String {
+        if let Some(item) = state.wallpapers.iter().find(|item| item.id == id) {
+            return item.image();
+        }
+        let id = if BACKGROUNDS.iter().any(|(known, _)| *known == id) {
+            id
+        } else {
+            "dunes"
+        };
+        self.path(format!("wallpapers/{id}.jpg"))
+    }
+
     fn width(&self, value: &str, style: TextStyle) -> f32 {
         let key = format!(
             "{}{}",
@@ -254,6 +266,146 @@ impl Scene {
     }
 }
 
+fn wallpaper_upload(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
+    let panel = Rect::new(520., 144., 880., 816.);
+    out.modal = Some(panel);
+    out.shadow(panel, 24., 40., 12., 0.3);
+    out.shape(panel, 24., c(0x1b2023, 1.));
+    out.border(panel, 24., 1., c(0xffffff, 0.09));
+    out.text(
+        language.t("uploadWallpaper"),
+        Rect::new(584., 198., 752., 48.),
+        text(32., 550, -0.02),
+        WHITE,
+        true,
+    );
+    out.text(
+        language.t("wallpaperUploadHint"),
+        Rect::new(604., 264., 712., 32.),
+        text(19., 400, 0.).leading(1.5),
+        c(0xffffff, 0.65),
+        true,
+    );
+    match &state.wallpaper_upload {
+        Some(Ok(session)) => {
+            let scale = (336. / (session.qr_size + 8) as f32).floor();
+            let size = (session.qr_size + 8) as f32 * scale;
+            let x = (1920. - size) / 2.;
+            let y = 310.;
+            // Invert the normal QR polarity to blend into the dark modal, while
+            // retaining a high-contrast foreground and the full quiet zone.
+            let background = c(0x1b2023, 1.);
+            let modules = c(0xf5f4ef, 1.);
+            out.shape(Rect::new(x, y, size, size), 0., background);
+            for row in 0..session.qr_size {
+                // Merge contiguous modules so QR rendering stays a few hundred quads.
+                let mut column = 0;
+                while column < session.qr_size {
+                    let mark_start = (session.qr_size - 11) / 2;
+                    let in_mark = (mark_start..mark_start + 11).contains(&row)
+                        && (mark_start..mark_start + 11).contains(&column);
+                    if in_mark {
+                        column += 1;
+                        continue;
+                    }
+                    if !session.qr[(row * session.qr_size + column) as usize] {
+                        column += 1;
+                        continue;
+                    }
+                    let start = column;
+                    while column < session.qr_size {
+                        let in_mark = (mark_start..mark_start + 11).contains(&row)
+                            && (mark_start..mark_start + 11).contains(&column);
+                        if in_mark || !session.qr[(row * session.qr_size + column) as usize] {
+                            break;
+                        }
+                        column += 1;
+                    }
+                    out.shape(
+                        Rect::new(
+                            x + (start + 4) as f32 * scale,
+                            y + (row + 4) as f32 * scale,
+                            (column - start) as f32 * scale,
+                            scale,
+                        ),
+                        0.,
+                        modules,
+                    );
+                }
+            }
+            let mark_start = (session.qr_size - 11) / 2;
+            let mark_plate = Rect::new(
+                x + (mark_start + 4) as f32 * scale,
+                y + (mark_start + 4) as f32 * scale,
+                11. * scale,
+                11. * scale,
+            );
+            out.shape(mark_plate, 1.1 * scale, background);
+            let mark = Rect::new(
+                mark_plate.x + 1.25 * scale,
+                mark_plate.y + 1.25 * scale,
+                8.5 * scale,
+                8.5 * scale,
+            );
+            out.icon(assets, "luma-mark", mark, WHITE);
+            out.text(
+                language.t("wallpaperUploadBrowser"),
+                Rect::new(604., 670., 712., 32.),
+                text(19., 400, 0.).leading(1.5),
+                c(0xffffff, 0.65),
+                true,
+            );
+            let display_url = session.url.trim_end_matches('/');
+            out.text(
+                display_url,
+                Rect::new(568., 716., 784., 36.),
+                assets.fit_text(display_url, text(26., 600, 0.), 784.),
+                WHITE,
+                true,
+            );
+            out.text(
+                language.t("wallpaperUploadKeepOpen"),
+                Rect::new(604., 766., 712., 52.),
+                text(16., 400, 0.).leading(1.4),
+                c(0xffffff, 0.75),
+                true,
+            );
+            out.text(
+                language.t("wallpaperUploadPrivate"),
+                Rect::new(604., 820., 712., 22.),
+                text(15., 400, 0.),
+                c(0xffffff, 0.5),
+                true,
+            );
+        }
+        result => {
+            let key = if result.is_some() {
+                "wallpaperUploadError"
+            } else {
+                "wallpaperUploadStarting"
+            };
+            out.text(
+                language.t(key),
+                Rect::new(604., 470., 712., 90.),
+                text(22., 450, 0.).leading(1.5),
+                c(0xffffff, 0.75),
+                true,
+            );
+        }
+    }
+    let close = Rect::new(812., 862., 296., 56.);
+    out.pill(close, state.focus == Target::CloseDialog, false);
+    out.text(
+        language.t("close"),
+        Rect::new(close.x, close.y + 15., close.w, 28.),
+        text(20., 550, 0.),
+        c(0x171c20, 1.),
+        true,
+    );
+    out.control(Target::CloseDialog, close, false);
+}
+
 fn c(rgb: u32, alpha: f32) -> Color {
     [
         ((rgb >> 16) & 255) as f32 / 255.,
@@ -301,14 +453,14 @@ pub fn scene_with_pill(
     let mut out = Scene::new();
     if let Some((previous, start)) = &state.previous_background {
         out.image(
-            assets.path(format!("wallpapers/{previous}.jpg")),
+            assets.background(state, previous),
             Rect::new(0., 0., 1920., 1080.),
             0.,
             false,
         );
         let alpha = (start.elapsed().as_secs_f32() / 0.4).min(1.);
         out.draw.push(Draw::TintedImage(
-            assets.path(format!("wallpapers/{}.jpg", state.preferences.background)),
+            assets.background(state, &state.preferences.background),
             Rect::new(0., 0., 1920., 1080.),
             0.,
             false,
@@ -316,7 +468,7 @@ pub fn scene_with_pill(
         ));
     } else {
         out.image(
-            assets.path(format!("wallpapers/{}.jpg", state.preferences.background)),
+            assets.background(state, &state.preferences.background),
             Rect::new(0., 0., 1920., 1080.),
             0.,
             false,
@@ -386,11 +538,19 @@ pub fn scene_with_pill(
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
     header(&mut out, state, assets, now, pill_x, pill_width);
-    footer(&mut out, state, assets);
-    if let Some(overlay @ (Overlay::Options { .. } | Overlay::Delete { .. } | Overlay::Keyboard)) =
-        &state.overlay
+    if let Some(
+        overlay @ (Overlay::Options { .. }
+        | Overlay::Delete { .. }
+        | Overlay::BackgroundOptions { .. }
+        | Overlay::BackgroundDelete { .. }
+        | Overlay::Keyboard
+        | Overlay::WallpaperUpload),
+    ) = &state.overlay
     {
         let anchor = match overlay {
+            Overlay::BackgroundOptions { id, .. } => out.controls.iter()
+                .find(|control| matches!(control.target, Target::Background(index) if state.background_id(index) == Some(id.as_str())))
+                .map(|control| Rect::new(control.rect.x, control.rect.y, control.rect.w, 202.5)),
             Overlay::Options { id, .. } => out
                 .controls
                 .iter()
@@ -416,21 +576,30 @@ pub fn scene_with_pill(
         out.controls.clear();
         let start = out.draw.len();
         out.shape(Rect::new(0., 0., 1920., 1080.), 0., c(0x080b12, 0.70));
-        if matches!(overlay, Overlay::Options { .. })
-            && let Some(opened) = state.panel_started
+        if matches!(
+            overlay,
+            Overlay::Options { .. } | Overlay::BackgroundOptions { .. }
+        ) && let Some(opened) = state.panel_started
         {
             // The lifted card stays opaque while the backdrop and popup fade.
             // Fading it over its dimmed parent copy causes a brightness dip.
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
         }
         match overlay {
-            Overlay::Options { id, .. } => options(&mut out, state, assets, id, anchor),
-            Overlay::Delete { id, .. } => delete_confirmation(&mut out, state, assets, id),
+            Overlay::Options { id, .. } | Overlay::BackgroundOptions { id, .. } => {
+                options(&mut out, state, assets, id, anchor)
+            }
+            Overlay::Delete { id, .. } | Overlay::BackgroundDelete { id, .. } => {
+                delete_confirmation(&mut out, state, assets, id)
+            }
             Overlay::Keyboard => keyboard(&mut out, state, assets),
+            Overlay::WallpaperUpload => wallpaper_upload(&mut out, state, assets),
             Overlay::SystemKeyboard | Overlay::Recents { .. } => {}
         }
-        if !matches!(overlay, Overlay::Options { .. })
-            && let Some(opened) = state.panel_started
+        if !matches!(
+            overlay,
+            Overlay::Options { .. } | Overlay::BackgroundOptions { .. }
+        ) && let Some(opened) = state.panel_started
         {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
         }
@@ -1464,7 +1633,14 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
         } else {
             (row.rect.h - 29.12) / 2.
         };
-    let title_width = row.rect.w - (x - row.rect.x) - if row.value.is_some() { 210. } else { 64. };
+    let right_inset = if row.value.is_some() {
+        210.
+    } else if row.target == Target::UploadWallpaper {
+        24.2
+    } else {
+        64.
+    };
+    let title_width = row.rect.w - (x - row.rect.x) - right_inset;
     let title_height = if row.description.is_some() {
         assets.lines(row.title, text(20.8, 550, -0.02), title_width) as f32 * 29.12
     } else {
@@ -1530,7 +1706,8 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
             },
         );
     }
-    out.control(row.target, row.rect, true);
+    let scrollable = row.target != Target::UploadWallpaper;
+    out.control(row.target, row.rect, scrollable);
 }
 
 fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
@@ -1773,7 +1950,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         .enumerate()
     {
         let label = language.t(key);
-        let rect = Rect::new(160., 164.8 + index as f32 * 84. - s, 403.2, 72.);
+        let rect = Rect::new(160., 164.8 + index as f32 * 84., 403.2, 72.);
         let focused = state.focus == Target::Sidebar(index);
         out.pill(rect, focused, state.section == index);
         let color = if focused {
@@ -1868,7 +2045,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 );
             }
         }
-        out.control(Target::Sidebar(index), rect, true);
+        out.control(Target::Sidebar(index), rect, false);
     }
     if let Some(subpage) = &state.subpage {
         let start = out.draw.len();
@@ -2028,22 +2205,48 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             }
         }
         1 => {
-            for (index, (id, _title)) in BACKGROUNDS.iter().enumerate() {
+            let upload_label = language.t("uploadWallpaper");
+            let upload_width = (assets.width(upload_label, text(20.8, 550, -0.02)) + 88.)
+                .ceil()
+                .clamp(240., 520.);
+            row(
+                out,
+                state,
+                assets,
+                Row {
+                    target: Target::UploadWallpaper,
+                    rect: Rect::new(1760. - upload_width, 164.8, upload_width, 64.),
+                    title: upload_label,
+                    icon: Some("upload"),
+                    value: None,
+                    description: None,
+                    selected: false,
+                    chevron: false,
+                },
+            );
+            out.draw
+                .push(Draw::Clip(Some(state.backgrounds_viewport())));
+            for index in 0..state.background_count() {
+                let id = state.background_id(index).unwrap();
+                let custom = state.wallpapers.iter().find(|item| item.id == id);
                 let rect = Rect::new(
                     640. + (index % 3) as f32 * 380.,
-                    164.8 + (index / 3) as f32 * 264.3 - s,
+                    252.8 + (index / 3) as f32 * 226.5 - s,
                     360.,
                     202.5,
                 );
                 out.shadow(rect, 16., 15., 3., 0.13);
                 out.image(
-                    assets.path(format!("thumbnails/{id}.jpg")),
+                    custom.map_or_else(
+                        || assets.path(format!("thumbnails/{id}.jpg")),
+                        |item| item.thumbnail(),
+                    ),
                     rect,
                     16.,
                     false,
                 );
                 out.border(rect, 16., 1., c(0xffffff, 0.086));
-                if state.preferences.background == *id {
+                if state.preferences.background == id {
                     out.border(rect.inset(-2.), 18., 2., c(0xdedede, 1.));
                     out.border(rect.inset(-7.), 23., 3., c(0xdedede, 0.10));
                     let check = Rect::new(rect.x + rect.w - 28., rect.y + rect.h - 28., 21.6, 21.6);
@@ -2053,22 +2256,22 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 if state.focus == Target::Background(index) {
                     out.ring(rect, 16.);
                 }
-                out.text(
-                    language.wallpaper(id),
-                    Rect::new(rect.x + 4., rect.y + rect.h + 12., 352., 26.),
-                    text(18.4, 500, -0.02).leading(1.4),
-                    c(0xf0f0f0, 0.87),
-                    false,
-                );
-                out.control(
-                    Target::Background(index),
-                    Rect::new(rect.x, rect.y, rect.w, rect.h + 37.8),
-                    true,
-                );
+                out.control(Target::Background(index), rect, true);
             }
+            out.draw.push(Draw::Clip(Some(state.content_viewport())));
         }
         WEATHER_SECTION => weather_settings(out, state, assets),
         SYSTEM_SECTION => {
+            let version_rect = Rect::new(640., 164.8 - s, 1120., 72.);
+            out.shape(version_rect, 48., c(0x171c20, 0.3));
+            out.border(version_rect, 48., 1., c(0xffffff, 0.045));
+            out.text(
+                format!("Luma v{}", assets.version.trim()),
+                Rect::new(664.2, version_rect.y + (72. - 29.12) / 2., 1031.8, 29.12),
+                text(20.8, 550, -0.02).leading(1.4),
+                c(0xeeeeee, 0.5),
+                false,
+            );
             for (position, (index, title, icon, value, chevron)) in [
                 (
                     3,
@@ -2099,7 +2302,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     assets,
                     Row {
                         target: Target::Setting(index),
-                        rect: Rect::new(640., 164.8 + position as f32 * 84. - s, 1120., 72.),
+                        rect: Rect::new(640., 248.8 + position as f32 * 84. - s, 1120., 72.),
                         title,
                         icon: Some(icon),
                         value,
@@ -2398,83 +2601,6 @@ pub fn input_status(input: &Input, renamed: bool, language: Language) -> String 
     parts.join(" · ")
 }
 
-fn keycap(out: &mut Scene, label: &str, x: f32, y: f32, w: f32, small: bool) {
-    let h = if small { 16. } else { 23.2 };
-    out.border(
-        Rect::new(x, y, w, h),
-        4.8,
-        1.,
-        c(0xffffff, if small { 0.125 } else { 0.20 }),
-    );
-    out.text(
-        label,
-        Rect::new(x, y + if small { 2. } else { 4.2 }, w, h),
-        text(if small { 8. } else { 11.52 }, 500, 0.),
-        c(0xf3f3f3, 0.64),
-        true,
-    );
-}
-
-fn footer(out: &mut Scene, state: &State, assets: &Assets) {
-    let language = state.preferences.language;
-    let style = text(14.4, 400, 0.005);
-    if matches!(state.page, Page::Home | Page::Apps) && state.moving.is_none() {
-        return;
-    }
-    let color = c(0xeeeeee, 0.37);
-    if state.moving.is_some() {
-        keycap(out, "← →", 84., 1030.4, 42., false);
-        out.text(
-            language.t("move"),
-            Rect::new(134., 1033., 100., 20.),
-            text(14.4, 400, 0.005),
-            color,
-            false,
-        );
-        let second_x = 134. + assets.width(language.t("move"), style) + 25.6;
-        keycap(out, "OK/Back", second_x, 1030.4, 62., false);
-        out.text(
-            language.t("done"),
-            Rect::new(second_x + 70., 1033., 150., 20.),
-            text(14.4, 400, 0.005),
-            color,
-            false,
-        );
-    } else {
-        let label = language.t(if state.page == Page::Settings {
-            "select"
-        } else {
-            "options"
-        });
-        let second_x = 119. + assets.width(label, style) + 25.6;
-        keycap(out, "OK", 84., 1030.4, 27., false);
-        out.text(
-            label,
-            Rect::new(119., 1033., 100., 20.),
-            text(14.4, 400, 0.005),
-            color,
-            false,
-        );
-        if state.page == Page::Settings {
-            keycap(out, "Back", second_x, 1030.4, 39., false);
-            out.text(
-                language.t("homeLabel"),
-                Rect::new(second_x + 47., 1033., 180., 20.),
-                text(14.4, 400, 0.005),
-                color,
-                false,
-            );
-            out.text(
-                format!("v{}", assets.version.trim()),
-                Rect::new(1775., 1037., 61., 16.),
-                text(12.48, 400, 0.),
-                c(0xf5f5f5, 0.56),
-                false,
-            );
-        }
-    }
-}
-
 struct EmptyState<'a> {
     rect: Rect,
     icon: &'a str,
@@ -2550,14 +2676,25 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
 
 fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Option<Rect>) {
     let language = state.preferences.language;
+    let background = matches!(state.overlay, Some(Overlay::BackgroundOptions { .. }));
     let app = state.inventory.apps.iter().find(|app| app.id == id);
     let favorite = state
         .preferences
         .favorites(&state.inventory.apps)
         .iter()
         .any(|item| item == id);
-    let deletable = crate::platform::can_uninstall(id);
-    let height = if deletable { 329.6 } else { 252.8 };
+    let deletable = if background {
+        state.can_delete_background(id) && state.deleting_wallpaper.is_none()
+    } else {
+        crate::platform::can_uninstall(id)
+    };
+    let height = if background {
+        if deletable { 176. } else { 99.2 }
+    } else if deletable {
+        329.6
+    } else {
+        252.8
+    };
     let card = anchor.unwrap_or(Rect::new(460., 380., 256., 153.6));
     let x = if card.x + card.w + 32. + 520. <= 1836. {
         card.x + card.w + 32.
@@ -2566,7 +2703,18 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     };
     let panel = Rect::new(x, card.y.clamp(164., 974. - height), 520., height);
     // Lift the selected card out of the dimmed grid without moving its hit region.
-    if let Some(app) = app {
+    if background {
+        let path = state
+            .wallpapers
+            .iter()
+            .find(|item| item.id == id)
+            .map_or_else(
+                || assets.path(format!("thumbnails/{id}.jpg")),
+                |item| item.thumbnail(),
+            );
+        out.image(path, card, 16., false);
+        out.border(card, 16., 1., c(0xffffff, 0.086));
+    } else if let Some(app) = app {
         app_face(out, assets, app, card, language, 19.2);
         if favorite {
             out.icon(
@@ -2588,26 +2736,34 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     ));
     out.border(panel, 27.2, 1., c(0xffffff, 0.12));
     let hidden = state.preferences.hidden.iter().any(|item| item == id);
-    for (row, (target, label)) in [
-        (Target::OpenApp, language.t("open")),
-        (
-            Target::Option(0),
-            if favorite {
-                language.t("removeFavorite")
-            } else {
-                language.t("addFavorite")
-            },
-        ),
-        (
-            Target::Option(1),
-            language.t(if hidden { "showApp" } else { "hideApp" }),
-        ),
-        (Target::Option(2), language.t("deleteApp")),
-    ]
-    .into_iter()
-    .take(if deletable { 4 } else { 3 })
-    .enumerate()
-    {
+    let actions = if background {
+        let mut actions = vec![(Target::UseBackground, language.t("useBackground"))];
+        if deletable {
+            actions.push((Target::DeleteBackground, language.t("deleteBackground")));
+        }
+        actions
+    } else {
+        vec![
+            (Target::OpenApp, language.t("open")),
+            (
+                Target::Option(0),
+                if favorite {
+                    language.t("removeFavorite")
+                } else {
+                    language.t("addFavorite")
+                },
+            ),
+            (
+                Target::Option(1),
+                language.t(if hidden { "showApp" } else { "hideApp" }),
+            ),
+            (Target::Option(2), language.t("deleteApp")),
+        ]
+        .into_iter()
+        .take(if deletable { 4 } else { 3 })
+        .collect()
+    };
+    for (row, (target, label)) in actions.into_iter().enumerate() {
         let rect = Rect::new(
             panel.x + 16.,
             panel.y + 16. + row as f32 * 76.8,
@@ -2615,7 +2771,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
             67.2,
         );
         let focused = state.focus == target;
-        let destructive = target == Target::Option(2);
+        let destructive = matches!(target, Target::Option(2) | Target::DeleteBackground);
         let label_style = text(20.8, 600, -0.02);
         let label_height = label_style.size * label_style.line_height;
         let label_color = if destructive || !focused {
@@ -2648,6 +2804,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
             assets,
             match &target {
                 Target::OpenApp => "arrow",
+                Target::UseBackground => "check",
                 Target::Option(0) => {
                     if favorite {
                         "heart-filled"
@@ -2680,6 +2837,27 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
 
 fn delete_confirmation(out: &mut Scene, state: &State, assets: &Assets, id: &str) {
     let language = state.preferences.language;
+    let background = matches!(state.overlay, Some(Overlay::BackgroundDelete { .. }));
+    let deleting = if background {
+        state.deleting_wallpaper.as_deref() == Some(id)
+    } else {
+        state.uninstalling.as_deref() == Some(id)
+    };
+    let warning_key = if background {
+        "deleteBackgroundWarning"
+    } else {
+        "deleteAppWarning"
+    };
+    let deleting_key = if background {
+        "deletingBackground"
+    } else {
+        "deletingApp"
+    };
+    let delete_key = if background {
+        "deleteBackground"
+    } else {
+        "deleteApp"
+    };
     let title = state
         .inventory
         .apps
@@ -2688,18 +2866,14 @@ fn delete_confirmation(out: &mut Scene, state: &State, assets: &Assets, id: &str
         .map_or(id, |app| app.title.as_str());
     let body_style = text(20.8, 600, -0.02).leading(1.5);
     let body = language.format(
-        if state.uninstalling.as_deref() == Some(id) {
-            "deletingApp"
-        } else {
-            "deleteAppWarning"
-        },
+        if deleting { deleting_key } else { warning_key },
         &[("app", title)],
     );
     // Status changes must not move the confirmation buttons under the pointer.
-    let warning = language.format("deleteAppWarning", &[("app", title)]);
+    let warning = language.format(warning_key, &[("app", title)]);
     let body_height = assets
         .lines(&warning, body_style, 568.)
-        .max(assets.lines(language.t("deletingApp"), body_style, 568.))
+        .max(assets.lines(language.t(deleting_key), body_style, 568.))
         .max(1) as f32
         * 31.2;
     let height = 244. + body_height;
@@ -2721,7 +2895,7 @@ fn delete_confirmation(out: &mut Scene, state: &State, assets: &Assets, id: &str
         true,
     );
     for (index, (target, label)) in [
-        (Target::ConfirmDelete, "deleteApp"),
+        (Target::ConfirmDelete, delete_key),
         (Target::CancelDelete, "cancel"),
     ]
     .into_iter()
@@ -2734,7 +2908,7 @@ fn delete_confirmation(out: &mut Scene, state: &State, assets: &Assets, id: &str
             68.,
         );
         let focused = state.focus == target;
-        let disabled = target == Target::ConfirmDelete && state.uninstalling.is_some();
+        let disabled = target == Target::ConfirmDelete && deleting;
         let label_style = text(20.8, 600, -0.02);
         let label_height = label_style.size * label_style.line_height;
         out.shape(

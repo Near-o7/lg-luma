@@ -10,6 +10,9 @@ use std::{collections::BTreeMap, path::PathBuf};
 #[path = "recents-tests.rs"]
 mod recent_tests;
 
+#[path = "wallpapers-ui-tests.rs"]
+mod wallpaper_tests;
+
 fn ready() -> State {
     let mut state = State::new(Preferences::default());
     state.set_inventory(demo_inventory(), None);
@@ -330,6 +333,10 @@ fn preferences_round_trip_and_corrupt_data_is_not_silently_overwritten() {
 #[test]
 fn gallery_and_grid_navigation_scroll_to_keep_focus_visible() {
     let mut state = ready();
+    state.set_wallpapers(vec![crate::wallpapers::Wallpaper {
+        id: "custom-00000000000000000000000000000001".into(),
+        directory: PathBuf::from("/preview/wallpapers/custom-00000000000000000000000000000001"),
+    }]);
     state.open(2);
     state.section = 1;
     state.focus = Target::Background(0);
@@ -337,10 +344,17 @@ fn gallery_and_grid_navigation_scroll_to_keep_focus_visible() {
     assert_eq!(state.focus, Target::Background(3));
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Background(6));
-    assert_eq!(
-        state.scroll, 0.,
-        "the web-sized gallery fits all three rows"
-    );
+    assert_eq!(state.scroll, 0., "the first three gallery rows fit");
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::Background(9));
+    assert!(state.scroll > 0., "the fourth gallery row must scroll");
+    let control = controls(&state)
+        .into_iter()
+        .find(|c| c.target == state.focus)
+        .unwrap();
+    let viewport = state.backgrounds_viewport();
+    assert!(control.rect.y >= viewport.y);
+    assert!(control.rect.y + control.rect.h <= viewport.y + viewport.h);
     state.direction(Direction::Left, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(1));
     state.open(1);
@@ -730,6 +744,29 @@ fn time_format_selects_seconds_without_changing_the_hour_format() {
     state.back();
     assert!(state.subpage.is_none());
     assert_eq!(state.focus, Target::Setting(1));
+}
+
+#[test]
+fn system_version_uses_a_settings_surface_without_an_interactive_target() {
+    let mut state = ready();
+    state.open(2);
+    state.section = crate::state::SYSTEM_SECTION;
+    state.panel_started = None;
+    let system = scene(&state);
+    assert!(system.draw.iter().any(|draw| matches!(
+        draw,
+        crate::renderer::Draw::Shape(rect, _, _, color)
+            if rect.x == 640. && rect.y == 164.8 && rect.w == 1120. && rect.h == 72. && color[3] == 0.3
+    )));
+    assert!(system.draw.iter().any(|draw| matches!(
+        draw,
+        crate::renderer::Draw::Text(label, _, style, color, _)
+            if label == "Luma vtest" && style.size == 20.8 && style.weight == 550 && color[3] == 0.5
+    )));
+    assert_eq!(state.hit_test(&system.controls, 900., 200.), None);
+    state.focus = Target::Sidebar(crate::state::SYSTEM_SECTION);
+    state.direction(Direction::Right, &system.controls);
+    assert_eq!(state.focus, Target::Setting(3));
 }
 
 #[test]
@@ -1430,6 +1467,13 @@ fn remote_can_select_and_restore_every_language() {
             state.direction(Direction::Down, &controls(&state));
         }
         assert_eq!(state.focus, Target::Choice(index));
+        let focused = controls(&state)
+            .into_iter()
+            .find(|control| control.target == state.focus)
+            .unwrap();
+        let viewport = state.content_viewport();
+        assert!(focused.rect.y >= viewport.y);
+        assert!(focused.rect.y + focused.rect.h <= viewport.y + viewport.h);
         assert_eq!(state.activate(), vec![Effect::Save]);
         assert_eq!(state.preferences.language, language);
         assert_eq!(state.focus, Target::Setting(4));
