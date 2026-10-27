@@ -458,7 +458,7 @@ pub fn scene_with_pill(
             0.,
             false,
         );
-        let alpha = (start.elapsed().as_secs_f32() / 0.4).min(1.);
+        let alpha = (start.elapsed().as_secs_f32() / state.background_fade).min(1.);
         out.draw.push(Draw::TintedImage(
             assets.background(state, &state.preferences.background),
             Rect::new(0., 0., 1920., 1080.),
@@ -1593,6 +1593,14 @@ struct Row<'a> {
     selected: bool,
     chevron: bool,
 }
+fn rotation_value_width(assets: &Assets, language: Language) -> f32 {
+    ["stateOn", "stateOff"]
+        .into_iter()
+        .map(|key| assets.width(language.t(key), text(18.4, 450, 0.)))
+        .fold(0., f32::max)
+        .ceil()
+}
+
 fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
     let focused = state.focus == row.target;
     let bright = focused;
@@ -1633,9 +1641,13 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
         } else {
             (row.rect.h - 29.12) / 2.
         };
-    let right_inset = if row.value.is_some() {
+    let compact_value_width = (row.target == Target::WallpaperCycle)
+        .then(|| rotation_value_width(assets, state.preferences.language));
+    let right_inset = if let Some(width) = compact_value_width {
+        width + 24.2 + 24.
+    } else if row.value.is_some() {
         210.
-    } else if row.target == Target::UploadWallpaper {
+    } else if matches!(row.target, Target::UploadWallpaper | Target::WallpaperCycle) {
         24.2
     } else {
         64.
@@ -1672,12 +1684,13 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
         );
     }
     if let Some(value) = row.value {
+        let value_width = compact_value_width.unwrap_or(170.);
         out.text(
             value,
             Rect::new(
-                row.rect.x + row.rect.w - 194.2 - if row.chevron { 34.4 } else { 0. },
+                row.rect.x + row.rect.w - value_width - 24.2 - if row.chevron { 34.4 } else { 0. },
                 row.rect.y + (row.rect.h - 23.) / 2.,
-                170.,
+                value_width,
                 24.,
             ),
             text(18.4, 450, 0.).right(),
@@ -1706,7 +1719,7 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
             },
         );
     }
-    let scrollable = row.target != Target::UploadWallpaper;
+    let scrollable = !matches!(row.target, Target::UploadWallpaper | Target::WallpaperCycle);
     out.control(row.target, row.rect, scrollable);
 }
 
@@ -2209,6 +2222,40 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             let upload_width = (assets.width(upload_label, text(20.8, 550, -0.02)) + 88.)
                 .ceil()
                 .clamp(240., 520.);
+            let cycle_label = language.t("wallpaperCycle");
+            let cycle_width = (assets.width(cycle_label, text(20.8, 550, -0.02))
+                + rotation_value_width(assets, language)
+                + 111.6)
+                .ceil()
+                .min(520.);
+            row(
+                out,
+                state,
+                assets,
+                Row {
+                    target: Target::WallpaperCycle,
+                    rect: Rect::new(
+                        1760. - upload_width - 20. - cycle_width,
+                        164.8,
+                        cycle_width,
+                        64.,
+                    ),
+                    title: cycle_label,
+                    icon: Some(if state.preferences.wallpaper_cycle {
+                        "refresh"
+                    } else {
+                        "refresh-off"
+                    }),
+                    value: Some(language.t(if state.preferences.wallpaper_cycle {
+                        "stateOn"
+                    } else {
+                        "stateOff"
+                    })),
+                    description: None,
+                    selected: false,
+                    chevron: false,
+                },
+            );
             row(
                 out,
                 state,
@@ -3087,6 +3134,54 @@ mod tests {
                 ),
             ]),
             artwork: crate::app_artwork::Service::new(false),
+        }
+    }
+
+    #[test]
+    fn auto_rotation_keeps_a_compact_gap_and_right_aligned_state() {
+        let assets = assets();
+        let mut state = State::new(Preferences::default());
+        state.open(2);
+        state.section = 1;
+        let label = state.preferences.language.t("wallpaperCycle");
+        let label_width = assets.width(label, text(20.8, 550, -0.02));
+        for enabled in [false, true] {
+            state.preferences.wallpaper_cycle = enabled;
+            let mut scene = Scene::new();
+            settings(&mut scene, &state, &assets);
+            let button = scene
+                .controls
+                .iter()
+                .find(|control| control.target == Target::WallpaperCycle)
+                .unwrap()
+                .rect;
+            let title = scene
+                .draw
+                .iter()
+                .find_map(|draw| match draw {
+                    Draw::Text(value, rect, ..) if value == label => Some(rect),
+                    _ => None,
+                })
+                .unwrap();
+            let state_label =
+                state
+                    .preferences
+                    .language
+                    .t(if enabled { "stateOn" } else { "stateOff" });
+            let (value, style) = scene
+                .draw
+                .iter()
+                .find_map(|draw| match draw {
+                    Draw::Text(label, rect, style, ..) if label == state_label => {
+                        Some((rect, style))
+                    }
+                    _ => None,
+                })
+                .unwrap();
+            assert!(style.align_right);
+            assert!((button.x + button.w - value.x - value.w - 24.2).abs() < 0.001);
+            assert!((24. ..25.).contains(&(value.x - title.x - label_width)));
+            assert!(button.w < 320.);
         }
     }
 

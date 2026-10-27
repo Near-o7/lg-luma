@@ -304,6 +304,14 @@ background is selected.
 The upload link works only while its TV dialog is open and focused, for at most ten minutes.
 Use a trusted local network: the temporary local upload uses HTTP, not encrypted HTTPS.
 
+### Automatic backgrounds
+
+Press **Rotation**, to the left of **Add a background**, to toggle On or Off (the default).
+The rotation icon is crossed out when Off.
+When enabled, all available images advance in gallery order once on every Luma restart and every
+15 minutes with a slow cross-fade (instant with reduced motion). Manual selection restarts the interval. Automatic changes leave
+your manually chosen LG splash unchanged, including after unrelated settings saves and restarts.
+
 ## Privacy and scope
 
 App/input discovery uses fixed inventory commands through Homebrew Channel's elevated service.

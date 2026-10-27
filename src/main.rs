@@ -25,6 +25,7 @@ mod storage;
 mod text_rendering;
 mod vector;
 mod view;
+mod wallpaper_cycle;
 mod wallpapers;
 mod weather;
 #[path = "weather-service.rs"]
@@ -282,7 +283,7 @@ fn effects(
                     eprintln!("{error}");
                     state.notify(state.preferences.language.t("savedError"));
                 } else {
-                    platform.sync_splash(&state.preferences.background);
+                    platform.sync_splash(state.preferences.splash_background());
                 }
             }
             effect @ (Effect::Refresh | Effect::Reload) => {
@@ -640,7 +641,7 @@ fn run() -> Result<(), String> {
         &weather_service,
         &wallpaper_service,
     );
-    platform.sync_splash(&state.preferences.background);
+    platform.sync_splash(state.preferences.splash_background());
     startup_stage("preferences and workers");
 
     let sdl = sdl2::init()?;
@@ -874,6 +875,9 @@ fn run() -> Result<(), String> {
     let mut queued_event = None;
     let mut text_active = false;
     let mut initial_focus = options.script.is_empty();
+    let mut startup_cycle_pending = state.preferences.wallpaper_cycle;
+    let mut wallpapers_scanned = false;
+    let launched = Instant::now();
     // When to ask for the inventory again after a failed load (State::inventory_failed).
     let mut inventory_retry: Option<Instant> = None;
     let scripted_input = !options.script.is_empty();
@@ -904,7 +908,10 @@ fn run() -> Result<(), String> {
         );
         while let Ok(event) = wallpaper_service.receiver.try_recv() {
             match event {
-                wallpapers::Event::Catalog(items) => state.set_wallpapers(items),
+                wallpapers::Event::Catalog(items) => {
+                    wallpapers_scanned = true;
+                    state.set_wallpapers(items);
+                }
                 wallpapers::Event::Deleted(id, result) => state.wallpaper_deleted(id, result),
                 wallpapers::Event::Session(generation, result)
                     if generation == wallpaper_service.generation()
@@ -927,6 +934,34 @@ fn run() -> Result<(), String> {
             }
         }
         state.dirty |= assets.artwork.poll();
+        let unix = state::unix_now();
+        let startup_cycle = wallpaper_cycle::startup_due(
+            state.preferences.wallpaper_cycle,
+            startup_cycle_pending,
+            wallpapers_scanned,
+            launched.elapsed(),
+        );
+        if focused
+            && visible
+            && state.overlay.is_none()
+            && state.moving.is_none()
+            && state.deleting_wallpaper.is_none()
+            && !state.animating()
+            && (startup_cycle
+                || wallpaper_cycle::due(
+                    state.preferences.wallpaper_cycle,
+                    state.preferences.wallpaper_changed,
+                    unix,
+                ))
+        {
+            let cycled = state.cycle_wallpaper(unix);
+            if startup_cycle {
+                startup_cycle_pending = false;
+            }
+            if cycled && let Err(error) = storage::save(&preferences_path, &state.preferences) {
+                eprintln!("{error}");
+            }
+        }
         while let Ok(response) = platform.receiver.try_recv() {
             match response {
                 Response::Inventory(Ok((mut inventory, warning))) => {

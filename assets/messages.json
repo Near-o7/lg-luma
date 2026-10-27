@@ -1,4 +1,17 @@
 {
+  "wallpaperCycle": {
+    "en": "Rotation",
+    "de": "Rotation",
+    "es": "Rotación",
+    "zh": "轮换",
+    "pt": "Rotação",
+    "it": "Rotazione",
+    "ru": "Смена",
+    "pl": "Rotacja",
+    "fr": "Rotation",
+    "vi": "Luân phiên",
+    "nl": "Rotatie"
+  },
   "useBackground": {
     "en": "Use background",
     "de": "Hintergrund verwenden",
