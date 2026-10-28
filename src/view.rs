@@ -1666,6 +1666,32 @@ fn filter(out: &mut Scene, state: &State, target: Target, rect: Rect, label: &st
     out.control(target, rect, false);
 }
 
+/// The existing System status card owns the only update action.
+fn update_value(state: &State) -> String {
+    use crate::update::{InstallStatus, Status};
+    let language = state.preferences.language;
+    match &state.update {
+        InstallStatus::Idle => {
+            if let Some(version) = &state.available_update {
+                language.format("installUpdate", &[("version", version)])
+            } else {
+                language
+                    .t(if state.update_status == Status::Checking {
+                        "checkingUpdates"
+                    } else {
+                        "checkAgain"
+                    })
+                    .to_owned()
+            }
+        }
+        InstallStatus::Downloading(percent) => {
+            language.format("updateDownloading", &[("percent", &percent.to_string())])
+        }
+        InstallStatus::Installing(_) => language.t("updateInstalling").to_owned(),
+        InstallStatus::Failed(_) => language.t("updateFailed").to_owned(),
+    }
+}
+
 struct Row<'a> {
     target: Target,
     rect: Rect,
@@ -2449,7 +2475,9 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
         }
         SYSTEM_SECTION => {
             let rect = Rect::new(640., 164.8 - s, 1120., 220.);
-            let title = if state.available_update.is_some() {
+            let title = if matches!(state.update, crate::update::InstallStatus::Failed(_)) {
+                "updateError"
+            } else if state.available_update.is_some() {
                 "updateAvailable"
             } else {
                 match state.update_status {
@@ -2487,18 +2515,12 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 assets,
                 Row {
                     target: if state.available_update.is_some() {
-                        Target::OpenHomebrew
+                        Target::InstallUpdate
                     } else {
                         Target::CheckUpdates
                     },
                     rect: Rect::new(rect.x + 24., rect.y + 132., rect.w - 48., 64.),
-                    title: language.t(if state.available_update.is_some() {
-                        "openHomebrewChannel"
-                    } else if state.update_status == crate::update::Status::Checking {
-                        "checkingUpdates"
-                    } else {
-                        "checkAgain"
-                    }),
+                    title: &update_value(state),
                     icon: Some(if state.available_update.is_some() {
                         "arrow"
                     } else {

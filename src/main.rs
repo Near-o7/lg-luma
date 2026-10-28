@@ -288,6 +288,7 @@ impl BackButton {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn effects(
     effects: Vec<Effect>,
     state: &mut State,
@@ -296,6 +297,7 @@ fn effects(
     weather: &weather_service::Service,
     wallpapers: &wallpapers::Service,
     webhook: &webhook::Service,
+    updates: &update::Worker,
 ) -> bool {
     for effect in effects {
         match effect {
@@ -342,6 +344,7 @@ fn effects(
                 }
             }
             Effect::FireWebhook(tile) => webhook.send(tile),
+            Effect::UpdateDownload(release) => updates.request(update::Request::Download(release)),
             Effect::Quit => return false,
             Effect::Uninstall(id) => platform.send(Request::Uninstall(id)),
             Effect::DeleteWallpaper(id) => {
@@ -676,6 +679,7 @@ fn run() -> Result<(), String> {
         weather_service::Client::new(options.weather_test_server.as_deref())?,
         weather_cache,
     );
+    let updates = update::Worker::new(webos && public_update_checks);
     let platform = Platform::new(
         webos,
         options.preferences.is_none() && options.test_extra_apps == 0,
@@ -690,6 +694,7 @@ fn run() -> Result<(), String> {
         &weather_service,
         &wallpaper_service,
         &webhook_service,
+        &updates,
     );
     platform.sync_splash(state.preferences.splash_background());
     startup_stage("preferences and workers");
@@ -999,6 +1004,7 @@ fn run() -> Result<(), String> {
                         &weather_service,
                         &wallpaper_service,
                         &webhook_service,
+                        &updates,
                     );
                 }
                 tile_editor::Event::Session(generation, result)
@@ -1049,6 +1055,9 @@ fn run() -> Result<(), String> {
             if cycled && let Err(error) = storage::save(&preferences_path, &state.preferences) {
                 eprintln!("{error}");
             }
+        }
+        while let Ok(response) = updates.receiver.try_recv() {
+            state.install_response(response);
         }
         while let Ok(response) = platform.receiver.try_recv() {
             match response {
@@ -1119,6 +1128,7 @@ fn run() -> Result<(), String> {
                         &weather_service,
                         &wallpaper_service,
                         &webhook_service,
+                        &updates,
                     );
                 }
                 Response::Recent {
@@ -1143,6 +1153,7 @@ fn run() -> Result<(), String> {
                         &weather_service,
                         &wallpaper_service,
                         &webhook_service,
+                        &updates,
                     );
                 }
             }
@@ -1523,6 +1534,7 @@ fn run() -> Result<(), String> {
                 &weather_service,
                 &wallpaper_service,
                 &webhook_service,
+                &updates,
             );
             wallpaper_service
                 .set_active(running && wallpaper_upload_active(&state, webos, focused, visible));
@@ -1557,6 +1569,7 @@ fn run() -> Result<(), String> {
                 &weather_service,
                 &wallpaper_service,
                 &webhook_service,
+                &updates,
             );
         }
         if let Some(held) = &mut press
@@ -1596,6 +1609,7 @@ fn run() -> Result<(), String> {
                     &weather_service,
                     &wallpaper_service,
                     &webhook_service,
+                    &updates,
                 );
             }
         }
@@ -1627,6 +1641,7 @@ fn run() -> Result<(), String> {
                 &weather_service,
                 &wallpaper_service,
                 &webhook_service,
+                &updates,
             );
         }
         let keyboard = state.text_input_active();

@@ -46,7 +46,7 @@ pub enum Page {
 pub enum Target {
     Nav(usize),
     TvSettings,
-    OpenHomebrew,
+    InstallUpdate,
     CheckUpdates,
     Recent(String),
     RecentEmpty,
@@ -192,6 +192,7 @@ pub enum Effect {
     FireWebhook(CustomTile),
     Quit,
     Weather(weather::Command),
+    UpdateDownload(String),
 }
 
 pub const KEYS: [&str; 40] = [
@@ -234,6 +235,8 @@ pub struct State {
     pub deleting_wallpaper: Option<String>,
     pub wallpaper_upload: Option<Result<crate::wallpapers::Session, String>>,
     pub tile_editor: Option<Result<crate::companion::Session, String>>,
+    /// Luma update (Settings → System), driven by the update worker.
+    pub update: crate::update::InstallStatus,
     pub panel_started: Option<Instant>,
     pub weather: weather::Weather,
     pub keyboard_field: TextField,
@@ -276,6 +279,7 @@ impl State {
             deleting_wallpaper: None,
             wallpaper_upload: None,
             tile_editor: None,
+            update: crate::update::InstallStatus::default(),
             panel_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
@@ -305,15 +309,57 @@ impl State {
                 self.update_status = crate::update::Status::Failed;
             }
         }
-        if matches!(self.focus, Target::CheckUpdates | Target::OpenHomebrew) {
+        if matches!(self.focus, Target::CheckUpdates | Target::InstallUpdate) {
             let target = if self.available_update.is_some() {
-                Target::OpenHomebrew
+                Target::InstallUpdate
             } else {
                 Target::CheckUpdates
             };
             if self.focus != target {
                 self.focus = target;
                 self.pressed = None;
+            }
+        }
+        self.dirty = true;
+    }
+
+    pub fn update_busy(&self) -> bool {
+        self.update_status == crate::update::Status::Checking
+            || matches!(
+                self.update,
+                crate::update::InstallStatus::Downloading(_)
+                    | crate::update::InstallStatus::Installing(_)
+            )
+    }
+
+    pub fn install_response(&mut self, response: crate::update::Response) {
+        use crate::update::{InstallStatus, Response};
+        match response {
+            Response::Progress(percent) => self.update = InstallStatus::Downloading(percent),
+            Response::Installing(version) => {
+                self.update = InstallStatus::Installing(version);
+                self.notify(self.preferences.language.t("updateRestart"));
+            }
+            Response::Finished(result) => {
+                self.available_update = None;
+                match result {
+                    Ok(()) => {
+                        self.update = InstallStatus::Idle;
+                        // This process may still run the old executable. Recheck rather
+                        // than claim that its in-memory version was replaced.
+                        self.update_status = crate::update::Status::Unchecked;
+                    }
+                    Err(error) => {
+                        eprintln!("Luma update: {error}");
+                        self.update = InstallStatus::Failed(error);
+                        self.update_status = crate::update::Status::Failed;
+                        self.notify(self.preferences.language.t("updateError"));
+                    }
+                }
+                if self.focus == Target::InstallUpdate {
+                    self.focus = Target::CheckUpdates;
+                    self.pressed = None;
+                }
             }
         }
         self.dirty = true;
@@ -900,7 +946,7 @@ impl State {
                     .unwrap_or(0),
             ),
             WIDGETS_SECTION => Target::Widget(0),
-            SYSTEM_SECTION if self.available_update.is_some() => Target::OpenHomebrew,
+            SYSTEM_SECTION if self.available_update.is_some() => Target::InstallUpdate,
             SYSTEM_SECTION => Target::CheckUpdates,
             _ => Target::Setting(0),
         }
@@ -1973,13 +2019,18 @@ impl State {
                     self.panel_started = Some(Instant::now());
                 }
             }
-            Target::OpenHomebrew => {
-                if self.available_update.is_some() {
-                    return vec![Effect::Launch(crate::update::HOMEBREW_CHANNEL.into())];
+            Target::InstallUpdate => {
+                if !self.update_busy()
+                    && let Some(version) = &self.available_update
+                {
+                    let version = version.clone();
+                    self.update = crate::update::InstallStatus::Downloading(0);
+                    return vec![Effect::UpdateDownload(version)];
                 }
             }
             Target::CheckUpdates => {
-                if self.update_status != crate::update::Status::Checking {
+                if !self.update_busy() {
+                    self.update = crate::update::InstallStatus::Idle;
                     self.update_status = crate::update::Status::Checking;
                     self.update_check_requested = true;
                     self.dirty = true;
