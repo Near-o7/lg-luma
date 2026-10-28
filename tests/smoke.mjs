@@ -219,7 +219,10 @@ try {
   assert.equal(clock.focus, 'ClockFormat');
   assert.ok(clock.ui_text.includes('Clock format'));
   assert.ok(clock.ui_text.includes('Time format'));
-  const inputsPage = 'settings,down,down,down,enter,down,down,down,enter';
+  const inputsPage = 'settings,down,down,down,enter,down,down,down,down,enter';
+  const inputs = await scenario('inputs-page', inputsPage);
+  assert.equal(inputs.subpage, 'Inputs');
+  assert.deepEqual(inputs.focus, { InputMode: 'com.webos.app.hdmi1' });
   const input = await scenario('inputs', `${inputsPage},enter,up,enter`);
   assert.equal(input.preferences.input_modes['com.webos.app.hdmi1'], 'Off');
   assert.equal(input.subpage, 'Inputs');
