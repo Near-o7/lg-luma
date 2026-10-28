@@ -88,8 +88,6 @@ https://github.com/user-attachments/assets/3d3564d9-5942-4aef-a726-0323f5e86a07
 | LG QNED86 | `55QNED86T6A`    | Unknown          |
 | LG UT8050 | `50UT8050*`      | ✅               |
 
-LG 50UT8050 takeover was confirmed on webOS 25 / 10.3.2.
-
 </details>
 
 <details>
