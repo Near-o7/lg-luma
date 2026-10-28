@@ -1232,6 +1232,7 @@ fn protected_apps_cannot_be_deleted_through_ui_or_worker() {
         "com.luma.launcher.native",
         "org.webosbrew.hbchannel",
         "org.webosbrew.hbchannel.service",
+        "custom.lamp",
         "invalid';command",
     ] {
         assert!(crate::platform::uninstall_request(id).is_err());
@@ -2031,4 +2032,399 @@ fn inventory_success_resets_failures_and_later_failures_show_at_once() {
     assert_eq!(state.inventory_failed("timeout".into()), None);
     assert!(!state.loading && state.error.is_some());
     assert!(!state.inventory.apps.is_empty());
+}
+
+#[test]
+fn tile_urls_need_a_host_the_request_client_accepts() {
+    use crate::model::valid_tile_url;
+    for url in [
+        "http://homeassistant.local:8123/api/webhook/lamp",
+        "http://ha/api/webhook/lamp",
+        "http://my_nas.lan/hook",
+        "https://example.com",
+        "HTTPS://example.com/",
+        "http://192.168.188.10:8123/api/webhook/lamp?on=1",
+        "http://[::1]:8123/api/webhook/lamp",
+        "http://[fd00::10]/hook",
+        "http://user:secret@ha.local/hook",
+        "http://ha.local:65535/",
+    ] {
+        assert!(valid_tile_url(url), "{url} should be valid");
+    }
+    for url in [
+        "http://",
+        "http:///",
+        "http:////api",
+        "http://:8123/foo",
+        "http://user@/foo",
+        "http://ha.local:/foo",
+        "http://ha.local:0/foo",
+        "http://ha.local:65536/foo",
+        "http://ha.local:80a/foo",
+        "http://ha.local:+80/foo",
+        "http://ha.local:80:81/foo",
+        "http://ha..local/foo",
+        "http://-ha.local/foo",
+        "http://ha%2elocal/foo",
+        "http://999.1.1.1/foo",
+        "http://192.168.1/foo",
+        "http://[::1/foo",
+        "http://[not-ip]/foo",
+        "http://::1/foo",
+        "http://ha.local/a b",
+        "ftp://ha.local/foo",
+    ] {
+        assert!(!valid_tile_url(url), "{url} should be invalid");
+    }
+}
+
+#[test]
+fn custom_tiles_are_sanitized_and_get_stable_unique_ids() {
+    use crate::model::{TileMethod, valid_app_id};
+    let mut preferences: Preferences = serde_json::from_value(json!({
+        "custom_tiles": [
+            {"id": "custom.lamp", "title": "  Lamp ", "url": " http://ha.local/api/webhook/a "},
+            {"id": "custom.lamp", "title": "Duplicate", "url": "http://ha.local/b"},
+            {"id": "custom.get", "title": "Get", "url": "HTTPS://ha.local/c", "method": "GET", "icon": "netflix"},
+            {"id": "netflix", "title": "Not custom", "url": "http://ha.local/d"},
+            {"id": "custom.ftp", "title": "FTP", "url": "ftp://ha.local/e"},
+            {"id": "custom.space", "title": "Space", "url": "http://ha local/f"},
+            {"id": "custom.bare", "title": "Bare", "url": "http://"},
+            {"id": "custom.blank", "title": "  ", "url": "http://ha.local/g"}
+        ]
+    }))
+    .unwrap();
+    preferences.sanitize();
+    let tiles: Vec<_> = preferences
+        .custom_tiles
+        .iter()
+        .map(|tile| {
+            (
+                tile.id.as_str(),
+                tile.title.as_str(),
+                tile.url.as_str(),
+                tile.method,
+            )
+        })
+        .collect();
+    assert_eq!(
+        tiles,
+        [
+            (
+                "custom.lamp",
+                "Lamp",
+                "http://ha.local/api/webhook/a",
+                TileMethod::Post
+            ),
+            ("custom.get", "Get", "HTTPS://ha.local/c", TileMethod::Get),
+        ]
+    );
+    // Only interface icons from the list are kept.
+    assert!(preferences.custom_tiles[1].icon.is_empty());
+    assert_eq!(preferences.custom_tiles[1].icon(), "weather-moon");
+    assert_eq!(preferences.new_tile_id("Lamp"), "custom.lamp-2");
+    assert_eq!(
+        preferences.new_tile_id("Licht Küche!"),
+        "custom.licht-k-che"
+    );
+    assert_eq!(preferences.new_tile_id("灯"), "custom.tile");
+    assert!(valid_app_id(&preferences.new_tile_id(&"x".repeat(200))));
+}
+
+#[test]
+fn shortcut_tiles_are_created_edited_sent_and_removed_in_settings() {
+    use crate::model::TileMethod;
+    use crate::state::{SHORTCUTS_SECTION, Subpage};
+    let mut state = ready();
+    state.preferences.reduced_motion = true;
+    state.open(2);
+    state.section = SHORTCUTS_SECTION;
+    state.focus = Target::Sidebar(SHORTCUTS_SECTION);
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::TileAdd);
+    assert!(state.activate().is_empty());
+    assert!(state.text_input_active());
+    state.text("Sandmann");
+    // Nothing is saved until the tile also has a valid URL.
+    assert!(state.finish_text_input().is_empty());
+    assert_eq!(state.subpage, Some(Subpage::Tile(None)));
+    assert_eq!(state.focus, Target::TileName);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::TileScheme);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::TileUrl);
+    state.activate();
+    state.text("ftp://example");
+    assert!(state.finish_text_input().is_empty());
+    assert!(state.preferences.custom_tiles.is_empty());
+    assert!(state.notice.is_some());
+    // Without a host the address is refused here, not saved to fail on every press.
+    for typed in ["/", ":8123/api/webhook/abc", "http:///"] {
+        state.notice = None;
+        state.activate();
+        state.text(typed);
+        assert!(state.finish_text_input().is_empty(), "{typed}");
+        assert!(state.tile_draft.url.is_empty(), "{typed}");
+        assert!(state.notice.is_some(), "{typed}");
+    }
+    assert!(state.preferences.custom_tiles.is_empty());
+    state.activate();
+    state.text("http://ha.local:8123/api/webhook/abc");
+    assert_eq!(state.finish_text_input(), vec![Effect::Save]);
+    let tile = state.preferences.custom_tiles[0].clone();
+    assert_eq!(tile.id, "custom.sandmann");
+    assert_eq!(tile.method, TileMethod::Post);
+    assert_eq!(state.subpage, Some(Subpage::Tile(Some(tile.id.clone()))));
+    assert!(
+        state
+            .preferences
+            .favorites
+            .as_ref()
+            .unwrap()
+            .contains(&tile.id)
+    );
+    assert!(
+        state
+            .inventory
+            .apps
+            .iter()
+            .any(|app| app.id == tile.id && app.brand == "custom")
+    );
+
+    // Renaming keeps the id, so the Home position is kept too.
+    state.focus = Target::TileName;
+    state.activate();
+    state.text("Sandmännchen");
+    assert_eq!(state.finish_text_input(), vec![Effect::Save]);
+    assert_eq!(state.preferences.custom_tiles[0].id, tile.id);
+    assert!(
+        state
+            .inventory
+            .apps
+            .iter()
+            .any(|app| app.id == tile.id && app.title == "Sandmännchen")
+    );
+    // An empty dismissal keeps the saved value.
+    state.activate();
+    assert!(state.finish_text_input().is_empty());
+    assert_eq!(state.preferences.custom_tiles[0].title, "Sandmännchen");
+
+    // The protocol row switches the scheme; an address typed without one gets it.
+    state.focus = Target::TileScheme;
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(
+        state.preferences.custom_tiles[0].url,
+        "https://ha.local:8123/api/webhook/abc"
+    );
+    state.focus = Target::TileUrl;
+    state.activate();
+    state.text("ha.local/api/webhook/xyz");
+    assert_eq!(state.finish_text_input(), vec![Effect::Save]);
+    assert_eq!(
+        state.preferences.custom_tiles[0].url,
+        "https://ha.local/api/webhook/xyz"
+    );
+    state.focus = Target::TileScheme;
+    state.activate();
+
+    // The icon list returns to its row and shows the choice on the Home card.
+    state.focus = Target::TileIcon;
+    state.direction(Direction::Right, &controls(&state));
+    assert!(matches!(state.subpage, Some(Subpage::TileIcon(_))));
+    assert_eq!(state.focus, Target::Choice(0));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(state.focus, Target::TileIcon);
+    assert!(matches!(state.subpage, Some(Subpage::Tile(Some(_)))));
+    assert_eq!(state.preferences.custom_tiles[0].icon, "weather-sun");
+    assert!(
+        state
+            .inventory
+            .apps
+            .iter()
+            .any(|app| app.brand == "custom" && app.mark == "weather-sun")
+    );
+    let tile = state.preferences.custom_tiles[0].clone();
+    assert_eq!(tile.url, "http://ha.local/api/webhook/xyz");
+
+    state.focus = Target::TileMethod;
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(state.preferences.custom_tiles[0].method, TileMethod::Get);
+    state.focus = Target::TileSend;
+    assert!(matches!(
+        state.activate().as_slice(),
+        [Effect::FireWebhook(sent)] if sent.method == TileMethod::Get
+    ));
+
+    state.open(0);
+    state.focus = Target::App(tile.id.clone());
+    assert!(matches!(
+        state.activate().as_slice(),
+        [Effect::FireWebhook(sent)] if sent.url == tile.url
+    ));
+
+    state.open(2);
+    state.section = SHORTCUTS_SECTION;
+    state.focus = Target::Tile(tile.id.clone());
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.subpage, Some(Subpage::Tile(Some(tile.id.clone()))));
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.subpage, None);
+    assert_eq!(state.focus, Target::Tile(tile.id.clone()));
+    state.activate();
+    state.focus = Target::TileRemove;
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(state.preferences.custom_tiles.is_empty());
+    assert!(
+        !state
+            .preferences
+            .favorites
+            .as_ref()
+            .unwrap()
+            .contains(&tile.id)
+    );
+    assert!(!state.inventory.apps.iter().any(|app| app.id == tile.id));
+    assert_eq!(state.subpage, None);
+    assert_eq!(state.focus, Target::TileAdd);
+}
+
+#[test]
+fn shortcut_tiles_keep_apps_options_and_never_launch_or_uninstall_a_platform_app() {
+    let tile = crate::model::CustomTile {
+        id: "custom.lamp".into(),
+        title: "Lamp".into(),
+        url: "http://127.0.0.1:9/hook".into(),
+        ..Default::default()
+    };
+    let mut state = ready();
+    state.preferences.reduced_motion = true;
+    state.replace_tiles(vec![tile.clone()]);
+    state.open(0);
+    state.focus = Target::App(tile.id.clone());
+    assert_eq!(state.activate(), vec![Effect::FireWebhook(tile.clone())]);
+    state.options();
+    assert_eq!(state.activate(), vec![Effect::FireWebhook(tile.clone())]);
+
+    state.open(1);
+    state.focus = Target::App(tile.id.clone());
+    assert!(state.activate().is_empty());
+    assert_eq!(state.focus, Target::OpenApp);
+    assert!(matches!(state.overlay, Some(Overlay::Options { .. })));
+    assert!(
+        !controls(&state)
+            .iter()
+            .any(|c| c.target == Target::Option(2))
+    );
+    assert_eq!(state.activate(), vec![Effect::FireWebhook(tile.clone())]);
+    assert!(state.overlay.is_none());
+
+    state.focus = Target::App(tile.id.clone());
+    state.options();
+    state.focus = Target::Option(0);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(
+        !state
+            .preferences
+            .favorites(&state.inventory.apps)
+            .contains(&tile.id)
+    );
+    state.options();
+    state.focus = Target::Option(1);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(state.preferences.hidden.contains(&tile.id));
+    assert_eq!(state.preferences.custom_tile(&tile.id), Some(&tile));
+}
+
+#[test]
+fn shortcut_tiles_alone_do_not_stop_inventory_retries() {
+    let mut preferences: Preferences = serde_json::from_value(json!({
+        "custom_tiles": [{"id": "custom.lamp", "title": "Lamp", "url": "http://ha.local/hook"}]
+    }))
+    .unwrap();
+    preferences.sanitize();
+    let mut state = State::new(preferences);
+    state.loading = true;
+    state.sync_custom_tiles();
+    assert!(!state.inventory.apps.is_empty());
+    assert_eq!(
+        state.inventory_failed("timeout".into()),
+        Some(crate::state::INVENTORY_RETRY_DELAY)
+    );
+    assert!(state.loading && state.error.is_none());
+}
+
+#[test]
+fn shortcut_tiles_open_a_modal_editor_for_another_device() {
+    use crate::state::SHORTCUTS_SECTION;
+    let mut state = ready();
+    state.preferences.reduced_motion = true;
+    state.open(2);
+    state.section = SHORTCUTS_SECTION;
+    state.focus = Target::TileAdd;
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::TileEditor);
+    assert!(state.activate().is_empty());
+    assert!(matches!(state.overlay, Some(Overlay::TileEditor)));
+    assert_eq!(state.focus, Target::CloseDialog);
+    let modal = scene(&state);
+    assert!(modal.modal.is_some());
+    assert_eq!(modal.controls.len(), 1);
+    assert_eq!(modal.controls[0].target, Target::CloseDialog);
+    assert!(state.direction(Direction::Up, &modal.controls).is_empty());
+    assert_eq!(state.focus, Target::CloseDialog);
+    state.tile_editor = Some(Err("offline".into()));
+    state.activate();
+    assert!(state.overlay.is_none());
+    assert!(state.tile_editor.is_none());
+    assert_eq!(state.focus, Target::TileEditor);
+    assert_eq!(state.section, SHORTCUTS_SECTION);
+}
+
+#[test]
+fn tiles_edited_elsewhere_join_and_leave_home_like_tv_edits() {
+    use crate::model::CustomTile;
+    let tile = |id: &str, title: &str| CustomTile {
+        id: id.into(),
+        title: title.into(),
+        url: "http://10.0.0.2/hook".into(),
+        ..Default::default()
+    };
+    let mut state = ready();
+    let before = state.preferences.favorites(&state.inventory.apps);
+    let saved = state.replace_tiles(vec![
+        tile("custom.gate", "Gate"),
+        tile("custom.lights", "Lights"),
+    ]);
+    assert_eq!(saved, vec![Effect::Save]);
+    let favorites = state.preferences.favorites.clone().unwrap();
+    assert_eq!(&favorites[..before.len()], &before[..]);
+    assert_eq!(&favorites[before.len()..], ["custom.gate", "custom.lights"]);
+    assert!(
+        state
+            .inventory
+            .apps
+            .iter()
+            .any(|app| app.id == "custom.gate")
+    );
+    state.preferences.hidden.push("custom.lights".into());
+    // A rename keeps the favorite in place; a removal clears it from favorites and hidden.
+    state.replace_tiles(vec![tile("custom.gate", "Garage")]);
+    assert_eq!(state.preferences.custom_tiles[0].title, "Garage");
+    let favorites = state.preferences.favorites.clone().unwrap();
+    assert_eq!(&favorites[before.len()..], ["custom.gate"]);
+    assert!(state.preferences.hidden.is_empty());
+    assert!(
+        !state
+            .inventory
+            .apps
+            .iter()
+            .any(|app| app.id == "custom.lights")
+    );
+    let app = state
+        .inventory
+        .apps
+        .iter()
+        .find(|app| app.id == "custom.gate")
+        .unwrap();
+    assert_eq!(app.title, "Garage");
 }

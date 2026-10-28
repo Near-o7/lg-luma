@@ -1,7 +1,8 @@
 use crate::i18n::Language;
 use crate::model::{
-    App, BACKGROUNDS, CATEGORIES, INPUT_NAME_LIMIT, InputMode, Inventory, Preferences,
-    clean_input_name,
+    App, BACKGROUNDS, CATEGORIES, CUSTOM_TILE_PREFIX, CustomTile, INPUT_NAME_LIMIT, InputMode,
+    Inventory, Preferences, TILE_ICONS, TILE_LIMIT, TILE_URL_LIMIT, TileMethod, clean_input_name,
+    split_tile_url, valid_tile_url,
 };
 use crate::text_rendering::TextRendering;
 use crate::weather::{self, Unit};
@@ -10,8 +11,9 @@ use std::time::{Duration, Instant};
 
 pub const WEATHER_SECTION: usize = 2;
 pub const INPUTS_SECTION: usize = 3;
-pub const SYSTEM_SECTION: usize = 4;
-pub const SECTION_COUNT: usize = 5;
+pub const SHORTCUTS_SECTION: usize = 4;
+pub const SYSTEM_SECTION: usize = 5;
+pub const SECTION_COUNT: usize = 6;
 pub const APPS_COLUMNS: usize = 6;
 /// Automatic inventory retries before the error shows: with the 6.5 s Luna timeout about 50 s.
 pub const INVENTORY_RETRIES: u32 = 5;
@@ -88,6 +90,16 @@ pub enum Target {
     WeatherSearch,
     WeatherClear,
     WeatherResult(usize),
+    Tile(String),
+    TileAdd,
+    TileName,
+    TileScheme,
+    TileUrl,
+    TileIcon,
+    TileMethod,
+    TileSend,
+    TileRemove,
+    TileEditor,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -127,6 +139,7 @@ pub enum Overlay {
     Keyboard,
     SystemKeyboard,
     WallpaperUpload,
+    TileEditor,
     BackgroundOptions { id: String, restore: Target },
     BackgroundDelete { id: String, restore: Target },
 }
@@ -143,6 +156,10 @@ pub enum Subpage {
     Temperature,
     Language,
     TextRendering,
+    /// Editor for a saved tile, or `None` for one not yet complete enough to save.
+    Tile(Option<String>),
+    /// Icon choices nested in the editor of the same tile.
+    TileIcon(Option<String>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -151,6 +168,8 @@ pub enum TextField {
     Location,
     Name,
     InputName,
+    TileName,
+    TileUrl,
 }
 
 #[derive(Clone, Copy)]
@@ -175,6 +194,8 @@ pub enum Effect {
         generation: u64,
         command: crate::recents::Command,
     },
+    /// Fire-and-forget HTTP request for a custom tile, off the SDL thread.
+    FireWebhook(CustomTile),
     Quit,
     Weather(weather::Command),
 }
@@ -215,11 +236,17 @@ pub struct State {
     pub wallpapers: Vec<crate::wallpapers::Wallpaper>,
     pub deleting_wallpaper: Option<String>,
     pub wallpaper_upload: Option<Result<crate::wallpapers::Session, String>>,
+    pub tile_editor: Option<Result<crate::companion::Session, String>>,
     pub panel_started: Option<Instant>,
     pub weather: weather::Weather,
     pub keyboard_field: TextField,
     pub greeting_name_draft: String,
     pub input_name: String,
+    pub tile_draft: CustomTile,
+    pub tile_text: String,
+    /// Scheme put in front of an address typed without one, so the TV
+    /// keyboard is only needed for the host and path.
+    pub tile_https: bool,
     pub recents: crate::recents::Recents,
 }
 
@@ -253,11 +280,15 @@ impl State {
             wallpapers: vec![],
             deleting_wallpaper: None,
             wallpaper_upload: None,
+            tile_editor: None,
             panel_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
             greeting_name_draft: String::new(),
             input_name: String::new(),
+            tile_draft: CustomTile::default(),
+            tile_text: String::new(),
+            tile_https: false,
             recents: crate::recents::Recents::default(),
         }
     }
@@ -504,6 +535,7 @@ impl State {
 
     pub fn set_inventory(&mut self, next: Inventory, warning: Option<String>) {
         self.inventory.apps = next.apps;
+        self.sync_custom_tiles();
         if let Some(warning) = warning {
             self.notify(warning);
         } else {
@@ -520,9 +552,15 @@ impl State {
     /// Homebrew service that reads the inventory can take longer than one request allows. While
     /// no apps are shown yet, the screen keeps loading and the caller retries after the returned
     /// delay; the error and its Retry button only appear once those retries are used up.
+    /// Custom tiles come from preferences, not the TV, so they don't count as loaded apps.
     pub fn inventory_failed(&mut self, error: String) -> Option<Duration> {
         self.dirty = true;
-        if self.inventory.apps.is_empty() && self.inventory_failures < INVENTORY_RETRIES {
+        let no_tv_apps = self
+            .inventory
+            .apps
+            .iter()
+            .all(|app| app.id.starts_with(CUSTOM_TILE_PREFIX));
+        if no_tv_apps && self.inventory_failures < INVENTORY_RETRIES {
             self.inventory_failures += 1;
             return Some(INVENTORY_RETRY_DELAY);
         }
@@ -530,6 +568,17 @@ impl State {
         self.loading = false;
         self.error = Some(error);
         None
+    }
+
+    /// Custom webhook tiles are never read from the TV. They are merged into
+    /// the inventory on every refresh and edit, so favoriting, hiding and
+    /// search treat them like any other app.
+    pub fn sync_custom_tiles(&mut self) {
+        self.inventory
+            .apps
+            .retain(|app| !app.id.starts_with(CUSTOM_TILE_PREFIX));
+        self.inventory.apps.extend(self.preferences.custom_apps());
+        self.dirty = true;
     }
 
     pub fn reconcile_focus(&mut self) {
@@ -807,6 +856,12 @@ impl State {
                     .unwrap_or(0),
             ),
             WEATHER_SECTION => Target::WeatherToggle,
+            SHORTCUTS_SECTION => self
+                .preferences
+                .custom_tiles
+                .first()
+                .map(|tile| Target::Tile(tile.id.clone()))
+                .unwrap_or(Target::TileAdd),
             SYSTEM_SECTION => Target::Setting(3),
             INPUTS_SECTION => self
                 .inventory
@@ -841,6 +896,11 @@ impl State {
             Some(Subpage::Temperature) => Target::WeatherTemperature,
             Some(Subpage::Language) => Target::Setting(4),
             Some(Subpage::TextRendering) => Target::Setting(7),
+            Some(Subpage::Tile(id)) => id.map_or(Target::TileAdd, Target::Tile),
+            Some(Subpage::TileIcon(id)) => {
+                self.subpage = Some(Subpage::Tile(id));
+                Target::TileIcon
+            }
             None => Target::Sidebar(self.section),
         };
         self.scroll = 0.;
@@ -857,7 +917,10 @@ impl State {
             // The TV keyboard owns its arrows until Done/Back dismisses it.
             return vec![];
         }
-        if matches!(self.overlay, Some(Overlay::WallpaperUpload)) {
+        if matches!(
+            self.overlay,
+            Some(Overlay::WallpaperUpload | Overlay::TileEditor)
+        ) {
             return vec![];
         }
         if let Some(id) = self.moving.clone() {
@@ -974,6 +1037,7 @@ impl State {
                         | Subpage::TextRendering,
                     ) => 2,
                     Some(Subpage::Language) => Language::ALL.len(),
+                    Some(Subpage::TileIcon(_)) => TILE_ICONS.len(),
                     _ => 3,
                 };
                 match direction {
@@ -1045,10 +1109,29 @@ impl State {
             }
             if matches!(
                 self.focus,
+                Target::TileName
+                    | Target::TileScheme
+                    | Target::TileUrl
+                    | Target::TileIcon
+                    | Target::TileMethod
+                    | Target::TileSend
+                    | Target::TileRemove
+            ) && matches!(direction, Direction::Left)
+            {
+                self.close_subpage();
+                return vec![];
+            }
+            if matches!(
+                self.focus,
                 Target::Setting(0 | 1 | 4 | 6 | 7)
                     | Target::InputMode(_)
                     | Target::WeatherLocation
                     | Target::WeatherTemperature
+                    | Target::Tile(_)
+                    | Target::TileAdd
+                    | Target::TileName
+                    | Target::TileUrl
+                    | Target::TileIcon
             ) && matches!(direction, Direction::Right)
             {
                 return self.activate();
@@ -1456,6 +1539,25 @@ impl State {
                 self.dirty = true;
                 return;
             }
+            if matches!(
+                self.keyboard_field,
+                TextField::TileName | TextField::TileUrl
+            ) {
+                let url = self.keyboard_field == TextField::TileUrl;
+                let limit = if url {
+                    TILE_URL_LIMIT
+                } else {
+                    INPUT_NAME_LIMIT
+                };
+                let length = self.tile_text.chars().count();
+                self.tile_text.extend(
+                    text.chars()
+                        .filter(|c| !(c.is_control() || url && c.is_whitespace()))
+                        .take(limit.saturating_sub(length)),
+                );
+                self.dirty = true;
+                return;
+            }
             self.query.extend(
                 text.chars()
                     .filter(|c| !c.is_control())
@@ -1476,6 +1578,11 @@ impl State {
                 self.greeting_name_draft.pop();
             } else if self.keyboard_field == TextField::InputName {
                 self.input_name.pop();
+            } else if matches!(
+                self.keyboard_field,
+                TextField::TileName | TextField::TileUrl
+            ) {
+                self.tile_text.pop();
             } else {
                 self.query.pop();
             }
@@ -1503,6 +1610,12 @@ impl State {
     }
 
     fn commit_text_input(&mut self) -> Vec<Effect> {
+        if matches!(
+            self.keyboard_field,
+            TextField::TileName | TextField::TileUrl
+        ) {
+            return self.commit_tile_text();
+        }
         if self.keyboard_field == TextField::Name {
             let name = std::mem::take(&mut self.greeting_name_draft);
             let name = name.trim();
@@ -1533,6 +1646,134 @@ impl State {
         }
     }
 
+    /// Like input names, an empty dismissal keeps the previous value.
+    fn commit_tile_text(&mut self) -> Vec<Effect> {
+        let text = std::mem::take(&mut self.tile_text);
+        let text = text.trim();
+        if text.is_empty() {
+            return vec![];
+        }
+        if self.keyboard_field == TextField::TileUrl {
+            let url = match split_tile_url(text) {
+                Some(_) => text.to_owned(),
+                None if text.contains("://") => String::new(),
+                None => format!("{}{text}", self.tile_scheme()),
+            };
+            if !valid_tile_url(&url) {
+                self.notify(self.preferences.language.t("tileUrlInvalid"));
+                return vec![];
+            }
+            self.tile_https = split_tile_url(&url).is_some_and(|(https, _)| https);
+            self.tile_draft.url = url;
+        } else {
+            self.tile_draft.title = clean_input_name(text);
+        }
+        self.store_tile()
+    }
+
+    /// Saves the draft once it has a name and a valid URL. A new tile is
+    /// added to the end of the Home favorites.
+    fn store_tile(&mut self) -> Vec<Effect> {
+        if self.tile_draft.title.is_empty() || !valid_tile_url(&self.tile_draft.url) {
+            return vec![];
+        }
+        let language = self.preferences.language;
+        match self.subpage.clone() {
+            Some(Subpage::Tile(Some(id))) => {
+                let Some(tile) = self
+                    .preferences
+                    .custom_tiles
+                    .iter_mut()
+                    .find(|tile| tile.id == id)
+                else {
+                    return vec![];
+                };
+                if *tile == self.tile_draft {
+                    return vec![];
+                }
+                *tile = self.tile_draft.clone();
+            }
+            Some(Subpage::Tile(None)) => {
+                if self.preferences.custom_tiles.len() >= TILE_LIMIT {
+                    self.notify(language.t("tileLimit"));
+                    return vec![];
+                }
+                let id = self.preferences.new_tile_id(&self.tile_draft.title);
+                self.tile_draft.id = id.clone();
+                self.preferences.custom_tiles.push(self.tile_draft.clone());
+                let mut favorites = self.preferences.favorites(&self.inventory.apps);
+                favorites.push(id.clone());
+                self.preferences.favorites = Some(favorites);
+                self.subpage = Some(Subpage::Tile(Some(id)));
+                self.notify(language.format("tileAdded", &[("tile", &self.tile_draft.title)]));
+            }
+            _ => return vec![],
+        }
+        self.sync_custom_tiles();
+        vec![Effect::Save]
+    }
+
+    /// Applies the tile list edited on a phone or computer. As in the TV editor, new tiles join
+    /// the end of the Home favorites and removed ones leave favorites and hidden apps.
+    pub fn replace_tiles(&mut self, tiles: Vec<CustomTile>) -> Vec<Effect> {
+        let removed: Vec<_> = self
+            .preferences
+            .custom_tiles
+            .iter()
+            .filter(|old| !tiles.iter().any(|tile| tile.id == old.id))
+            .map(|old| old.id.clone())
+            .collect();
+        for id in &removed {
+            self.preferences.remove_tile(id);
+        }
+        let added: Vec<_> = tiles
+            .iter()
+            .filter(|tile| self.preferences.custom_tile(&tile.id).is_none())
+            .map(|tile| tile.id.clone())
+            .collect();
+        self.preferences.custom_tiles = tiles;
+        self.preferences.sanitize();
+        self.sync_custom_tiles();
+        if !added.is_empty() {
+            let mut favorites = self.preferences.favorites(&self.inventory.apps);
+            for id in added {
+                if self.preferences.custom_tile(&id).is_some() && !favorites.contains(&id) {
+                    favorites.push(id);
+                }
+            }
+            self.preferences.favorites = Some(favorites);
+        }
+        vec![Effect::Save]
+    }
+
+    fn send_tile(&mut self, tile: CustomTile) -> Vec<Effect> {
+        self.notify(
+            self.preferences
+                .language
+                .format("tileSending", &[("tile", &tile.title)]),
+        );
+        vec![Effect::FireWebhook(tile)]
+    }
+
+    pub fn tile_scheme(&self) -> &'static str {
+        if self.tile_https {
+            "https://"
+        } else {
+            "http://"
+        }
+    }
+
+    fn open_tile(&mut self, tile: Option<CustomTile>) {
+        self.subpage = Some(Subpage::Tile(tile.as_ref().map(|tile| tile.id.clone())));
+        self.tile_draft = tile.unwrap_or_default();
+        self.tile_https = split_tile_url(&self.tile_draft.url).is_some_and(|(https, _)| https);
+        self.focus = Target::TileName;
+        self.scroll = 0.;
+        if !self.preferences.reduced_motion {
+            self.panel_started = Some(Instant::now());
+        }
+    }
+
     pub fn delete_surrounding_text(&mut self, offset: i32, length: i32) {
         if !self.text_input_active() || length <= 0 {
             return;
@@ -1556,6 +1797,11 @@ impl State {
             self.greeting_name_draft = query;
         } else if self.keyboard_field == TextField::InputName {
             self.input_name = query;
+        } else if matches!(
+            self.keyboard_field,
+            TextField::TileName | TextField::TileUrl
+        ) {
+            self.tile_text = query;
         } else {
             self.query = query;
             self.scroll = 0.;
@@ -1568,6 +1814,7 @@ impl State {
             TextField::Location => &self.weather.query,
             TextField::Name => &self.greeting_name_draft,
             TextField::InputName => &self.input_name,
+            TextField::TileName | TextField::TileUrl => &self.tile_text,
             TextField::Apps => &self.query,
         }
     }
@@ -1581,6 +1828,9 @@ impl State {
             // The TV keyboard starts empty, so a new name replaces the old one.
             self.input_name.clear();
         }
+        if matches!(field, TextField::TileName | TextField::TileUrl) {
+            self.tile_text.clear();
+        }
         if cfg!(all(
             feature = "webos",
             target_os = "linux",
@@ -1591,6 +1841,8 @@ impl State {
                 TextField::Location => Target::WeatherQuery,
                 TextField::Name => Target::GreetingName,
                 TextField::InputName => Target::InputRename,
+                TextField::TileName => Target::TileName,
+                TextField::TileUrl => Target::TileUrl,
                 TextField::Apps => Target::Search,
             };
             self.panel_started = None;
@@ -1619,6 +1871,8 @@ impl State {
             TextField::Location => Target::WeatherSearch,
             TextField::Name => Target::GreetingName,
             TextField::InputName => Target::InputRename,
+            TextField::TileName => Target::TileName,
+            TextField::TileUrl => Target::TileUrl,
             TextField::Apps => Target::Search,
         }
     }
@@ -1639,6 +1893,12 @@ impl State {
             return vec![];
         }
         self.dirty = true;
+        if self.page != Page::Apps
+            && let Target::App(id) = &self.focus
+            && let Some(tile) = self.preferences.custom_tile(id).cloned()
+        {
+            return self.send_tile(tile);
+        }
         match self.focus.clone() {
             Target::Nav(index) => self.open(index),
             Target::Browse => self.open(1),
@@ -1648,6 +1908,12 @@ impl State {
             Target::UploadWallpaper => {
                 self.wallpaper_upload = None;
                 self.overlay = Some(Overlay::WallpaperUpload);
+                self.focus = Target::CloseDialog;
+                self.pressed = None;
+            }
+            Target::TileEditor => {
+                self.tile_editor = None;
+                self.overlay = Some(Overlay::TileEditor);
                 self.focus = Target::CloseDialog;
                 self.pressed = None;
             }
@@ -1662,6 +1928,9 @@ impl State {
                 {
                     let id = id.clone();
                     self.back();
+                    if let Some(tile) = self.preferences.custom_tile(&id).cloned() {
+                        return self.send_tile(tile);
+                    }
                     return vec![Effect::Launch(id)];
                 }
             }
@@ -1736,6 +2005,72 @@ impl State {
                 }
             }
             Target::InputRename => self.open_keyboard(TextField::InputName),
+            Target::Tile(id) => {
+                let tile = self.preferences.custom_tile(&id).cloned();
+                if tile.is_some() {
+                    self.open_tile(tile);
+                }
+            }
+            Target::TileAdd => {
+                self.open_tile(None);
+                self.open_keyboard(TextField::TileName);
+            }
+            Target::TileName => self.open_keyboard(TextField::TileName),
+            Target::TileUrl => self.open_keyboard(TextField::TileUrl),
+            Target::TileIcon => {
+                if let Some(Subpage::Tile(id)) = self.subpage.clone() {
+                    let icon = self.tile_draft.icon();
+                    self.subpage = Some(Subpage::TileIcon(id));
+                    self.focus = Target::Choice(
+                        TILE_ICONS
+                            .iter()
+                            .position(|(key, _)| *key == icon)
+                            .unwrap_or(0),
+                    );
+                    self.scroll = 0.;
+                    if !self.preferences.reduced_motion {
+                        self.panel_started = Some(Instant::now());
+                    }
+                }
+            }
+            Target::TileScheme => {
+                self.tile_https = !self.tile_https;
+                if let Some((_, rest)) = split_tile_url(&self.tile_draft.url) {
+                    self.tile_draft.url = format!("{}{rest}", self.tile_scheme());
+                }
+                return self.store_tile();
+            }
+            Target::TileMethod => {
+                self.tile_draft.method = match self.tile_draft.method {
+                    TileMethod::Get => TileMethod::Post,
+                    TileMethod::Post => TileMethod::Get,
+                };
+                return self.store_tile();
+            }
+            Target::TileSend => {
+                if self.tile_draft.title.is_empty() || !valid_tile_url(&self.tile_draft.url) {
+                    self.notify(self.preferences.language.t("tileIncomplete"));
+                } else {
+                    return self.send_tile(self.tile_draft.clone());
+                }
+            }
+            Target::TileRemove => {
+                if let Some(Subpage::Tile(Some(id))) = &self.subpage
+                    && let Some(tile) = self.preferences.remove_tile(id)
+                {
+                    self.notify(
+                        self.preferences
+                            .language
+                            .format("tileRemoved", &[("tile", &tile.title)]),
+                    );
+                    self.subpage = None;
+                    self.panel_started = None;
+                    self.scroll = 0.;
+                    self.sync_custom_tiles();
+                    self.focus = self.section_entry();
+                    return vec![Effect::Save];
+                }
+            }
             Target::InputNameReset => {
                 if let Some(Subpage::Input(id)) = &self.subpage
                     && self.preferences.input_names.remove(id).is_some()
@@ -1888,6 +2223,11 @@ impl State {
             }
             Target::Choice(index) => {
                 match self.subpage.clone() {
+                    Some(Subpage::TileIcon(_)) => {
+                        self.tile_draft.icon = TILE_ICONS[index.min(TILE_ICONS.len() - 1)].0.into();
+                        self.close_subpage();
+                        return self.store_tile();
+                    }
                     Some(Subpage::ClockFormat) => self.preferences.hour_24 = index == 1,
                     Some(Subpage::TimeFormat) => self.preferences.show_seconds = index == 1,
                     Some(Subpage::Input(id)) => {
@@ -1919,7 +2259,8 @@ impl State {
                         Subpage::WeatherLocation
                         | Subpage::Greeting
                         | Subpage::AppNames
-                        | Subpage::Clock,
+                        | Subpage::Clock
+                        | Subpage::Tile(_),
                     ) => {
                         return vec![];
                     }
@@ -2046,6 +2387,7 @@ impl State {
                     TextField::Location => self.weather.edit(String::new()),
                     TextField::Name => self.greeting_name_draft.clear(),
                     TextField::InputName => self.input_name.clear(),
+                    TextField::TileName | TextField::TileUrl => self.tile_text.clear(),
                     TextField::Apps => self.query.clear(),
                 },
                 "Done" => {
@@ -2083,6 +2425,12 @@ impl State {
             if matches!(overlay, Overlay::WallpaperUpload) {
                 self.wallpaper_upload = None;
                 self.focus = Target::UploadWallpaper;
+                self.pressed = None;
+                return vec![];
+            }
+            if matches!(overlay, Overlay::TileEditor) {
+                self.tile_editor = None;
+                self.focus = Target::TileEditor;
                 self.pressed = None;
                 return vec![];
             }

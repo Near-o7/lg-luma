@@ -1,12 +1,12 @@
 //! Screen geometry and styling mirror the web UI's 1920×1080 / 16px-rem layout.
 use crate::{
     i18n::Language,
-    model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode},
+    model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode, TILE_ICONS},
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
         APPS_COLUMNS, Control, HOME_FADE_LEFT, HOME_FADE_RIGHT, HOME_STRIP_LEFT, HOME_STRIP_RIGHT,
-        HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page, Rect, SYSTEM_SECTION, State,
-        Subpage, Target, TextField, WEATHER_SECTION,
+        HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page, Rect, SHORTCUTS_SECTION,
+        SYSTEM_SECTION, State, Subpage, Target, TextField, WEATHER_SECTION,
     },
     weather::{self, Unit},
 };
@@ -266,7 +266,55 @@ impl Scene {
     }
 }
 
+/// The strings a companion dialog shows around its QR code, as message keys.
+struct Companion {
+    title: &'static str,
+    keep_open: &'static str,
+    private: &'static str,
+    error: &'static str,
+    starting: &'static str,
+}
+
 fn wallpaper_upload(out: &mut Scene, state: &State, assets: &Assets) {
+    companion(
+        out,
+        state,
+        assets,
+        state.wallpaper_upload.as_ref(),
+        Companion {
+            title: "uploadWallpaper",
+            keep_open: "wallpaperUploadKeepOpen",
+            private: "wallpaperUploadPrivate",
+            error: "wallpaperUploadError",
+            starting: "wallpaperUploadStarting",
+        },
+    );
+}
+
+fn tile_editor(out: &mut Scene, state: &State, assets: &Assets) {
+    companion(
+        out,
+        state,
+        assets,
+        state.tile_editor.as_ref(),
+        Companion {
+            title: "editTilesElsewhere",
+            keep_open: "tileEditorKeepOpen",
+            private: "tileEditorPrivate",
+            error: "tileEditorError",
+            starting: "tileEditorStarting",
+        },
+    );
+}
+
+/// A QR code and address for a page on the owner's phone or computer, with a Close button.
+fn companion(
+    out: &mut Scene,
+    state: &State,
+    assets: &Assets,
+    session: Option<&Result<crate::companion::Session, String>>,
+    strings: Companion,
+) {
     let language = state.preferences.language;
     let panel = Rect::new(520., 144., 880., 816.);
     out.modal = Some(panel);
@@ -274,7 +322,7 @@ fn wallpaper_upload(out: &mut Scene, state: &State, assets: &Assets) {
     out.shape(panel, 24., c(0x1b2023, 1.));
     out.border(panel, 24., 1., c(0xffffff, 0.09));
     out.text(
-        language.t("uploadWallpaper"),
+        language.t(strings.title),
         Rect::new(584., 198., 752., 48.),
         text(32., 550, -0.02),
         WHITE,
@@ -287,7 +335,7 @@ fn wallpaper_upload(out: &mut Scene, state: &State, assets: &Assets) {
         c(0xffffff, 0.65),
         true,
     );
-    match &state.wallpaper_upload {
+    match session {
         Some(Ok(session)) => {
             let scale = (336. / (session.qr_size + 8) as f32).floor();
             let size = (session.qr_size + 8) as f32 * scale;
@@ -365,14 +413,14 @@ fn wallpaper_upload(out: &mut Scene, state: &State, assets: &Assets) {
                 true,
             );
             out.text(
-                language.t("wallpaperUploadKeepOpen"),
+                language.t(strings.keep_open),
                 Rect::new(604., 766., 712., 52.),
                 text(16., 400, 0.).leading(1.4),
                 c(0xffffff, 0.75),
                 true,
             );
             out.text(
-                language.t("wallpaperUploadPrivate"),
+                language.t(strings.private),
                 Rect::new(604., 820., 712., 22.),
                 text(15., 400, 0.),
                 c(0xffffff, 0.5),
@@ -381,9 +429,9 @@ fn wallpaper_upload(out: &mut Scene, state: &State, assets: &Assets) {
         }
         result => {
             let key = if result.is_some() {
-                "wallpaperUploadError"
+                strings.error
             } else {
-                "wallpaperUploadStarting"
+                strings.starting
             };
             out.text(
                 language.t(key),
@@ -544,7 +592,8 @@ pub fn scene_with_pill(
         | Overlay::BackgroundOptions { .. }
         | Overlay::BackgroundDelete { .. }
         | Overlay::Keyboard
-        | Overlay::WallpaperUpload),
+        | Overlay::WallpaperUpload
+        | Overlay::TileEditor),
     ) = &state.overlay
     {
         let anchor = match overlay {
@@ -594,6 +643,7 @@ pub fn scene_with_pill(
             }
             Overlay::Keyboard => keyboard(&mut out, state, assets),
             Overlay::WallpaperUpload => wallpaper_upload(&mut out, state, assets),
+            Overlay::TileEditor => tile_editor(&mut out, state, assets),
             Overlay::SystemKeyboard | Overlay::Recents { .. } => {}
         }
         if !matches!(
@@ -978,6 +1028,7 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect, language:
                 "browser" => ("globe", language.t("browser")),
                 "moonlight" => ("moonlight", "Moonlight"),
                 "gaming" => ("gaming", app.title.as_str()),
+                "custom" => (app.mark, app.title.as_str()),
                 _ => ("generic", app.title.as_str()),
             };
             let font = if brand == "generic" {
@@ -1958,9 +2009,16 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
 fn settings(out: &mut Scene, state: &State, assets: &Assets) {
     let language = state.preferences.language;
     let s = state.scroll;
-    for (index, key) in ["interface", "background", "weather", "inputs", "system"]
-        .into_iter()
-        .enumerate()
+    for (index, key) in [
+        "interface",
+        "background",
+        "weather",
+        "inputs",
+        "shortcuts",
+        "system",
+    ]
+    .into_iter()
+    .enumerate()
     {
         let label = language.t(key);
         let rect = Rect::new(160., 164.8 + index as f32 * 84., 403.2, 72.);
@@ -2004,6 +2062,11 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                 Some(Subpage::Temperature) => language.t("temperature"),
                 Some(Subpage::Language) => language.t("language"),
                 Some(Subpage::TextRendering) => language.t("textRendering"),
+                Some(Subpage::Tile(_)) if state.tile_draft.title.is_empty() => {
+                    language.t("newTile")
+                }
+                Some(Subpage::Tile(_)) => state.tile_draft.title.as_str(),
+                Some(Subpage::TileIcon(_)) => language.t("icon"),
                 None => "",
             };
             let parent_width = assets.width(label, text(20.8, 550, -0.02)) + 2.;
@@ -2064,13 +2127,20 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         let start = out.draw.len();
         if matches!(
             subpage,
-            Subpage::WeatherLocation | Subpage::Greeting | Subpage::AppNames | Subpage::Clock
+            Subpage::WeatherLocation
+                | Subpage::Greeting
+                | Subpage::AppNames
+                | Subpage::Clock
+                | Subpage::Tile(_)
+                | Subpage::TileIcon(_)
         ) {
             match subpage {
                 Subpage::WeatherLocation => location_settings(out, state, assets),
                 Subpage::Greeting => greeting_settings(out, state, assets),
                 Subpage::AppNames => app_name_settings(out, state, assets),
                 Subpage::Clock => clock_settings(out, state, assets),
+                Subpage::Tile(id) => tile_settings(out, state, assets, id.is_some()),
+                Subpage::TileIcon(_) => tile_icon_settings(out, state, assets),
                 _ => unreachable!(),
             }
             if let Some(opened) = state.panel_started {
@@ -2124,7 +2194,12 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
                     state.preferences.temperature_unit == Unit::Fahrenheit,
                 ),
             ],
-            Subpage::WeatherLocation | Subpage::Greeting | Subpage::AppNames | Subpage::Clock => {
+            Subpage::WeatherLocation
+            | Subpage::Greeting
+            | Subpage::AppNames
+            | Subpage::Clock
+            | Subpage::Tile(_)
+            | Subpage::TileIcon(_) => {
                 unreachable!()
             }
             Subpage::Language => Language::ALL
@@ -2308,6 +2383,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
             out.draw.push(Draw::Clip(Some(state.content_viewport())));
         }
         WEATHER_SECTION => weather_settings(out, state, assets),
+        SHORTCUTS_SECTION => shortcut_settings(out, state, assets),
         SYSTEM_SECTION => {
             let version_rect = Rect::new(640., 164.8 - s, 1120., 72.);
             out.shape(version_rect, 48., c(0x171c20, 0.3));
@@ -2591,6 +2667,202 @@ fn input_name_rows(out: &mut Scene, state: &State, assets: &Assets, id: &str, y:
                 chevron: false,
             },
         );
+    }
+}
+
+fn shortcut_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
+    let tiles = &state.preferences.custom_tiles;
+    for (index, tile) in tiles.iter().enumerate() {
+        let description = format!("{} · {}", tile.method.label(), shorten(&tile.url, false));
+        row(
+            out,
+            state,
+            assets,
+            Row {
+                target: Target::Tile(tile.id.clone()),
+                rect: Rect::new(
+                    640.,
+                    164.8 + index as f32 * 102.7 - state.scroll,
+                    1120.,
+                    90.7,
+                ),
+                title: &tile.title,
+                icon: Some(tile.icon()),
+                value: None,
+                description: Some(&description),
+                selected: false,
+                chevron: true,
+            },
+        );
+    }
+    let mut y = 164.8 + tiles.len() as f32 * 102.7 + 16. - state.scroll;
+    if tiles.is_empty() {
+        out.text(
+            language.t("noTiles"),
+            Rect::new(664., 165. - state.scroll, 1000., 26.),
+            text(16.8, 400, 0.).leading(1.5),
+            c(0xf5f5f5, 0.72),
+            false,
+        );
+        y += 36.;
+    }
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::TileAdd,
+            rect: Rect::new(640., y, 1120., 72.),
+            title: language.t("addTile"),
+            icon: Some("sparkles"),
+            value: None,
+            description: None,
+            selected: false,
+            chevron: true,
+        },
+    );
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::TileEditor,
+            rect: Rect::new(640., y + 84., 1120., 90.7),
+            title: language.t("editTilesElsewhere"),
+            icon: Some("globe"),
+            value: None,
+            description: Some(language.t("editTilesElsewhereHint")),
+            selected: false,
+            chevron: false,
+        },
+    );
+}
+
+/// Every row keeps its place while typing, so completing entry cannot move a
+/// clicked control; Remove only exists once the tile is saved.
+fn tile_settings(out: &mut Scene, state: &State, assets: &Assets, saved: bool) {
+    let language = state.preferences.language;
+    let draft = &state.tile_draft;
+    let editing = |field: TextField| state.text_input_active() && state.keyboard_field == field;
+    let name = if editing(TextField::TileName) {
+        format!("{}|", state.tile_text)
+    } else if draft.title.is_empty() {
+        language.t("tileNameHint").into()
+    } else {
+        draft.title.clone()
+    };
+    let url = if editing(TextField::TileUrl) {
+        let typed = &state.tile_text;
+        let scheme = if typed.contains("://") {
+            ""
+        } else {
+            state.tile_scheme()
+        };
+        format!("{}|", shorten(&format!("{scheme}{typed}"), true))
+    } else if draft.url.is_empty() {
+        language.t("tileUrlHint").into()
+    } else {
+        shorten(&draft.url, false)
+    };
+    let mut rows = vec![
+        (Target::TileName, "name", "type", None, Some(name)),
+        (
+            Target::TileScheme,
+            "protocol",
+            "globe",
+            Some(state.tile_scheme()),
+            None,
+        ),
+        (Target::TileUrl, "url", "location", None, Some(url)),
+        (
+            Target::TileIcon,
+            "icon",
+            draft.icon(),
+            Some(language.t(tile_icon_name(draft.icon()))),
+            None,
+        ),
+        (
+            Target::TileMethod,
+            "requestMethod",
+            "settings",
+            Some(draft.method.label()),
+            None,
+        ),
+        (Target::TileSend, "sendNow", "arrow", None, None),
+    ];
+    if saved {
+        rows.push((Target::TileRemove, "removeTile", "close", None, None));
+    }
+    let mut y = 164.8 - state.scroll;
+    for (target, title, icon, value, description) in rows {
+        let height = if description.is_some() { 90.7 } else { 72. };
+        let chevron = matches!(
+            target,
+            Target::TileName | Target::TileUrl | Target::TileIcon
+        );
+        row(
+            out,
+            state,
+            assets,
+            Row {
+                target,
+                rect: Rect::new(640., y, 1120., height),
+                title: language.t(title),
+                icon: Some(icon),
+                value,
+                description: description.as_deref(),
+                selected: false,
+                chevron,
+            },
+        );
+        y += height + 12.;
+    }
+}
+
+fn tile_icon_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let language = state.preferences.language;
+    let current = state.tile_draft.icon();
+    for (index, (icon, name)) in TILE_ICONS.iter().enumerate() {
+        row(
+            out,
+            state,
+            assets,
+            Row {
+                target: Target::Choice(index),
+                rect: Rect::new(640., 164.8 + index as f32 * 84. - state.scroll, 1120., 72.),
+                title: language.t(name),
+                icon: Some(icon),
+                value: None,
+                description: None,
+                selected: *icon == current,
+                chevron: false,
+            },
+        );
+    }
+}
+
+fn tile_icon_name(icon: &str) -> &'static str {
+    TILE_ICONS
+        .iter()
+        .find(|(key, _)| *key == icon)
+        .map_or(TILE_ICONS[0].1, |(_, name)| name)
+}
+
+/// URLs have no break opportunities, so long ones are cut to a single line.
+/// While typing, the end stays visible next to the cursor.
+fn shorten(text: &str, keep_end: bool) -> String {
+    const MAX: usize = 96;
+    let count = text.chars().count();
+    if count <= MAX {
+        text.into()
+    } else if keep_end {
+        format!(
+            "…{}",
+            text.chars().skip(count + 1 - MAX).collect::<String>()
+        )
+    } else {
+        format!("{}…", text.chars().take(MAX - 1).collect::<String>())
     }
 }
 
@@ -3015,6 +3287,8 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
             TextField::Location => language.t("cityPostcode"),
             TextField::Name => language.t("greetingName"),
             TextField::InputName => language.t("inputName"),
+            TextField::TileName => language.t("tileName"),
+            TextField::TileUrl => language.t("tileUrl"),
             TextField::Apps => language.t("findApp"),
         },
         Rect::new(389., 324., 1000., 44.),
