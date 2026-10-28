@@ -282,7 +282,7 @@ try {
   assert.ok(widgets.ui_text.includes('Widgets'));
   for (const title of ['Greeting', 'Weather', 'Shortcuts', 'Inputs'])
     assert.ok(widgets.ui_text.includes(title));
-  const greetingEditor = `${widgetsPage},enter,enter`;
+  const greetingEditor = `${widgetsPage},enter,down,enter`;
   for (const [id, name] of [
     ['Ana', 'Ana'],
     ['Bob', 'Bob'],
@@ -310,7 +310,7 @@ try {
       'Keyboard completion must save without waiting for another SDL input event',
     );
   }
-  const greeting = await scenario('greeting-settings', `${widgetsPage},enter,down`);
+  const greeting = await scenario('greeting-settings', `${widgetsPage},enter,down,down`);
   assert.equal(greeting.subpage, 'Greeting');
   assert.equal(greeting.focus, 'GreetingNameClear');
   assert.ok(greeting.ui_text.includes('Clear name'));
@@ -357,12 +357,44 @@ try {
   const clockFocus = await scenario('clock-format-focus', `${clockEditor},enter,down`);
   assert.equal(clockFocus.subpage, 'ClockFormat');
   assert.deepEqual(clockFocus.focus, { Choice: 1 });
-  const system = await scenario('system-settings', 'settings,down,down,down,down,right,down,down');
+  const system = await scenario(
+    'system-settings',
+    'settings,down,down,down,down,right,down,down,down',
+  );
   assert.deepEqual(system.focus, { Setting: 5 });
   assert.ok(system.ui_text.includes('Refresh apps & inputs'));
   assert.ok(system.ui_text.includes('Quit app'));
   assert.ok(system.ui_text.includes('Text rendering'));
-  const textOptions = 'settings,down,down,down,down,right,down,enter';
+  const updatePreview = await scenario('update-preview', 'settings,down,down,down,down,right', [
+    '--test-update-version',
+    '99.0.0',
+  ]);
+  assert.equal(updatePreview.focus, 'OpenHomebrew');
+  assert.ok(updatePreview.ui_text.includes('Update available'));
+  assert.ok(updatePreview.ui_text.some((label) => label.includes('Latest: 99.0.0')));
+  assert.ok(updatePreview.ui_text.includes('Open Homebrew Channel to update'));
+  const afterUpdatePreview = await scenario(
+    'update-preview-cleared',
+    'settings,down,down,down,down,right',
+  );
+  assert.equal(afterUpdatePreview.focus, 'CheckUpdates');
+  assert.ok(!afterUpdatePreview.ui_text.includes('Update available'));
+  const currentVersion = JSON.parse(
+    await fs.readFile(path.join(root, 'package.json'), 'utf8'),
+  ).version;
+  const latestPreview = await scenario(
+    'update-current-preview',
+    'settings,down,down,down,down,right,enter',
+    ['--test-update-version', currentVersion],
+  );
+  assert.equal(latestPreview.focus, 'CheckUpdates');
+  assert.equal(latestPreview.update_status, 'checked');
+  assert.equal(latestPreview.available_update, null);
+  assert.ok(latestPreview.ui_text.includes('No newer version found'));
+  assert.ok(latestPreview.ui_text.includes('Check again'));
+  assert.ok(latestPreview.ui_text.includes(`Current version: ${currentVersion}`));
+  assert.ok(!latestPreview.ui_text.some((label) => label.startsWith('Luma v')));
+  const textOptions = 'settings,down,down,down,down,right,down,down,enter';
   const textRendering = await scenario('text-rendering-options', textOptions);
   assert.equal(textRendering.subpage, 'TextRendering');
   assert.deepEqual(textRendering.focus, { Choice: 0 });
@@ -421,7 +453,7 @@ try {
   assert.ok(!shortcut.ui_text.includes('Add shortcut'));
   assert.ok(!shortcut.ui_text.includes('Request method'));
   // Scenarios share one preferences file, so the tile is removed again here.
-  const removed = await scenario('shortcut-removed', `${shortcutsPage},down,enter`);
+  const removed = await scenario('shortcut-removed', `${shortcutsPage},down,enter,down,enter`);
   assert.equal(removed.focus, 'TileEditor');
   assert.equal(removed.subpage, 'Shortcuts');
   assert.deepEqual(removed.preferences.custom_tiles, []);
@@ -473,7 +505,7 @@ try {
   await fs.writeFile(preferences, JSON.stringify({ show_weather: false }));
   const cycleEnabled = await scenario(
     'wallpaper-cycle-enabled',
-    'settings,down,down,enter,up,up,left,enter',
+    'settings,down,down,enter,up,up,right,enter',
   );
   assert.equal(cycleEnabled.subpage, null);
   assert.equal(cycleEnabled.focus, 'WallpaperCycle');
@@ -487,7 +519,7 @@ try {
   );
   const cycleDisabled = await scenario(
     'wallpaper-cycle-disabled',
-    'settings,down,down,enter,up,up,left,enter',
+    'settings,down,down,enter,up,up,right,enter',
   );
   assert.equal(cycleDisabled.preferences.wallpaper_cycle, false);
   assert.ok(cycleDisabled.ui_text.includes('Rotation'));

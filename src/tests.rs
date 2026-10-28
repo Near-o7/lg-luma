@@ -564,6 +564,8 @@ fn greeting_subpage_opens_the_keyboard_and_back_restores_its_parent() {
             .is_empty()
     );
     assert_eq!(state.subpage, Some(crate::state::Subpage::Greeting));
+    assert_eq!(state.focus, Target::GreetingToggle);
+    state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::GreetingName);
     assert!(!state.text_input_active());
     assert!(state.activate().is_empty());
@@ -592,6 +594,7 @@ fn greeting_name_replacement_commits_on_every_keyboard_completion_route() {
         state.open(2);
         state.focus = Target::Widget(0);
         state.activate();
+        state.direction(Direction::Down, &controls(&state));
         state.activate();
         assert!(state.editing_text().is_empty());
         state.text("  BobX ");
@@ -632,6 +635,7 @@ fn remote_can_clear_a_saved_greeting_name_without_moving_the_controls() {
         .iter()
         .map(|c| (c.target.clone(), c.rect.y))
         .collect();
+    state.direction(Direction::Down, &controls(&state));
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::GreetingNameClear);
     assert_eq!(state.activate(), vec![Effect::Save]);
@@ -871,7 +875,7 @@ fn time_format_selects_seconds_without_changing_the_hour_format() {
 }
 
 #[test]
-fn system_version_uses_a_settings_surface_without_an_interactive_target() {
+fn system_version_is_inside_the_update_status_card_without_a_separate_row() {
     let mut state = ready();
     state.open(2);
     state.section = crate::state::SYSTEM_SECTION;
@@ -880,17 +884,17 @@ fn system_version_uses_a_settings_surface_without_an_interactive_target() {
     assert!(system.draw.iter().any(|draw| matches!(
         draw,
         crate::renderer::Draw::Shape(rect, _, _, color)
-            if rect.x == 640. && rect.y == 164.8 && rect.w == 1120. && rect.h == 72. && color[3] == 0.3
+            if rect.x == 640. && rect.y == 164.8 && rect.w == 1120. && rect.h == 220. && color[3] == 0.72
     )));
     assert!(system.draw.iter().any(|draw| matches!(
         draw,
         crate::renderer::Draw::Text(label, _, style, color, _)
-            if label == "Luma vtest" && style.size == 20.8 && style.weight == 550 && color[3] == 0.5
+            if label == "Current version: test" && style.size == 20.8 && style.weight == 450 && color[3] == 0.73
     )));
     assert_eq!(state.hit_test(&system.controls, 900., 200.), None);
     state.focus = Target::Sidebar(crate::state::SYSTEM_SECTION);
     state.direction(Direction::Right, &system.controls);
-    assert_eq!(state.focus, Target::Setting(3));
+    assert_eq!(state.focus, Target::CheckUpdates);
 }
 
 #[test]
@@ -912,6 +916,8 @@ fn system_category_owns_refresh_and_quit_and_restores_sidebar_focus() {
     assert_eq!(state.focus, Target::Sidebar(crate::state::SYSTEM_SECTION));
     assert_eq!(state.section, crate::state::SYSTEM_SECTION);
     state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::CheckUpdates);
+    state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Setting(3));
     assert_eq!(state.activate(), vec![Effect::Reload]);
     state.direction(Direction::Down, &controls(&state));
@@ -1006,25 +1012,25 @@ fn input_visibility_has_explicit_choices_and_returns_to_the_same_input() {
 }
 
 #[test]
-fn background_sidebar_right_focuses_rotation_and_ok_restores_the_applied_background() {
+fn background_sidebar_right_focuses_upload_and_ok_restores_the_applied_background() {
     let mut state = ready();
     state.open(2);
     state.preferences.background = "forest".into();
     state.focus = Target::Sidebar(1);
     state.section = 1;
     state.direction(Direction::Right, &controls(&state));
-    assert_eq!(state.focus, Target::WallpaperCycle);
+    assert_eq!(state.focus, Target::UploadWallpaper);
     assert_eq!(state.preferences.background, "forest");
     assert!(!state.preferences.wallpaper_cycle);
     assert!(state.overlay.is_none());
     state.direction(Direction::Right, &controls(&state));
-    assert_eq!(state.focus, Target::UploadWallpaper);
-    state.direction(Direction::Left, &controls(&state));
     assert_eq!(state.focus, Target::WallpaperCycle);
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::UploadWallpaper);
     state.direction(Direction::Left, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(1));
     state.direction(Direction::Right, &controls(&state));
-    assert_eq!(state.focus, Target::WallpaperCycle);
+    assert_eq!(state.focus, Target::UploadWallpaper);
     state.back();
     state.activate();
     assert_eq!(state.focus, Target::Background(6));
@@ -1615,8 +1621,11 @@ fn language_selection_restores_its_parent_and_is_saved_with_preferences() {
     state.focus = Target::Setting(4);
     state.direction(Direction::Right, &controls(&state));
     assert_eq!(state.subpage, Some(crate::state::Subpage::Language));
-    assert_eq!(state.focus, Target::Choice(0));
-    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(
+        state.focus,
+        Target::Choice(crate::i18n::Language::En.index())
+    );
+    state.direction(Direction::Up, &controls(&state));
     assert_eq!(state.activate(), vec![Effect::Save]);
     assert_eq!(state.preferences.language, crate::i18n::Language::De);
     assert_eq!(state.focus, Target::Setting(4));
@@ -1632,6 +1641,9 @@ fn remote_can_select_and_restore_every_language() {
         state.open(2);
         state.focus = Target::Setting(4);
         state.activate();
+        for _ in 0..crate::i18n::Language::En.index() {
+            state.direction(Direction::Up, &controls(&state));
+        }
         for _ in 0..index {
             state.direction(Direction::Down, &controls(&state));
         }
@@ -1660,6 +1672,49 @@ fn remote_can_select_and_restore_every_language() {
             Target::Choice((index + 1) % crate::i18n::Language::ALL.len())
         );
     }
+}
+
+#[test]
+fn settings_order_language_sort_and_shortcut_empty_card() {
+    use crate::{i18n::Language, renderer::Draw, state::Subpage};
+    assert!(
+        Language::ALL
+            .windows(2)
+            .all(|pair| pair[0].name().to_lowercase() < pair[1].name().to_lowercase())
+    );
+    for (index, language) in Language::ALL.into_iter().enumerate() {
+        assert_eq!(language.index(), index);
+    }
+    let mut state = ready();
+    state.open(2);
+    let general = controls(&state);
+    let language = general
+        .iter()
+        .find(|control| control.target == Target::Setting(4))
+        .unwrap();
+    let motion = general
+        .iter()
+        .find(|control| control.target == Target::Setting(2))
+        .unwrap();
+    assert!(language.rect.y < motion.rect.y);
+    state.subpage = Some(Subpage::Shortcuts);
+    let empty = scene(&state);
+    assert!(empty.draw.iter().any(|draw| matches!(draw,
+        Draw::Shape(rect, radius, stroke, color) if rect.x == 640. && rect.y == 248.8 && rect.h == 220.
+            && *radius == 20. && *stroke == 0. && color[3] == 0.72
+    )));
+    assert!(empty.draw.iter().any(|draw| matches!(draw,
+        Draw::Text(label, _, style, ..) if label == state.preferences.language.t("noTiles") && style.size == 24.
+    )));
+    assert!(empty.draw.iter().any(|draw| matches!(draw,
+        Draw::Text(label, ..) if label == "Press Configure to add your first shortcut."
+    )));
+    assert!(
+        empty
+            .controls
+            .iter()
+            .any(|control| control.target == Target::TileEditor)
+    );
 }
 
 #[test]
@@ -2174,7 +2229,7 @@ fn custom_tiles_are_sanitized_and_get_stable_unique_ids() {
 }
 
 #[test]
-fn shortcut_settings_only_offer_qr_editing_and_local_removal() {
+fn shortcut_settings_offer_qr_editing_and_a_test_remove_popup() {
     use crate::state::{Subpage, WIDGETS_SECTION};
     let mut state = ready();
     state.preferences.reduced_motion = true;
@@ -2206,12 +2261,48 @@ fn shortcut_settings_only_offer_qr_editing_and_local_removal() {
             .filter(|c| c.scrollable)
             .map(|c| c.target)
             .collect::<Vec<_>>(),
-        vec![Target::TileRemove(tile.id.clone()), Target::TileEditor]
+        vec![Target::Tile(tile.id.clone()), Target::TileEditor]
     );
-    assert!(state.hit_test(&controls(&state), 800., 280.).is_none());
+    assert_eq!(
+        state.hit_test(&controls(&state), 800., 280.),
+        Some(Target::Tile(tile.id.clone()))
+    );
     let page = scene(&state);
-    assert!(page.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::Text(label, _, _, color, _) if label == "Lamp" && color[3] == 0.5)));
+    assert!(page.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::Text(label, _, _, color, _) if label == "Lamp" && color[3] == 0.73)));
+    assert!(page.draw.iter().any(|draw| matches!(draw,
+        crate::renderer::Draw::Shape(rect, radius, _, color)
+            if rect.x == 640. && rect.h == 90.7 && *radius == 20. && color[3] == 0.72
+    )));
+    assert!(
+        !page
+            .controls
+            .iter()
+            .any(|control| matches!(control.target, Target::TileRemove(_)))
+    );
     assert!(!page.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::TintedImage(path, rect, ..) if path.ends_with("right.lvec") && rect.x >= 640.)));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::Tile(tile.id.clone()));
+    state.activate();
+    assert_eq!(state.focus, Target::TileTest(tile.id.clone()));
+    let popup = scene(&state);
+    assert!(popup.modal.is_some());
+    assert_eq!(
+        popup
+            .controls
+            .iter()
+            .map(|control| control.target.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            Target::TileTest(tile.id.clone()),
+            Target::TileRemove(tile.id.clone())
+        ]
+    );
+    assert!(
+        matches!(state.activate().as_slice(), [Effect::FireWebhook(sent)] if sent.id == tile.id)
+    );
+    state.back();
+    assert_eq!(state.focus, Target::Tile(tile.id.clone()));
+    state.activate();
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::TileRemove(tile.id.clone()));
     assert_eq!(state.activate(), vec![Effect::Save]);
@@ -2375,7 +2466,7 @@ fn shortcut_list_scroll_and_pointer_focus_preserve_control_positions() {
     for _ in 0..20 {
         state.direction(Direction::Down, &controls(&state));
     }
-    assert_eq!(state.focus, Target::TileRemove("custom.tile-19".into()));
+    assert_eq!(state.focus, Target::Tile("custom.tile-19".into()));
     assert!(state.scroll > 0.);
     let before: Vec<_> = controls(&state)
         .iter()
@@ -2384,9 +2475,7 @@ fn shortcut_list_scroll_and_pointer_focus_preserve_control_positions() {
     let scroll = state.scroll;
     let target = controls(&state)
         .into_iter()
-        .find(|c| {
-            matches!(c.target, Target::TileRemove(_)) && c.rect.y > state.content_viewport().y
-        })
+        .find(|c| matches!(c.target, Target::Tile(_)) && c.rect.y > state.content_viewport().y)
         .unwrap();
     state.pointer_focus(target.target);
     assert_eq!(state.scroll, scroll);
@@ -2401,7 +2490,7 @@ fn shortcut_list_scroll_and_pointer_focus_preserve_control_positions() {
 
 #[test]
 fn settings_lists_keep_bottom_padding_for_remote_and_wheel_scrolling() {
-    use crate::state::{SETTINGS_BOTTOM_PADDING, Subpage};
+    use crate::state::{SETTINGS_LIST_BOTTOM_PADDING, Subpage};
     for backgrounds in [false, true] {
         let mut state = ready();
         state.preferences.reduced_motion = true;
@@ -2430,7 +2519,7 @@ fn settings_lists_keep_bottom_padding_for_remote_and_wheel_scrolling() {
         state.focus = last.clone();
         state.reveal_focus(&controls(&state));
         let bottom =
-            state.content_viewport().y + state.content_viewport().h - SETTINGS_BOTTOM_PADDING;
+            state.content_viewport().y + state.content_viewport().h - SETTINGS_LIST_BOTTOM_PADDING;
         let rect = controls(&state)
             .into_iter()
             .find(|c| c.target == last)
@@ -2445,6 +2534,422 @@ fn settings_lists_keep_bottom_padding_for_remote_and_wheel_scrolling() {
             .rect;
         assert!((rect.y + rect.h - bottom).abs() < 0.01);
     }
+}
+
+#[test]
+fn language_list_scrolls_under_fixed_ui_without_clipping_or_fades() {
+    use crate::{renderer::Draw, state::Subpage};
+    let mut state = ready();
+    state.preferences.reduced_motion = true;
+    state.open(2);
+    state.subpage = Some(Subpage::Language);
+    state.scroll = 180.;
+    let rendered = scene(&state);
+    assert!(!rendered.draw.iter().any(|draw| matches!(
+        draw,
+        Draw::Clip(Some(_)) | Draw::EdgeFade(Some(_)) | Draw::EdgeFadeX(Some(_))
+    )));
+    let first = rendered
+        .controls
+        .iter()
+        .find(|control| control.target == Target::Choice(0))
+        .unwrap();
+    assert!(first.rect.y < state.content_viewport().y);
+    let last_language = rendered
+        .draw
+        .iter()
+        .rposition(|draw| {
+            matches!(draw,
+                Draw::Text(label, ..) if label == crate::i18n::Language::ALL.last().unwrap().name()
+            )
+        })
+        .unwrap();
+    for key in ["interface", "settings"] {
+        let label = state.preferences.language.t(key);
+        let fixed = rendered
+            .draw
+            .iter()
+            .position(|draw| {
+                matches!(draw,
+                    Draw::Text(text, ..) if text == label
+                )
+            })
+            .unwrap();
+        assert!(fixed > last_language);
+    }
+    let nav = rendered
+        .controls
+        .iter()
+        .find(|control| control.target == Target::Nav(2))
+        .unwrap();
+    let (x, y) = nav.rect.center();
+    assert_eq!(
+        state.hit_test(&rendered.controls, x, y),
+        Some(Target::Nav(2))
+    );
+}
+
+#[test]
+fn apps_scroll_behind_navigation_without_a_top_cutoff_or_fade() {
+    use crate::renderer::Draw;
+    let mut state = ready();
+    state.open(1);
+    state.scroll = 400.;
+    let rendered = scene(&state);
+    assert!(!rendered.draw.iter().any(|draw| matches!(
+        draw,
+        Draw::Clip(Some(_)) | Draw::EdgeFade(Some(_)) | Draw::EdgeFadeX(Some(_))
+    )));
+    let card = rendered
+        .draw
+        .iter()
+        .position(|draw| {
+            matches!(draw,
+                Draw::Shadow(rect, ..) if rect.y < 0. && rect.y + rect.h > 0.
+            )
+        })
+        .expect("cards remain drawn until they leave the screen, not the content viewport");
+    let nav_label = rendered
+        .draw
+        .iter()
+        .rposition(|draw| {
+            matches!(draw,
+                Draw::Text(label, ..) if label == state.preferences.language.t("apps")
+            )
+        })
+        .unwrap();
+    assert!(card < nav_label);
+    let nav = rendered
+        .controls
+        .iter()
+        .find(|control| control.target == Target::Nav(1))
+        .unwrap();
+    let (x, y) = nav.rect.center();
+    assert_eq!(
+        state.hit_test(&rendered.controls, x, y),
+        Some(Target::Nav(1))
+    );
+}
+
+#[test]
+fn apps_toolbar_stays_fixed_above_scrolling_cards_and_keeps_pointer_priority() {
+    for with_clear_controls in [false, true] {
+        let mut state = ready();
+        state.open(1);
+        if with_clear_controls {
+            state.filter = 1;
+            state.query = "n".into();
+        }
+        let before = controls(&state);
+        state.scroll = 200.;
+        let rendered = scene(&state);
+        for control in before.iter().filter(|control| {
+            matches!(
+                control.target,
+                Target::Filter(_) | Target::ClearFilter | Target::Search | Target::ClearSearch
+            )
+        }) {
+            let fixed = rendered
+                .controls
+                .iter()
+                .find(|item| item.target == control.target)
+                .unwrap();
+            assert_eq!(fixed.rect.y, control.rect.y);
+            assert!(!fixed.scrollable);
+            let (x, y) = fixed.rect.center();
+            assert_eq!(
+                state.hit_test(&rendered.controls, x, y),
+                Some(fixed.target.clone())
+            );
+        }
+        assert_eq!(state.hit_test(&rendered.controls, 1400., 230.), None);
+        let first = before
+            .iter()
+            .find(|control| matches!(control.target, Target::App(_)))
+            .unwrap();
+        let scrolled = rendered
+            .controls
+            .iter()
+            .find(|control| control.target == first.target)
+            .unwrap();
+        assert_eq!(first.rect.y - scrolled.rect.y, state.scroll);
+        state.focus = first.target.clone();
+        state.reveal_focus(&rendered.controls);
+        let revealed = controls(&state)
+            .into_iter()
+            .find(|control| control.target == first.target)
+            .unwrap();
+        assert!(revealed.rect.y >= state.apps_viewport().y);
+    }
+}
+
+#[test]
+fn app_categories_and_search_use_matching_pills_and_larger_heavier_labels() {
+    use crate::renderer::Draw;
+    let mut state = ready();
+    state.open(1);
+    let rendered = scene(&state);
+    for control in rendered
+        .controls
+        .iter()
+        .filter(|control| matches!(control.target, Target::Filter(_) | Target::Search))
+    {
+        assert_eq!(control.rect.h, 56.);
+        assert_eq!(control.rect.y, 164.8);
+        assert!(rendered.draw.iter().any(|draw| matches!(draw,
+            Draw::Shape(rect, radius, _, color) if rect.x == control.rect.x && rect.y == control.rect.y
+                && rect.w == control.rect.w && (*radius == 48. || *radius == 28.) && color[3] >= 0.72
+        )));
+        assert!(rendered.draw.iter().any(|draw| matches!(draw,
+            Draw::Text(_, rect, style, ..) if rect.x >= control.rect.x && rect.x < control.rect.x + control.rect.w
+                && rect.y > control.rect.y && rect.y < control.rect.y + control.rect.h
+                && style.size == 20.8 && style.weight == 550
+        )));
+    }
+}
+
+#[test]
+fn category_focus_active_and_clear_button_share_the_pill_style() {
+    use crate::renderer::Draw;
+    let mut state = ready();
+    state.open(1);
+    state.filter = 1;
+    state.focus = Target::ClearFilter;
+    let rendered = scene(&state);
+    let clear = rendered
+        .controls
+        .iter()
+        .find(|control| control.target == Target::ClearFilter)
+        .unwrap();
+    assert_eq!((clear.rect.w, clear.rect.h), (56., 56.));
+    assert!(rendered.draw.iter().any(|draw| matches!(draw,
+        Draw::RoundedGradient(rect, radius, ..) if rect.x == clear.rect.x && rect.y == clear.rect.y && *radius == 28.
+    )));
+    let category = rendered
+        .controls
+        .iter()
+        .find(|control| control.target == Target::Filter(1))
+        .unwrap();
+    assert!(rendered.draw.iter().any(|draw| matches!(draw,
+        Draw::Shape(rect, radius, stroke, color) if rect.x == category.rect.x && rect.y == category.rect.y
+            && *radius == 28. && *stroke == 1.5 && color[3] == 0.35
+    )));
+    state.focus = Target::Filter(1);
+    let focused = scene(&state);
+    assert!(focused.draw.iter().any(|draw| matches!(draw,
+        Draw::RoundedGradient(rect, radius, ..) if rect.x == category.rect.x && rect.y == category.rect.y && *radius == 28.
+    )));
+}
+
+#[test]
+fn clock_date_and_home_input_descriptions_use_larger_text() {
+    use crate::renderer::Draw;
+    for language in crate::i18n::Language::ALL {
+        let mut state = ready();
+        state.preferences.language = language;
+        let rendered = scene(&state);
+        let now = time::OffsetDateTime::UNIX_EPOCH;
+        for (label, size) in [
+            (
+                language.clock(
+                    now,
+                    state.preferences.hour_24,
+                    state.preferences.show_seconds,
+                ),
+                24.,
+            ),
+            (language.date(now), 18.4),
+        ] {
+            assert!(rendered.draw.iter().any(|draw| matches!(draw,
+                Draw::Text(text, rect, style, ..) if text == &label && style.size == size && rect.h >= size
+            )));
+        }
+        let input = &state.inventory.inputs[0];
+        let description = view::input_status(
+            input,
+            state.preferences.input_name(input).is_some(),
+            language,
+        );
+        assert!(rendered.draw.iter().any(|draw| matches!(draw,
+            Draw::Text(text, rect, style, ..) if text == &description && style.size == 16.8 && rect.h == 25.2
+        )));
+    }
+}
+
+#[test]
+fn tv_settings_button_is_centered_alongside_navigation() {
+    let rendered = scene(&ready());
+    let button = rendered
+        .controls
+        .iter()
+        .find(|control| control.target == Target::TvSettings)
+        .unwrap();
+    assert!((button.rect.y + button.rect.h / 2. - (42.5 + 68.6 / 2.)).abs() < 0.01);
+    assert_eq!(button.rect.h, 60.);
+    assert_eq!(button.rect.w, button.rect.h);
+    assert_eq!(button.rect.x + button.rect.w, 1836.);
+    let (x, y) = button.rect.center();
+    assert_eq!(
+        ready().hit_test(&rendered.controls, x, y),
+        Some(Target::TvSettings)
+    );
+}
+
+#[test]
+fn greeting_visibility_toggle_persists_without_clearing_name_or_hiding_date() {
+    use crate::{renderer::Draw, state::Subpage};
+    let legacy: Preferences = serde_json::from_str(r#"{"greeting_name":"Ana"}"#).unwrap();
+    assert!(legacy.show_greeting);
+    let mut state = ready();
+    state.preferences = legacy;
+    state.open(2);
+    state.focus = Target::Widget(0);
+    state.activate();
+    assert_eq!(state.subpage, Some(Subpage::Greeting));
+    assert_eq!(state.focus, Target::GreetingToggle);
+    let rendered = scene(&state);
+    let toggle = rendered
+        .controls
+        .iter()
+        .find(|control| control.target == Target::GreetingToggle)
+        .unwrap();
+    assert_eq!(toggle.rect.y, 164.8);
+    assert!(rendered.draw.iter().any(|draw| matches!(draw,
+        Draw::Text(label, ..) if label == state.preferences.language.t("showWidget")
+    )));
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(!state.preferences.show_greeting);
+    assert_eq!(state.preferences.greeting_name, "Ana");
+    let saved = serde_json::to_string(&state.preferences).unwrap();
+    let restored: Preferences = serde_json::from_str(&saved).unwrap();
+    assert!(!restored.show_greeting);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::GreetingName);
+    state.focus = Target::GreetingToggle;
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::Widget(0));
+    state.open(0);
+    let hidden = scene(&state);
+    let language = state.preferences.language;
+    let now = time::OffsetDateTime::UNIX_EPOCH;
+    let greeting = language.greeting(now.hour(), "Ana");
+    assert!(
+        !hidden
+            .draw
+            .iter()
+            .any(|draw| matches!(draw, Draw::Text(label, ..) if label == &greeting))
+    );
+    assert!(
+        hidden
+            .draw
+            .iter()
+            .any(|draw| matches!(draw, Draw::Text(label, ..) if label == &language.date(now)))
+    );
+    state.open(2);
+    state.focus = Target::Widget(0);
+    state.activate();
+    state.focus = Target::GreetingToggle;
+    state.activate();
+    assert!(state.preferences.show_greeting);
+    state.open(0);
+    assert!(
+        scene(&state)
+            .draw
+            .iter()
+            .any(|draw| matches!(draw, Draw::Text(label, ..) if label == &greeting))
+    );
+}
+
+#[test]
+fn update_card_shows_both_versions_and_launches_homebrew_without_installing() {
+    use crate::{i18n::Language, renderer::Draw};
+    for language in Language::ALL {
+        let mut state = ready();
+        state.preferences.language = language;
+        state.open(2);
+        state.section = crate::state::SYSTEM_SECTION;
+        assert!(
+            !controls(&state)
+                .iter()
+                .any(|control| control.target == Target::OpenHomebrew)
+        );
+        state.available_update = Some("9.0.0".into());
+        let rendered = scene(&state);
+        for label in [
+            language.t("updateAvailable").to_owned(),
+            language.t("openHomebrewChannel").to_owned(),
+            language.format(
+                "updateVersions",
+                &[("current", "test"), ("latest", "9.0.0")],
+            ),
+        ] {
+            assert!(
+                rendered
+                    .draw
+                    .iter()
+                    .any(|draw| matches!(draw, Draw::Text(text, ..) if text == &label))
+            );
+        }
+        state.focus = Target::Sidebar(crate::state::SYSTEM_SECTION);
+        state.direction(Direction::Right, &rendered.controls);
+        assert_eq!(state.focus, Target::OpenHomebrew);
+        assert_eq!(
+            state.activate(),
+            vec![Effect::Launch("org.webosbrew.hbchannel".into())]
+        );
+        let button = rendered
+            .controls
+            .iter()
+            .find(|control| control.target == Target::OpenHomebrew)
+            .unwrap();
+        let (x, y) = button.rect.center();
+        assert_eq!(
+            state.hit_test(&rendered.controls, x, y),
+            Some(Target::OpenHomebrew)
+        );
+        state.direction(Direction::Down, &rendered.controls);
+        assert_eq!(state.focus, Target::Setting(3));
+        state.focus = Target::OpenHomebrew;
+        state.direction(Direction::Left, &rendered.controls);
+        assert_eq!(state.focus, Target::Sidebar(crate::state::SYSTEM_SECTION));
+    }
+}
+
+#[test]
+fn update_status_card_only_claims_latest_after_success_and_allows_single_flight_retry() {
+    use crate::{renderer::Draw, update::Status};
+    let mut state = ready();
+    state.open(2);
+    state.section = crate::state::SYSTEM_SECTION;
+    state.focus = Target::CheckUpdates;
+    assert_eq!(state.update_status, Status::Unchecked);
+    assert!(!scene(&state).draw.iter().any(|draw| matches!(draw,
+        Draw::Text(label, ..) if label == state.preferences.language.t("latestVersionInstalled")
+    )));
+    assert!(state.activate().is_empty());
+    assert_eq!(state.update_status, Status::Checking);
+    assert!(std::mem::take(&mut state.update_check_requested));
+    state.activate();
+    assert!(!state.update_check_requested);
+    state.update_response(Err("offline".into()));
+    assert_eq!(state.update_status, Status::Failed);
+    assert!(!scene(&state).draw.iter().any(|draw| matches!(draw,
+        Draw::Text(label, ..) if label == state.preferences.language.t("latestVersionInstalled")
+    )));
+    state.activate();
+    assert!(std::mem::take(&mut state.update_check_requested));
+    state.update_response(Ok(None));
+    assert_eq!(state.update_status, Status::Checked);
+    for key in ["latestVersionInstalled", "checkAgain"] {
+        assert!(scene(&state).draw.iter().any(|draw| matches!(draw,
+            Draw::Text(label, ..) if label == state.preferences.language.t(key)
+        )));
+    }
+    state.activate();
+    state.update_response(Ok(Some("9.0.0".into())));
+    assert_eq!(state.focus, Target::OpenHomebrew);
+    state.update_response(Err("offline".into()));
+    assert_eq!(state.available_update.as_deref(), Some("9.0.0"));
 }
 
 #[test]

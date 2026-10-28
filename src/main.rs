@@ -26,6 +26,7 @@ mod storage;
 mod text_rendering;
 #[path = "tile-editor.rs"]
 mod tile_editor;
+mod update;
 mod vector;
 mod view;
 mod wallpaper_cycle;
@@ -74,6 +75,7 @@ struct Options {
     profile_frames: Option<usize>,
     weather_test_server: Option<String>,
     test_extra_apps: usize,
+    test_update_version: Option<String>,
 }
 
 impl Options {
@@ -115,6 +117,9 @@ impl Options {
                     "\n  --test-extra-apps N  Explicit scroll preview with up to 300 non-launchable extra cards; separate preferences"
                 );
                 println!(
+                    "  --test-update-version VERSION  Preview an available update without HTTP; also LUMA_TEST_UPDATE_VERSION"
+                );
+                println!(
                     "\n  Press Back / Escape on Home, or hold for 600 ms, to open Recent apps.\n  --script recents,await-recents  Open the desktop recent-app preview."
                 );
                 std::process::exit(0);
@@ -141,6 +146,7 @@ impl Options {
                 }
                 "--diagnostics" => result.diagnostics = Some(value.into()),
                 "--weather-test-server" => result.weather_test_server = Some(value),
+                "--test-update-version" => result.test_update_version = Some(value),
                 "--test-extra-apps" => {
                     result.test_extra_apps = value
                         .parse::<usize>()
@@ -178,6 +184,12 @@ impl Options {
                 "--script" => result.script = value.split(',').map(str::to_owned).collect(),
                 _ => return Err(format!("Unknown option: {arg}")),
             }
+        }
+        if result.test_update_version.is_none() {
+            result.test_update_version = std::env::var("LUMA_TEST_UPDATE_VERSION").ok();
+        }
+        if let Some(version) = &result.test_update_version {
+            update::validate_preview(version, env!("CARGO_PKG_VERSION"))?;
         }
         if result.screenshot.is_some() && result.frames.is_none() && result.profile_frames.is_none()
         {
@@ -630,7 +642,20 @@ fn run() -> Result<(), String> {
     } else {
         storage::load(&preferences_path)?
     };
+    let public_update_checks = update::public_checks_enabled(
+        !options.script.is_empty(),
+        options.test_update_version.is_some(),
+    );
     let mut state = State::new(initial_preferences);
+    if let Some(version) = &options.test_update_version {
+        eprintln!(
+            "Luma update preview: simulated version {version}; public release check disabled"
+        );
+        state.available_update = (version != env!("CARGO_PKG_VERSION")).then(|| version.clone());
+        state.update_status = update::Status::Checked;
+    } else if public_update_checks {
+        state.update_status = update::Status::Checking;
+    }
     // Scripted desktop captures must never open a server on the real LAN.
     let mut wallpaper_service =
         wallpapers::Service::new(&preferences_path, !webos && !options.script.is_empty())?;
@@ -656,6 +681,7 @@ fn run() -> Result<(), String> {
         options.preferences.is_none() && options.test_extra_apps == 0,
     );
     let webhook_service = webhook::Service::new();
+    let update_service = update::Service::new(public_update_checks);
     effects(
         vec![Effect::Refresh],
         &mut state,
@@ -1134,6 +1160,18 @@ fn run() -> Result<(), String> {
             state.notify(state.preferences.language.format(key, &[("tile", &title)]));
         }
         weather_tick(&mut state, &weather_service, visible);
+        if std::mem::take(&mut state.update_check_requested) {
+            if let Some(version) = &options.test_update_version {
+                state.update_response(Ok(
+                    (version != env!("CARGO_PKG_VERSION")).then(|| version.clone())
+                ));
+            } else {
+                update_service.check();
+            }
+        }
+        for result in update_service.receiver.try_iter() {
+            state.update_response(result);
+        }
         // Rebuild hit regions before input whenever inventory/layout changed.
         if state.dirty {
             scene = compose(&mut state, &assets, pill, pill_width, now);
@@ -1802,6 +1840,7 @@ fn run() -> Result<(), String> {
     if let Some(path) = options.dump {
         let state = serde_json::json!({ "page": state.page, "focus": state.focus, "query": state.query,
             "filter": state.filter, "preferences": state.preferences, "apps": state.apps().iter().map(|a| &a.id).collect::<Vec<_>>(),
+            "update_status": state.update_status, "available_update": state.available_update,
             "error": state.error, "scroll": state.scroll, "home_scroll": state.home_scroll, "subpage": state.subpage, "modal": state.overlay.is_some(), "weather": state.weather,
             "inventory": state.inventory.apps,
             "recents": state.recents.entries, "recents_pending": state.recents.pending, "recents_error": state.recents.error, "recents_visibility": state.recents.visibility,

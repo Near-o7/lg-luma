@@ -9,7 +9,7 @@ fn custom(index: u32) -> Wallpaper {
 }
 
 #[test]
-fn cycling_button_sits_left_of_upload_and_both_remain_fixed_in_every_language() {
+fn upload_sits_left_of_rotation_and_both_remain_fixed_in_every_language() {
     let mut state = ready();
     state.open(2);
     state.section = 1;
@@ -28,7 +28,7 @@ fn cycling_button_sits_left_of_upload_and_both_remain_fixed_in_every_language() 
             .unwrap()
             .rect;
         assert!(cycle.x >= 640.);
-        assert_eq!(cycle.x + cycle.w + 20., upload.x);
+        assert_eq!(upload.x + upload.w + 20., cycle.x);
         assert_eq!(cycle.y, upload.y);
         state.scroll = 500.;
         let after = controls(&state);
@@ -50,11 +50,11 @@ fn cycling_button_toggles_on_off_without_opening_a_page_or_moving_controls() {
     state.open(2);
     state.section = 1;
     state.focus = Target::UploadWallpaper;
-    state.direction(Direction::Left, &controls(&state));
-    assert_eq!(state.focus, Target::WallpaperCycle);
     state.direction(Direction::Right, &controls(&state));
-    assert_eq!(state.focus, Target::UploadWallpaper);
+    assert_eq!(state.focus, Target::WallpaperCycle);
     state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::UploadWallpaper);
+    state.direction(Direction::Right, &controls(&state));
     assert!(!state.preferences.wallpaper_cycle);
     state.scroll = 300.;
     for language in crate::i18n::Language::ALL {
@@ -215,7 +215,7 @@ fn upload_is_modal_and_close_restores_its_exact_parent() {
     assert_eq!(state.focus, Target::UploadWallpaper);
     assert_eq!(state.section, 1);
     state.direction(Direction::Down, &controls(&state));
-    assert_eq!(state.focus, Target::Background(2));
+    assert_eq!(state.focus, Target::Background(0));
 }
 
 #[test]
@@ -298,7 +298,7 @@ fn upload_instructions_are_ordered_and_only_the_displayed_url_loses_its_slash() 
 }
 
 #[test]
-fn upload_button_is_compact_and_right_aligned_in_every_language() {
+fn upload_button_is_compact_and_rotation_is_right_aligned_in_every_language() {
     let mut state = ready();
     state.open(2);
     state.section = 1;
@@ -316,7 +316,12 @@ fn upload_button_is_compact_and_right_aligned_in_every_language() {
             .find(|c| c.target == Target::Background(2))
             .unwrap()
             .rect;
-        assert_eq!(upload.x + upload.w, right_card.x + right_card.w);
+        let cycle = gallery
+            .iter()
+            .find(|c| c.target == Target::WallpaperCycle)
+            .unwrap()
+            .rect;
+        assert_eq!(cycle.x + cycle.w, right_card.x + right_card.w);
         assert!((88. ..=520.).contains(&upload.w));
         assert!(upload.y + upload.h < right_card.y);
         let title = rendered
@@ -332,7 +337,7 @@ fn upload_button_is_compact_and_right_aligned_in_every_language() {
 }
 
 #[test]
-fn gallery_scrolling_keeps_sidebar_and_upload_fixed_and_clips_only_backgrounds() {
+fn gallery_scrolls_behind_fixed_controls_without_clipping_or_fades() {
     let mut state = ready();
     state.open(2);
     state.section = 1;
@@ -369,8 +374,32 @@ fn gallery_scrolling_keeps_sidebar_and_upload_fixed_and_clips_only_backgrounds()
         .find(|c| c.target == Target::Background(3))
         .unwrap();
     assert_eq!(old.rect.y - new.rect.y, state.scroll);
-    let viewport = state.backgrounds_viewport();
-    assert!(scrolled.draw.iter().any(|draw| matches!(draw, Draw::Clip(Some(rect)) if rect.x == viewport.x && rect.y == viewport.y && rect.h == viewport.h)));
+    assert!(!scrolled.draw.iter().any(|draw| matches!(
+        draw,
+        Draw::Clip(Some(_)) | Draw::EdgeFade(Some(_)) | Draw::EdgeFadeX(Some(_))
+    )));
+    let last_card = scrolled
+        .draw
+        .iter()
+        .rposition(|draw| {
+            matches!(draw,
+                Draw::Image(_, rect, ..) if rect.w == 360. && rect.h == 202.5
+            )
+        })
+        .unwrap();
+    for key in ["uploadWallpaper", "wallpaperCycle", "interface"] {
+        let label = state.preferences.language.t(key);
+        let fixed = scrolled
+            .draw
+            .iter()
+            .position(|draw| {
+                matches!(draw,
+                    Draw::Text(text, ..) if text == label
+                )
+            })
+            .unwrap();
+        assert!(fixed > last_card, "{key} must be drawn above the gallery");
+    }
     let scroll = state.scroll;
     state.wheel_scroll(&scrolled.controls, Some((300., 300.)), 0, -3);
     assert_eq!(state.scroll, scroll);
@@ -427,7 +456,7 @@ fn remote_background_focus_stays_below_the_fixed_upload_action() {
     }
     assert_eq!(state.focus, Target::Background(2));
     state.direction(Direction::Up, &controls(&state));
-    assert_eq!(state.focus, Target::UploadWallpaper);
+    assert_eq!(state.focus, Target::WallpaperCycle);
 }
 
 #[test]
