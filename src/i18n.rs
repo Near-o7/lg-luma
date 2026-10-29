@@ -664,7 +664,7 @@ mod tests {
         assert_eq!(Language::Nl.category("Gaming"), "Games");
         assert_eq!(
             Language::Sv.format("favoriteAdded", &[("app", "Netflix")]),
-            "Netflix har lagts till i favoriter."
+            "Netflix har lagts till bland favoriterna."
         );
         assert_eq!(Language::Sv.greeting(2, "Ana"), "Fortfarande uppe, Ana?");
         assert_eq!(Language::Sv.category("Gaming"), "Spel");
