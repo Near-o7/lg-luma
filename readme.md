@@ -103,6 +103,7 @@ https://github.com/user-attachments/assets/3d3564d9-5942-4aef-a726-0323f5e86a07
 | LG C6 | `OLED65C6*`           | Unknown          |
 | LG C6 | `OLED77C6*`           | ✅               |
 | LG G5 | `OLED83G5WUA.BUSYDJR` | ✅               |
+| LG G5 | `OLED77G5WUA.DUSQLJR` | ✅               |
 
 </details>
 
