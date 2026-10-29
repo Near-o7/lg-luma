@@ -422,13 +422,7 @@ impl Language {
             Self::Sv => format!(
                 "{} {} {}",
                 [
-                    "måndag",
-                    "tisdag",
-                    "onsdag",
-                    "torsdag",
-                    "fredag",
-                    "lördag",
-                    "söndag"
+                    "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag"
                 ][weekday],
                 now.day(),
                 [
