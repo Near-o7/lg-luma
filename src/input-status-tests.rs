@@ -115,7 +115,8 @@ fn live_input_update_reconciles_hidden_focus_without_resetting_apps_or_preferenc
 fn live_status_also_changes_inside_settings() {
     let mut state = ready();
     state.open(2);
-    state.section = crate::state::INPUTS_SECTION;
+    state.section = crate::state::WIDGETS_SECTION;
+    state.subpage = Some(crate::state::Subpage::Inputs);
     state.preferences.language = Language::Es;
     let mut inputs = state.inventory.inputs.clone();
     inputs[0].signal = Some(false);

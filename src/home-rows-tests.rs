@@ -92,16 +92,16 @@ fn two_row_reorder_skips_hidden_and_missing_entries_vertically() {
 fn favorite_rows_setting_saves_and_back_returns_to_its_parent() {
     let mut state = ready();
     state.open(2);
-    state.focus = Target::Setting(7);
+    state.focus = Target::HomeRows;
     state.activate();
     assert_eq!(state.subpage, Some(Subpage::HomeRows));
     state.back();
-    assert_eq!(state.focus, Target::Setting(7));
+    assert_eq!(state.focus, Target::HomeRows);
     state.activate();
     state.focus = Target::Choice(1);
     assert_eq!(state.activate(), vec![Effect::Save]);
     assert_eq!(state.preferences.home_rows, 2);
-    assert_eq!(state.focus, Target::Setting(7));
+    assert_eq!(state.focus, Target::HomeRows);
     assert_eq!(state.page, Page::Settings);
     let saved = serde_json::to_value(&state.preferences).unwrap();
     let restored: Preferences = serde_json::from_value(saved).unwrap();

@@ -34,7 +34,7 @@ share one row. App captions use a more compact header. Reduced motion makes the 
 immediate. Pointer holds, app reordering and overlays pause the movement. Returning Home
 starts settled, and adding another input does not move the favorite grid again.
 
-The personal branch currently includes official **v2.9.0**, including its System → Text
+The personal branch currently includes official **v2.16.0**, including its System → Text
 rendering setting. The fork uses independent setting identifiers to preserve Favorite
 rows and Wallpaper shading alongside it.
 
@@ -84,8 +84,8 @@ Pushing the personal branch runs CI automatically. It checks formatting, lint, u
 the ARM IPK. Download the `luma-release` artifact from the successful run. A manual run
 does not publish an official release. Test the package before installing it on the TV.
 The upstream PR/comment and release-PR workflows are disabled on this fork; CI remains enabled.
-For a manually reviewed layout-only adjustment, CI also offers a manual `package_only` input
-that builds the IPK without repeating checks or tests. Ordinary pushes and PRs keep full checks.
+CI follows the official parallel workflow: shared checks/assets, four independent smoke
+suites, and ARM packaging. Manual runs validate the branch without publishing a release.
 
 Fork synchronization does not update an installed TV app. Installing an official IPK
 would replace the customized executable and remove this layout option; use a package
@@ -95,3 +95,27 @@ Package versions follow upstream and the checked commit identifies the custom bu
 Personal layout, settings and input refresh changes do not modify Home takeover.
 Future official Home/settings refactors can still require a manual merge. If the author
 adds an equivalent option, remove the personal patch and return to official packages.
+
+## Official synchronization: 2.16.0
+
+The October 30 update includes custom wallpaper uploads, rotation and a global gradient
+switch; Date/Greeting visibility and date formats; QR-managed webhook shortcuts; app
+options and protected uninstall; reliable Home-button routing; shared preference ownership;
+verified self-updates; larger text and fixed toolbars; and 13 UI languages.
+
+The official maintainer closed #112 in favor of #117, then closed #117 for scope and
+complexity. The released version has no resizable Home grid or optional second favorite
+row. This fork therefore retains its two-row grid, adaptive HDMI spacing, early HDMI
+source detection and interruptible UI motion.
+
+Global Background → Gradient disables shading on all pages. General → Wallpaper shading
+still controls Home strength when the global switch is enabled, including uploaded
+wallpapers. Larger official app captions use a recalculated compact Home header so the
+complete HDMI row retains its small bottom margin. Personal settings have named focus
+targets, preserving the official Text rendering control.
+
+The updater resolves published releases from `Near-o7/lg-luma`, including pre-releases,
+and accepts only verified IPKs from that fork. It never installs an official binary over
+the personal launcher. The manifest version must increase for an in-app update; builds
+with the same internal version still require manual installation. Upstream integration
+continues through reviewed feature branches targeting `personal/home-grid`.
