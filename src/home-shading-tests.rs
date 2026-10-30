@@ -7,6 +7,39 @@ use crate::{
 use serde_json::json;
 
 #[test]
+fn global_gradient_off_overrides_personal_strength_on_every_page() {
+    let mut state = ready();
+    state.preferences.home_shading = 75;
+    state.preferences.wallpaper_gradient = false;
+    for page in [0, 1, 2] {
+        state.open(page);
+        assert!(
+            matches!(&scene(&state).draw[0],Draw::Image(path,..) if path.ends_with("dunes-plain.jpg"))
+        );
+    }
+}
+
+#[test]
+fn uploaded_wallpapers_use_their_real_original_and_shaded_paths() {
+    let mut state = ready();
+    let id = format!("custom-{}", "a".repeat(32));
+    state.wallpapers.push(crate::wallpapers::Wallpaper {
+        id: id.clone(),
+        directory: "/tmp/luma-test-upload".into(),
+        has_original: true,
+    });
+    state.preferences.background = id;
+    state.preferences.home_shading = 50;
+    let frame = scene(&state);
+    assert!(
+        matches!(&frame.draw[0],Draw::Image(path,..) if path=="/tmp/luma-test-upload/original.jpg")
+    );
+    assert!(
+        matches!(&frame.draw[1],Draw::TintedImage(path,_,_,_,color) if path=="/tmp/luma-test-upload/wallpaper.jpg" && color[3]==0.5)
+    );
+}
+
+#[test]
 fn existing_preferences_keep_original_shading_and_values_are_bounded() {
     let mut preferences: Preferences =
         serde_json::from_value(json!({"home_rows":2,"favorites":["netflix"]})).unwrap();
@@ -56,7 +89,12 @@ fn home_shading_does_not_change_the_apps_or_settings_wallpaper() {
         assert!(
             matches!(&scene.draw[0], Draw::Image(path, ..) if path.ends_with("wallpapers/dunes.jpg"))
         );
-        assert!(matches!(&scene.draw[1], Draw::Clip(_)));
+        assert!(
+            !scene
+                .draw
+                .iter()
+                .any(|draw| matches!(draw, Draw::Clip(Some(_))))
+        );
     }
 }
 
@@ -65,19 +103,19 @@ fn all_five_levels_are_reachable_and_save_without_changing_favorites() {
     let mut state = ready();
     state.preferences.home_rows = 2;
     state.open(2);
-    state.focus = Target::Setting(8);
+    state.focus = Target::HomeShading;
     state.direction(Direction::Right, &controls(&state));
     assert_eq!(state.subpage, Some(Subpage::HomeShading));
     assert_eq!(state.focus, Target::Choice(4));
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Choice(0));
     for (index, amount) in [0, 25, 50, 75, 100].into_iter().enumerate() {
-        state.focus = Target::Setting(8);
+        state.focus = Target::HomeShading;
         state.activate();
         state.focus = Target::Choice(index);
         assert_eq!(state.activate(), vec![Effect::Save]);
         assert_eq!(state.preferences.home_shading, amount);
-        assert_eq!(state.focus, Target::Setting(8));
+        assert_eq!(state.focus, Target::HomeShading);
         assert_eq!(state.preferences.home_rows, 2);
         let restored: Preferences =
             serde_json::from_value(serde_json::to_value(&state.preferences).unwrap()).unwrap();

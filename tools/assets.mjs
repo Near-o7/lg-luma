@@ -85,13 +85,10 @@ for (const file of await fs.readdir(path.join(source, 'wallpapers'))) {
         [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s],
       ]);
     }
-    // Keep a matching, unshaded crop for Home's adjustable shading. The original
-    // shaded asset remains unchanged, including the per-photo brightness treatment.
-    await image
-      .clone()
+    const data = await image.linear(brightness).png().toBuffer();
+    await sharp(data)
       .jpeg({ quality: 96 })
       .toFile(path.join(out, 'wallpapers', `${id}-plain${scale === 2 ? '@2x' : ''}.jpg`));
-    const data = await image.linear(brightness).png().toBuffer();
     const shaded = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 1920 1080"><defs>
     <linearGradient id="v" x2="0" y2="1"><stop stop-color="#0d1013" stop-opacity=".24"/><stop offset=".19" stop-color="#0e1115" stop-opacity=".08"/><stop offset=".35" stop-color="#0f1114" stop-opacity=".35"/><stop offset=".63" stop-color="#111317" stop-opacity=".86"/><stop offset=".85" stop-color="#17191d" stop-opacity=".92157"/><stop offset="1" stop-color="#17191d" stop-opacity=".96078"/></linearGradient>
     <linearGradient id="h"><stop stop-color="#111417" stop-opacity=".42"/><stop offset=".75" stop-color="#111417" stop-opacity="0"/></linearGradient></defs>
@@ -110,7 +107,7 @@ for (const file of await fs.readdir(path.join(source, 'wallpapers'))) {
 // webOS shows `splashBackground` (a static image, scaled to 1080p) until the window opens. One
 // 1080p PNG per background lets the package start on the user's wallpaper instead of a grey card.
 for (const file of await fs.readdir(path.join(out, 'wallpapers'))) {
-  if (!file.endsWith('.jpg') || file.includes('@2x') || file.endsWith('-plain.jpg')) continue;
+  if (!file.endsWith('.jpg') || file.includes('@2x') || file.includes('-plain')) continue;
   await sharp(path.join(out, 'wallpapers', file))
     .resize(1920, 1080, { fit: 'cover' })
     .png({ compressionLevel: 9 })
@@ -123,6 +120,7 @@ await fs.writeFile(
 
 const surfaces = {
   generic: ['#4e5c6b', '#243c4e'],
+  custom: ['#2f5a63', '#16323a'],
   'live-tv': ['#192a43', '#0d1628'],
   netflix: ['#141414', '#141414'],
   youtube: ['#0f0f0f', '#0f0f0f'],

@@ -45,6 +45,60 @@ fn frame(state: &State, assets: &Assets) -> view::Scene {
         time::OffsetDateTime::UNIX_EPOCH,
     )
 }
+
+#[test]
+fn fixed_app_toolbar_and_settings_sidebar_do_not_follow_animated_scroll() {
+    for background in [false, true] {
+        let (mut state, assets) = setup();
+        state.open(if background { 2 } else { 1 });
+        if background {
+            state.section = 1;
+        }
+        let now = Instant::now();
+        state.sync_motion(now);
+        let before = frame(&state, &assets);
+        let target = if background {
+            Target::UploadWallpaper
+        } else {
+            Target::Search
+        };
+        let original = before
+            .controls
+            .iter()
+            .find(|c| c.target == target)
+            .unwrap()
+            .rect;
+        state.scroll = 300.;
+        state.sync_motion(now + Duration::from_millis(1));
+        state.sync_motion(now + Duration::from_millis(91));
+        let moving = frame(&state, &assets);
+        let fixed = moving
+            .controls
+            .iter()
+            .find(|c| c.target == target)
+            .unwrap()
+            .rect;
+        assert_eq!((fixed.x, fixed.y), (original.x, original.y));
+        let expected_label = if background { "Upload" } else { "Find an app" };
+        let rect = |s: &view::Scene| {
+            s.draw
+                .iter()
+                .find_map(|d| match d {
+                    Draw::Text(t, r, ..) if t == expected_label => Some((r.x, r.y)),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        assert_eq!(rect(&before), rect(&moving));
+        assert!(
+            moving
+                .controls
+                .iter()
+                .zip(&moving.layout_controls)
+                .any(|(a, b)| a.scrollable && (a.rect.y - b.rect.y).abs() > 1.)
+        );
+    }
+}
 fn text(frame: &view::Scene) -> Vec<(String, u32, u32, u32)> {
     frame.draw[frame.content_draw.clone()]
         .iter()
