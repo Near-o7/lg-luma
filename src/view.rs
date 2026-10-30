@@ -826,12 +826,7 @@ fn tile(
     );
     app_face(out, assets, app, rect, state.preferences.language, 19.2);
     if pinned {
-        out.icon(
-            assets,
-            "heart-filled",
-            Rect::new(rect.x + rect.w - 27.2, rect.y + 11.2, 16., 16.),
-            c(0xffffff, 0.9),
-        );
+        favorite_badge(out, assets, rect);
     }
     if state.moving.as_ref() == Some(&app.id) {
         let indicator = Rect::new(
@@ -892,6 +887,13 @@ fn tile(
     if state.moving.is_some() && state.moving.as_ref() != Some(&app.id) {
         out.fade(start, 0.48, 1.);
     }
+}
+
+fn favorite_badge(out: &mut Scene, assets: &Assets, card: Rect) {
+    let icon = Rect::new(card.x + card.w - 27.2, card.y + 11.2, 16., 16.);
+    // Keep the white heart legible even over white installed artwork.
+    out.shape(icon.inset(-6.), 14., c(0x101318, 0.79));
+    out.icon(assets, "heart-filled", icon, c(0xffffff, 0.9));
 }
 
 /// Shared card artwork for Home, Apps and Recents. Curated vectors always take
@@ -3211,12 +3213,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     } else if let Some(app) = app.filter(|_| !shortcut) {
         app_face(out, assets, app, card, language, 19.2);
         if favorite {
-            out.icon(
-                assets,
-                "heart-filled",
-                Rect::new(card.x + card.w - 27.2, card.y + 11.2, 16., 16.),
-                c(0xffffff, 0.9),
-            );
+            favorite_badge(out, assets, card);
         }
     }
     let panel_start = out.draw.len();
