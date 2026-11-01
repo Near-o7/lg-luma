@@ -1,4 +1,5 @@
-//! Bounded HDMI polling: cable/signal changes must arrive without reopening Home.
+//! Refresh only HDMI status, without reloading apps or queueing repeated reads.
+use crate::model::Input;
 use std::time::{Duration, Instant};
 
 #[derive(Default)]
@@ -8,11 +9,13 @@ pub struct Refresh {
     urgent: bool,
     pending_signal: bool,
     fast_until: Option<Instant>,
+    pending: Option<Vec<Input>>,
 }
 
 impl Refresh {
     const INTERVAL: Duration = Duration::from_secs(2);
     const RETRY: Duration = Duration::from_secs(10);
+
     const FAST: Duration = Duration::from_millis(250);
     const HANDSHAKE: Duration = Duration::from_secs(10);
 
@@ -33,8 +36,6 @@ impl Refresh {
         self.pending_signal = pending_signal;
     }
 
-    /// The worker is shared with launches. Never queue a second poll behind a
-    /// slow service call, and do no background work while Home is unfocused.
     pub fn due(&mut self, now: Instant, active: bool) -> bool {
         if !active {
             self.next = None;
@@ -43,11 +44,7 @@ impl Refresh {
             self.fast_until = None;
             return false;
         }
-        if self.in_flight {
-            return false;
-        }
-        let next = self.next.get_or_insert(now + Self::INTERVAL);
-        if now < *next {
+        if self.in_flight || now < *self.next.get_or_insert(now + Self::INTERVAL) {
             return false;
         }
         self.in_flight = true;
@@ -55,18 +52,37 @@ impl Refresh {
         true
     }
 
-    pub fn completed(&mut self, now: Instant, success: bool) {
+    pub fn completed(
+        &mut self,
+        now: Instant,
+        result: Result<Vec<Input>, String>,
+    ) -> Result<(), String> {
         self.in_flight = false;
-        let delay = if self.urgent {
-            Duration::ZERO
-        } else if !success {
+        let delay = if result.is_err() {
+            self.urgent = false;
             Self::RETRY
+        } else if self.urgent {
+            Duration::ZERO
         } else if self.fast_until.is_some_and(|until| now < until) {
             Self::FAST
         } else {
             Self::INTERVAL
         };
         self.next = Some(now + delay);
+        self.pending = Some(result?);
+        Ok(())
+    }
+
+    /// Keep the latest snapshot until the current interaction has finished.
+    pub fn take_pending(&mut self, ready: bool) -> Option<Vec<Input>> {
+        ready.then(|| self.pending.take()).flatten()
+    }
+
+    /// A later complete inventory already contains newer input data.
+    pub fn superseded(&mut self, now: Instant) {
+        self.pending = None;
+        self.urgent = false;
+        self.next = Some(now + Self::INTERVAL);
     }
 }
 
@@ -121,7 +137,9 @@ mod tests {
         assert!(!refresh.due(now, true));
         assert!(refresh.due(now + Duration::from_secs(2), true));
         assert!(!refresh.due(now + Duration::from_secs(60), true));
-        refresh.completed(now + Duration::from_secs(60), true);
+        refresh
+            .completed(now + Duration::from_secs(60), Ok(vec![]))
+            .unwrap();
         assert!(!refresh.due(now + Duration::from_secs(61), true));
         assert!(refresh.due(now + Duration::from_secs(62), true));
     }
@@ -137,7 +155,9 @@ mod tests {
         assert!(refresh.due(now + Duration::from_secs(63), true));
         assert!(!refresh.due(now + Duration::from_secs(64), false));
         assert!(!refresh.due(now + Duration::from_secs(65), true));
-        refresh.completed(now + Duration::from_secs(65), true);
+        refresh
+            .completed(now + Duration::from_secs(65), Ok(vec![]))
+            .unwrap();
         assert!(refresh.due(now + Duration::from_secs(67), true));
     }
 
@@ -147,7 +167,11 @@ mod tests {
         let mut refresh = Refresh::default();
         assert!(!refresh.due(now, true));
         assert!(refresh.due(now + Duration::from_secs(2), true));
-        refresh.completed(now + Duration::from_secs(3), false);
+        assert!(
+            refresh
+                .completed(now + Duration::from_secs(3), Err("unavailable".into()))
+                .is_err()
+        );
         assert!(!refresh.due(now + Duration::from_secs(5), true));
         assert!(!refresh.due(now + Duration::from_secs(12), true));
         assert!(refresh.due(now + Duration::from_secs(13), true));
@@ -160,7 +184,9 @@ mod tests {
         assert!(refresh.due(now, true));
         refresh.request_now(now + Duration::from_millis(20));
         assert!(!refresh.due(now + Duration::from_millis(20), true));
-        refresh.completed(now + Duration::from_millis(50), true);
+        refresh
+            .completed(now + Duration::from_millis(50), Ok(vec![]))
+            .unwrap();
         assert!(refresh.due(now + Duration::from_millis(50), true));
         assert!(!refresh.due(now + Duration::from_millis(60), true));
     }
@@ -170,11 +196,13 @@ mod tests {
         let now = Instant::now();
         let mut refresh = Refresh::default();
         refresh.observe(now, true);
-        refresh.completed(now, true);
+        refresh.completed(now, Ok(vec![])).unwrap();
         assert!(!refresh.due(now + Duration::from_millis(249), true));
         assert!(refresh.due(now + Duration::from_millis(250), true));
         refresh.observe(now + Duration::from_secs(9), true);
-        refresh.completed(now + Duration::from_secs(11), true);
+        refresh
+            .completed(now + Duration::from_secs(11), Ok(vec![]))
+            .unwrap();
         assert!(!refresh.due(now + Duration::from_secs(12), true));
         assert!(refresh.due(now + Duration::from_secs(13), true));
     }
@@ -185,13 +213,21 @@ mod tests {
         let mut refresh = Refresh::default();
         refresh.observe(now, true);
         refresh.observe(now + Duration::from_secs(1), false);
-        refresh.completed(now + Duration::from_secs(1), true);
+        refresh
+            .completed(now + Duration::from_secs(1), Ok(vec![]))
+            .unwrap();
         assert!(!refresh.due(now + Duration::from_millis(1250), true));
         assert!(refresh.due(now + Duration::from_secs(3), true));
         refresh.observe(now + Duration::from_secs(4), true);
-        refresh.completed(now + Duration::from_secs(4), true);
+        refresh
+            .completed(now + Duration::from_secs(4), Ok(vec![]))
+            .unwrap();
         assert!(refresh.due(now + Duration::from_millis(4250), true));
-        refresh.completed(now + Duration::from_secs(5), false);
+        assert!(
+            refresh
+                .completed(now + Duration::from_secs(5), Err("unavailable".into()))
+                .is_err()
+        );
         assert!(!refresh.due(now + Duration::from_secs(6), true));
         assert!(refresh.due(now + Duration::from_secs(15), true));
     }

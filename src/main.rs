@@ -463,6 +463,23 @@ fn wallpaper_upload_active(state: &State, webos: bool, focused: bool, visible: b
     visible && (!webos || focused) && matches!(state.overlay, Some(Overlay::WallpaperUpload))
 }
 
+fn input_refresh_active(state: &State, webos: bool, focused: bool, visible: bool) -> bool {
+    webos
+        && focused
+        && visible
+        && !state.loading
+        && state.overlay.is_none()
+        && state.moving.is_none()
+        && state.pressed.is_none()
+        && state.recents.visibility == 0.
+        && (state.page == state::Page::Home
+            || (state.page == state::Page::Settings
+                && matches!(
+                    state.subpage,
+                    Some(state::Subpage::Inputs | state::Subpage::Input(_))
+                )))
+}
+
 fn weather_tick(state: &mut State, service: &weather_service::Service, visible: bool) {
     let now = OffsetDateTime::now_utc().unix_timestamp();
     let (command, changed) = state.weather.sync(
@@ -1078,6 +1095,9 @@ fn run() -> Result<(), String> {
         while let Ok(response) = platform.receiver.try_recv() {
             match response {
                 Response::Inventory(Ok((mut inventory, warning))) => {
+                    if warning.is_none() {
+                        input_refresh.superseded(Instant::now());
+                    }
                     prewarm = vec![state::Page::Settings, state::Page::Apps];
                     if std::mem::take(&mut state.reload_artwork) {
                         assets.artwork.reset();
@@ -1140,26 +1160,19 @@ fn run() -> Result<(), String> {
                     }
                 }
                 Response::Inputs(result) => {
-                    let success = result.is_ok();
                     if let Some(observed) = input_event_at.take() {
                         eprintln!(
                             "Luma HDMI timing: event-to-refresh {} ms",
                             observed.elapsed().as_millis()
                         );
                     }
-                    match result {
-                        Ok(inputs) => {
-                            input_refresh.observe(
-                                Instant::now(),
-                                inputs.iter().any(|i| i.awaiting_signal()),
-                            );
-                            if state.set_inputs(inputs) {
-                                eprintln!("Luma HDMI status: {:?}", state.inventory.inputs);
-                            }
-                        }
-                        Err(error) => eprintln!("Luma HDMI refresh: {error}"),
+                    if let Ok(inputs) = &result {
+                        input_refresh
+                            .observe(Instant::now(), inputs.iter().any(|i| i.awaiting_signal()));
                     }
-                    input_refresh.completed(Instant::now(), success);
+                    if let Err(error) = input_refresh.completed(Instant::now(), result) {
+                        eprintln!("Luma HDMI refresh: {error}");
+                    }
                 }
                 Response::Launched(result) => {
                     state.launching = false;
@@ -1684,7 +1697,18 @@ fn run() -> Result<(), String> {
             inventory_retry = None;
             platform.send(Request::Refresh);
         }
-        let inputs_active = webos && visible && focused;
+        // Apply the official deferred snapshot after queued SDL events, preserving
+        // the fork's early detection and visibility without moving held pointer targets.
+        let inputs_active =
+            input_refresh_active(&state, webos, focused, visible) && press.is_none();
+        if let Some(inputs) = input_refresh.take_pending(inputs_active)
+            && state.set_inputs(inputs)
+        {
+            eprintln!("Luma HDMI status: {:?}", state.inventory.inputs);
+        }
+        if !inputs_active {
+            input_event_at = None;
+        }
         if let Some((generation, enabled)) =
             input_watch.command(Instant::now(), inputs_active && platform.input_events)
         {
@@ -1693,7 +1717,7 @@ fn run() -> Result<(), String> {
                 enabled,
             });
         }
-        if input_refresh.due(Instant::now(), inputs_active && !state.loading) {
+        if input_refresh.due(Instant::now(), inputs_active) {
             platform.send(Request::RefreshInputs);
         }
         weather_tick(&mut state, &weather_service, visible);

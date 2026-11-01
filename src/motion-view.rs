@@ -37,7 +37,7 @@ pub fn fade(draws: &mut [Draw], alpha: f32, brightness: f32) {
             | Draw::Shadow(_, _, _, color)
             | Draw::Text(_, _, _, color, _)
             | Draw::TintedImage(_, _, _, _, color)
-            | Draw::AppImage(_, _, color) => apply(color),
+            | Draw::AppImage(_, _, _, color) => apply(color),
             Draw::RoundedGradient(_, _, a, b) => {
                 apply(a);
                 apply(b);
@@ -66,7 +66,7 @@ fn visible(draw: &Draw) -> bool {
         | Draw::Shadow(_, _, _, c)
         | Draw::Text(_, _, _, c, _)
         | Draw::TintedImage(_, _, _, _, c)
-        | Draw::AppImage(_, _, c) => c[3] > 0.003,
+        | Draw::AppImage(_, _, _, c) => c[3] > 0.003,
         Draw::RoundedGradient(_, _, a, b) => a[3].max(b[3]) > 0.003,
         _ => true,
     }
@@ -144,6 +144,31 @@ impl Presenter {
 mod tests {
     use super::*;
     use crate::state::Rect;
+    #[test]
+    fn installed_icon_and_backdrop_keep_their_shared_opacity_during_motion() {
+        let artwork = std::sync::Arc::new(crate::app_artwork::Artwork {
+            key: "motion-test".into(),
+            pixels: image::RgbaImage::new(1, 1),
+            backdrop: [[240; 3], [20; 3]],
+        });
+        let mut draws = vec![Draw::AppImage(
+            artwork.clone(),
+            Rect::new(10., 20., 200., 100.),
+            19.2,
+            [1., 1., 1., 0.8],
+        )];
+        fade(&mut draws, 0.25, 0.5);
+        translate(&mut draws, 8., 4.);
+        match &draws[0] {
+            Draw::AppImage(image, rect, radius, color) => {
+                assert!(std::sync::Arc::ptr_eq(image, &artwork));
+                assert_eq!((rect.x, rect.y, rect.w, rect.h), (18., 24., 200., 100.));
+                assert_eq!(*radius, 19.2);
+                assert_eq!(*color, [0.5, 0.5, 0.5, 0.2]);
+            }
+            _ => panic!("Installed artwork must stay a single composited card"),
+        }
+    }
     #[test]
     fn moving_content_does_not_move_its_clip_or_fade_boundaries() {
         let rect = Rect::new(10., 20., 100., 40.);

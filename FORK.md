@@ -34,7 +34,7 @@ share one row. App captions use a more compact header. Reduced motion makes the 
 immediate. Pointer holds, app reordering and overlays pause the movement. Returning Home
 starts settled, and adding another input does not move the favorite grid again.
 
-The personal branch currently includes official **v2.16.0**, including its System → Text
+The personal branch currently includes official **v2.16.2**, including its System → Text
 rendering setting. The fork uses independent setting identifiers to preserve Favorite
 rows and Wallpaper shading alongside it.
 
@@ -119,3 +119,24 @@ and accepts only verified IPKs from that fork. It never installs an official bin
 the personal launcher. The manifest version must increase for an in-app update; builds
 with the same internal version still require manual installation. Upstream integration
 continues through reviewed feature branches targeting `personal/home-grid`.
+
+## Official synchronization: 2.16.2
+
+The November 1 update includes the merged HDMI contribution (#182), the native Rust
+`luma-helper` replacing TV-side Node scripts (#143), contrast-aware favorite hearts (#184),
+and single-pass compositing of installed icons/backdrops to avoid rectangular fade seams (#185).
+
+The accepted official scheduler now owns deferred input snapshots, interaction gating, focus
+recovery and complete-inventory supersession. The fork layers only its EIM notification watch,
+bounded fast polling and early-source/empty-dongle policy on top. Cable state always wins over
+stale positive signals. A connected cable without signal is hidden in Auto unless EIM reports
+an active source; forced On still shows No signal. This preserves the owner's selected behavior.
+
+The new composited artwork retains a single alpha and its rounded corners during personal
+screen transitions. Optional favorite rows, adaptive HDMI spacing, Home shading percentages,
+UI motion and fork-only verified updates remain available. Home enable/disable and boot recovery
+now copy the native helper along with the wrapper, matching upstream.
+
+Stable 2.16.2 still has no second favorite row or Home shading percentages. The soft-focus Home
+proposal (#192), AirPlay/running-app controls (#193), wallpaper-first Home (#103), widgets and
+other open proposals are not part of this stable synchronization.

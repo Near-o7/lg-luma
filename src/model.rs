@@ -366,7 +366,9 @@ impl Preferences {
         match self.input_modes.get(&input.id).copied().unwrap_or_default() {
             InputMode::On => true,
             InputMode::Off => false,
-            InputMode::Auto => input.detected() || input.signal.or(input.connected) == Some(true),
+            InputMode::Auto => {
+                input.connected == Some(true) && (input.detected() || input.signal != Some(false))
+            }
         }
     }
 

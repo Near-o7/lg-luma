@@ -35,7 +35,10 @@ fn powered_dongle_without_source_is_not_an_available_auto_input() {
     );
     input.signal = Some(true);
     assert!(preferences.input_visible(&input));
-    assert_eq!(input_status(&input, false, Language::En), "Connected");
+    assert_eq!(
+        input_status(&input, false, Language::En),
+        Language::En.t("noDevice")
+    );
     preferences
         .input_modes
         .insert(input.id.clone(), InputMode::Off);
@@ -145,7 +148,7 @@ fn an_active_source_is_visible_before_signal_but_a_powered_empty_dongle_stays_hi
             .iter()
             .map(|i| preferences.input_visible(i))
             .collect::<Vec<_>>(),
-        [true, false, false, true]
+        [true, false, false, false]
     );
     assert_eq!(inputs[0].active, Some(true));
     assert_eq!(inputs[2].active, Some(true));
@@ -154,7 +157,10 @@ fn an_active_source_is_visible_before_signal_but_a_powered_empty_dongle_stays_hi
     assert!(!preferences.input_visible(&malformed[0]));
     assert!(!inputs[2].awaiting_signal());
     assert_eq!(input_status(&inputs[0], false, Language::Es), "Sin señal");
-    assert_eq!(input_status(&inputs[3], false, Language::Es), "Conectado");
+    assert_eq!(
+        input_status(&inputs[3], false, Language::Es),
+        Language::Es.t("noDevice")
+    );
     preferences
         .input_modes
         .insert(inputs[0].id.clone(), InputMode::Off);

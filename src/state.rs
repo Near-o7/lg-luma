@@ -768,6 +768,21 @@ impl State {
         self.inventory.inputs = inputs;
         self.dirty = true;
         self.reconcile_focus();
+        let missing = |id: &str| !self.inventory.inputs.iter().any(|input| input.id == id);
+        if self.page == Page::Settings
+            && (matches!(&self.subpage, Some(Subpage::Input(id)) if missing(id))
+                || matches!(&self.focus, Target::InputMode(id) if missing(id)))
+        {
+            self.subpage = Some(Subpage::Inputs);
+            self.scroll = 0.;
+            self.focus = self
+                .inventory
+                .inputs
+                .first()
+                .map_or(Target::Sidebar(WIDGETS_SECTION), |input| {
+                    Target::InputMode(input.id.clone())
+                });
+        }
         true
     }
 
