@@ -582,6 +582,34 @@ mod tests {
     }
     use super::*;
     #[test]
+    fn catalog_message_keys_are_unique_after_merging_translations() {
+        struct UniqueKeys;
+        impl<'de> serde::de::Visitor<'de> for UniqueKeys {
+            type Value = ();
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a catalog with unique message keys")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(self, mut map: M) -> Result<(), M::Error> {
+                let mut keys = std::collections::HashSet::new();
+                while let Some((key, _)) = map.next_entry::<String, serde::de::IgnoredAny>()? {
+                    if !keys.insert(key) {
+                        return Err(serde::de::Error::custom("duplicate message key"));
+                    }
+                }
+                Ok(())
+            }
+        }
+        let check = |raw: &str| {
+            serde::Deserializer::deserialize_map(
+                &mut serde_json::Deserializer::from_str(raw),
+                UniqueKeys,
+            )
+        };
+        assert!(check(r#"{"noSignal":{},"noSignal":{}}"#).is_err());
+        check(include_str!("../assets/messages.json")).unwrap();
+    }
+
+    #[test]
     fn every_message_has_all_languages_and_no_empty_values() {
         for (key, entry) in messages() {
             for language in Language::ALL {
