@@ -361,6 +361,30 @@ fn boot_apply_does_not_take_another_apps_screen() {
     assert!(!f.calls().iter().any(|s| s.contains("/launch ")));
 }
 #[test]
+fn manifest_boot_only_waits_when_sam_is_unavailable() {
+    for failures in [0, 2, 6] {
+        let f = Fixture::new();
+        let target = "/usr/palm/applications/com.webos.app.home";
+        f.put_json(
+            "/var/lib/luma-home/state.json",
+            json!(f.config("manifest", home::HOME)),
+        );
+        f.put_json(
+            "/var/lib/luma-home/app/appinfo.json",
+            json!({"id":home::HOME,"type":"native","main":"luma","appCategory":["home"]}),
+        );
+        for _ in 0..failures {
+            f.reply("getForegroundAppInfo", Err("SAM unavailable".into()));
+        }
+        let result = home::dispatch(&f, "boot-apply", None, None);
+        assert_eq!(f.pauses.get(), failures.min(5));
+        assert_eq!(result.is_ok(), failures < 6);
+        assert_eq!(f.mounts.borrow().contains_key(target), failures < 6);
+        assert!(!f.calls().iter().any(|s| s.contains("/launch ")));
+    }
+}
+
+#[test]
 fn package_update_replaces_the_old_bound_inode() {
     let f = Fixture::new();
     let h = home::Home::new(&f, home::HOME).unwrap();
