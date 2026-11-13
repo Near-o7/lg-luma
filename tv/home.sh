@@ -10,11 +10,11 @@ fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$SCRIPT")" && pwd) || exit 1
 COMMAND=${1:-boot}
 case "$COMMAND" in
-  enable|disable|restore|status|apply|boot) ;;
+  enable|disable|restore|status|apply|boot-apply|boot) ;;
   *) printf '%s\n' 'Usage: home.sh enable [APP_DIR] [HOME_ID] | disable | restore | status' >&2; exit 1 ;;
 esac
 [ "$(id -u)" = 0 ] || { printf '%s\n' 'Run as root.' >&2; exit 1; }
-# boot only schedules the copied $STATE/home.sh apply, which checks for the helper itself.
+# boot only schedules the copied $STATE/home.sh boot-apply, which checks for the helper itself.
 [ "$COMMAND" = boot ] || [ -x "$SCRIPT_DIR/luma-helper" ] ||
   { printf '%s\n' 'The native Luma TV helper is missing.' >&2; exit 1; }
 if [ "$COMMAND" = enable ] && grep -q 'release [56]\.' /etc/starfish-release 2>/dev/null; then
@@ -67,8 +67,7 @@ if [ ! -d "$STATE" ]; then mkdir -m 755 "$STATE" || exit 1; fi
 [ "$(stat -c %u "$STATE")" = 0 ] || exit 1
 if [ "$COMMAND" = boot ]; then
   (
-    sleep 5
-    exec sh "$STATE/home.sh" apply
+    exec sh "$STATE/home.sh" boot-apply
   ) </dev/null >>"$STATE/boot.log" 2>&1 &
   exit 0
 fi
