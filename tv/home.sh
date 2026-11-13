@@ -10,11 +10,11 @@ fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$SCRIPT")" && pwd) || exit 1
 COMMAND=${1:-boot}
 case "$COMMAND" in
-  enable|disable|restore|status|apply|boot|early|pin|unpin|startup-home) ;;
+  enable|disable|restore|status|apply|boot-apply|boot|early|pin|unpin|startup-home) ;;
   *) printf '%s\n' 'Usage: home.sh enable [APP_DIR] [HOME_ID] | disable | restore | status | startup-home on|off' >&2; exit 1 ;;
 esac
 [ "$(id -u)" = 0 ] || { printf '%s\n' 'Run as root.' >&2; exit 1; }
-# boot only schedules the copied $STATE/home.sh apply, which checks for the helper itself; the
+# boot only schedules the copied $STATE/home.sh boot-apply, which checks for the helper itself; the
 # early and pin fast paths are shell only.
 case "$COMMAND" in
   boot|early|pin) ;;
@@ -137,8 +137,7 @@ if [ "$COMMAND" = boot ]; then
   # The early helper has already mounted Luma during this boot.
   if [ -f "$MARKER" ] && grep -q " $EXE " /proc/mounts; then exit 0; fi
   (
-    sleep 5
-    exec sh "$STATE/home.sh" apply
+    exec sh "$STATE/home.sh" boot-apply
   ) </dev/null >>"$STATE/boot.log" 2>&1 &
   exit 0
 fi
