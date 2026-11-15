@@ -342,6 +342,8 @@ pub struct Preferences {
     pub legacy_date_position: Option<WidgetPosition>,
     pub favorites: Option<Vec<String>>,
     pub home_rows: u8,
+    pub show_favorites_dock: bool,
+    pub favorites_dock_top: bool,
     pub custom_tiles: Vec<CustomTile>,
     pub hidden: Vec<String>,
     pub background: String,
@@ -389,6 +391,8 @@ impl Default for Preferences {
             legacy_date_position: None,
             favorites: None,
             home_rows: 1,
+            show_favorites_dock: true,
+            favorites_dock_top: false,
             custom_tiles: vec![],
             hidden: vec![],
             background: "dunes".into(),
@@ -448,13 +452,18 @@ impl Preferences {
 
     /// Restore widget membership and placement without discarding configuration.
     pub fn reset_widgets(&mut self) -> bool {
-        let changed = HomeWidget::ALL.into_iter().any(|widget| {
-            !self.has_widget(widget) || self.widget_position(widget) != widget.default_position()
-        });
+        let changed = !self.show_favorites_dock
+            || self.favorites_dock_top
+            || HomeWidget::ALL.into_iter().any(|widget| {
+                !self.has_widget(widget)
+                    || self.widget_position(widget) != widget.default_position()
+            });
         for widget in HomeWidget::ALL {
             self.set_widget_present(widget, true);
             self.set_widget_position(widget, widget.default_position());
         }
+        self.show_favorites_dock = true;
+        self.favorites_dock_top = false;
         self.legacy_date_position = None;
         changed
     }

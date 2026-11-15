@@ -172,6 +172,11 @@ pub enum Target {
     WidgetAdd,
     WidgetReset,
     FavoriteRows,
+    ConfigureFavorites,
+    MoveFavorites,
+    RemoveFavorites,
+    AddFavorites,
+    OpenDrawer,
     AddWidget(HomeWidget),
     ConfigureWidget(HomeWidget),
     RemoveWidget(HomeWidget),
@@ -257,6 +262,7 @@ pub enum Overlay {
     BackgroundOptions { id: String, restore: Target },
     BackgroundDelete { id: String, restore: Target },
     WidgetOptions { cell: usize },
+    FavoritesOptions,
     WidgetCatalog { cell: usize, restore: Target },
 }
 
@@ -268,6 +274,7 @@ pub enum Subpage {
     Weather,
     Shortcuts,
     FavoriteRows,
+    FavoritesPosition,
     Clock,
     ClockFormat,
     TimeFormat,
@@ -695,7 +702,11 @@ impl State {
     }
 
     pub fn home_dock_y(&self) -> f32 {
-        820. + HOME_TILE_HEIGHT - self.dock_layout().height()
+        if self.preferences.show_favorites_dock && self.preferences.favorites_dock_top {
+            DRAWER_DOCK_Y
+        } else {
+            820. + HOME_TILE_HEIGHT - self.dock_layout().height()
+        }
     }
 
     pub fn dock_y(&self) -> f32 {
@@ -766,11 +777,13 @@ impl State {
             .collect()
     }
 
-    /// Backfill the six visible dock slots without changing saved favorites.
     pub fn dock_apps(&self) -> Vec<&App> {
+        if !self.preferences.show_favorites_dock {
+            return vec![];
+        }
         let mut apps = self.favorite_apps();
-        let capacity = self.dock_layout().capacity();
-        if apps.len() < capacity {
+        // Preserve the stock six-slot backfill in the default one-row layout.
+        if self.preferences.home_rows == 1 && apps.len() < APPS_COLUMNS {
             let mut remaining: Vec<_> = self
                 .inventory
                 .apps
@@ -781,7 +794,7 @@ impl State {
                 })
                 .collect();
             remaining.sort_by(|a, b| self.preferences.compare_apps(a, b));
-            apps.extend(remaining.into_iter().take(capacity - apps.len()));
+            apps.extend(remaining.into_iter().take(APPS_COLUMNS - apps.len()));
         }
         apps
     }
@@ -828,7 +841,11 @@ impl State {
 
     pub fn drawer_grid_top(&self) -> f32 {
         // Pinned artwork height, glass inset, then the matching outer list padding.
-        DRAWER_DOCK_Y + self.dock_layout().height() + DOCK_PADDING + DRAWER_PADDING
+        if self.preferences.show_favorites_dock {
+            DRAWER_DOCK_Y + self.dock_layout().height() + DOCK_PADDING + DRAWER_PADDING
+        } else {
+            DRAWER_DOCK_Y
+        }
     }
 
     pub fn app_settings_viewport(&self) -> Rect {
@@ -863,7 +880,10 @@ impl State {
                     self.app_settings_viewport()
                 } else if self.page == Page::Apps {
                     let mut viewport = self.apps_viewport();
-                    if self.preferences.home_rows > 1 && matches!(control.target, Target::App(_)) {
+                    if self.preferences.show_favorites_dock
+                        && self.preferences.home_rows > 1
+                        && matches!(control.target, Target::App(_))
+                    {
                         let top = self.drawer_grid_top() - DRAWER_PADDING;
                         viewport.h -= top - viewport.y;
                         viewport.y = top;
@@ -1051,6 +1071,7 @@ impl State {
 
     pub fn first_content(&self) -> Target {
         match self.page {
+            Page::Home if !self.preferences.show_favorites_dock => Target::OpenDrawer,
             Page::Home => self
                 .apps()
                 .get(self.dock_layout().index(self.first_dock_column(), 0))
@@ -1343,7 +1364,12 @@ impl State {
         self.focus = HomeWidget::ALL
             .into_iter()
             .find(|widget| !self.preferences.has_widget(*widget))
-            .map_or(Target::CloseDialog, Target::AddWidget);
+            .map(Target::AddWidget)
+            .unwrap_or(if self.preferences.show_favorites_dock {
+                Target::CloseDialog
+            } else {
+                Target::AddFavorites
+            });
         self.panel_started = (!self.preferences.reduced_motion).then(Instant::now);
     }
 
@@ -1395,7 +1421,7 @@ impl State {
             }
             Some(Subpage::Weather) => Target::WidgetCell(self.preferences.weather_position.cell()),
             Some(Subpage::Shortcuts) => Target::Widget(2),
-            Some(Subpage::FavoriteRows) => Target::FavoriteRows,
+            Some(Subpage::FavoriteRows | Subpage::FavoritesPosition) => Target::FavoriteRows,
             Some(Subpage::Clock) => Target::Setting(1),
             Some(Subpage::ClockFormat) => {
                 self.subpage = Some(Subpage::Clock);
@@ -1457,6 +1483,12 @@ impl State {
                 Direction::Up if index >= HOME_GRID_COLUMNS => {
                     Target::WidgetCell(index - HOME_GRID_COLUMNS)
                 }
+                Direction::Up
+                    if self.preferences.show_favorites_dock
+                        && self.preferences.favorites_dock_top =>
+                {
+                    Target::FavoriteRows
+                }
                 Direction::Up => {
                     if index % HOME_GRID_COLUMNS == 0 {
                         Target::Widget(2)
@@ -1469,7 +1501,12 @@ impl State {
                 Direction::Down if index + HOME_GRID_COLUMNS < HOME_GRID_CELLS => {
                     Target::WidgetCell(index + HOME_GRID_COLUMNS)
                 }
-                Direction::Down => Target::FavoriteRows,
+                Direction::Down
+                    if self.preferences.show_favorites_dock
+                        && !self.preferences.favorites_dock_top =>
+                {
+                    Target::FavoriteRows
+                }
                 _ => self.focus.clone(),
             };
             self.focus(target, controls);
@@ -1491,6 +1528,12 @@ impl State {
                 Direction::Right if self.focus == Target::Widget(2) => Target::WidgetReset,
                 Direction::Right => Target::WidgetAdd,
                 Direction::Up => Target::SettingsMenu,
+                Direction::Down
+                    if self.preferences.show_favorites_dock
+                        && self.preferences.favorites_dock_top =>
+                {
+                    Target::FavoriteRows
+                }
                 Direction::Down => Target::WidgetCell(0),
             };
             self.focus(target, controls);
@@ -1503,7 +1546,9 @@ impl State {
             && self.focus == Target::FavoriteRows
         {
             let target = match direction {
+                Direction::Up if self.preferences.favorites_dock_top => Target::WidgetAdd,
                 Direction::Up => Target::WidgetCell(HOME_GRID_CELLS - HOME_GRID_COLUMNS),
+                Direction::Down if self.preferences.favorites_dock_top => Target::WidgetCell(0),
                 Direction::Left => Target::Sidebar(WIDGETS_SECTION),
                 _ => return vec![],
             };
@@ -1578,6 +1623,23 @@ impl State {
             return vec![];
         }
         if self.overlay.is_none() {
+            if self.focus == Target::OpenDrawer {
+                match direction {
+                    Direction::Down => return self.activate(),
+                    Direction::Up => self.focus(
+                        if self.preferences.weather_visible()
+                            && self.preferences.weather_location.is_none()
+                        {
+                            Target::WeatherConfigure
+                        } else {
+                            self.first_input_target()
+                        },
+                        controls,
+                    ),
+                    _ => {}
+                }
+                return vec![];
+            }
             if self.page == Page::Apps
                 && let Target::DockApp(id) = &self.focus
             {
@@ -1770,7 +1832,8 @@ impl State {
                         | Subpage::TimeFormat
                         | Subpage::Temperature
                         | Subpage::TextRendering
-                        | Subpage::AppSorting,
+                        | Subpage::AppSorting
+                        | Subpage::FavoritesPosition,
                     ) => 2,
                     Some(Subpage::FavoriteRows) => usize::from(MAX_HOME_ROWS),
                     Some(Subpage::InputIcons(_)) => crate::model::INPUT_ICONS.len() + 1,
@@ -2024,7 +2087,13 @@ impl State {
                                 index
                             };
                             let target = layout.bottom_index(column, dock.len()).map_or_else(
-                                || self.above_dock(index),
+                                || {
+                                    if self.preferences.show_favorites_dock {
+                                        self.above_dock(index)
+                                    } else {
+                                        Target::OpenDrawer
+                                    }
+                                },
                                 |favorite| Target::App(dock[favorite].id.clone()),
                             );
                             // Return to the dock in the same visible column.
@@ -2719,11 +2788,45 @@ impl State {
             Target::WidgetAdd => {
                 self.open_widget_catalog(0);
             }
-            Target::FavoriteRows => {
-                self.subpage = Some(Subpage::FavoriteRows);
-                self.focus = Target::Choice(self.dock_layout().rows - 1);
-                self.scroll = 0.;
+            Target::FavoriteRows if self.preferences.show_favorites_dock => {
+                self.overlay = Some(Overlay::FavoritesOptions);
+                self.focus = Target::ConfigureFavorites;
                 self.panel_started = (!self.preferences.reduced_motion).then(Instant::now);
+            }
+            Target::ConfigureFavorites | Target::MoveFavorites
+                if matches!(self.overlay, Some(Overlay::FavoritesOptions)) =>
+            {
+                let (page, choice) = if self.focus == Target::ConfigureFavorites {
+                    (Subpage::FavoriteRows, self.dock_layout().rows - 1)
+                } else {
+                    (
+                        Subpage::FavoritesPosition,
+                        usize::from(!self.preferences.favorites_dock_top),
+                    )
+                };
+                self.overlay = None;
+                self.subpage = Some(page);
+                self.focus = Target::Choice(choice);
+                self.scroll = 0.;
+                self.panel_started = None;
+            }
+            Target::RemoveFavorites if matches!(self.overlay, Some(Overlay::FavoritesOptions)) => {
+                self.overlay = None;
+                self.preferences.show_favorites_dock = false;
+                self.focus = Target::WidgetAdd;
+                self.panel_started = None;
+                return vec![Effect::Save];
+            }
+            Target::AddFavorites if matches!(self.overlay, Some(Overlay::WidgetCatalog { .. })) => {
+                self.overlay = None;
+                self.preferences.show_favorites_dock = true;
+                self.focus = Target::FavoriteRows;
+                self.panel_started = None;
+                return vec![Effect::Save];
+            }
+            Target::OpenDrawer => {
+                self.open(1);
+                self.focus = self.first_content();
             }
             Target::WidgetReset => {
                 if self.preferences.reset_widgets() {
@@ -3015,6 +3118,16 @@ impl State {
                             vec![]
                         };
                     }
+                    Some(Subpage::FavoritesPosition) => {
+                        if index > 1 {
+                            return vec![];
+                        }
+                        let top = index == 0;
+                        let changed = top != self.preferences.favorites_dock_top;
+                        self.preferences.favorites_dock_top = top;
+                        self.close_subpage();
+                        return if changed { vec![Effect::Save] } else { vec![] };
+                    }
                     Some(Subpage::FavoriteRows) => {
                         if index >= usize::from(MAX_HOME_ROWS) {
                             return vec![];
@@ -3251,6 +3364,11 @@ impl State {
             self.panel_started = None;
             if let Overlay::WidgetCatalog { restore, .. } = overlay {
                 self.focus = restore;
+                self.pressed = None;
+                return vec![];
+            }
+            if matches!(overlay, Overlay::FavoritesOptions) {
+                self.focus = Target::FavoriteRows;
                 self.pressed = None;
                 return vec![];
             }

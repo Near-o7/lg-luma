@@ -389,7 +389,20 @@ try {
   assert.ok(widgets.ui_text.includes('Favorites'));
 
   const previousRowsPreferences = await fs.readFile(preferences, 'utf8');
-  const rowsPage = `${widgetsPage},down,down,down,down,down,enter`;
+  const rowFavorites = [
+    'netflix',
+    'youtube.leanback.v4',
+    'com.apple.appletv',
+    'com.disney.disneyplus-prod',
+    'amazon',
+    'com.arte.tv',
+    'de.zdf.app.zdfm3',
+  ];
+  await fs.writeFile(
+    preferences,
+    JSON.stringify({ ...JSON.parse(previousRowsPreferences), favorites: rowFavorites, hidden: [] }),
+  );
+  const rowsPage = `${widgetsPage},down,down,down,down,down,enter,enter`;
   const rowsPicker = await scenario('widget-favorite-rows-picker', rowsPage);
   assert.ok(rowsPicker.ui_text.includes('Favorites'));
   assert.ok(rowsPicker.ui_text.includes('One row'));
@@ -399,7 +412,7 @@ try {
   const twoRows = await scenario('widget-favorite-rows-home', `${rowsPage},down,enter,home,down`);
   assert.equal(twoRows.preferences.home_rows, 2);
   assert.equal(twoRows.page, 'Home');
-  assert.ok(twoRows.apps.length >= 12);
+  assert.deepEqual(twoRows.apps, rowFavorites);
   assert.deepEqual(twoRows.focus, { App: twoRows.apps[6] });
   const lowerRow = await scenario('widget-favorite-rows-return', 'home,down,down,up');
   assert.equal(lowerRow.page, 'Home');

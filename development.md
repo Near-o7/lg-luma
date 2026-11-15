@@ -155,11 +155,13 @@ Configure/Move/Remove popup. A fixed, right-aligned toolbar above the preview co
 left and Add widget on the right, using the Backgrounds pill style. Empty cells also open the
 Add catalog directly; it excludes installed widgets. Reset restores the default membership and
 positions, preserving date/weather configuration and the app dock; an already-default reset does not save.
-The preview shows the Favorites dock beneath the widget placements. Select it to persist
-`home_rows` (1 by default, or 2 or 3). The dock fills six columns per page in reading order and
-scrolls if more favorites are pinned. Right moves up to an occupied row if the next column is
-empty on the selected row. With multiple rows, widget cells fit above the taller dock without
-changing saved anchors. Down opens the drawer from the lowest occupied row.
+Select Favorites in the grid preview for Configure, Move, and Remove. The editor keeps the
+placement cells the same size as the dock changes height. Luma persists `home_rows` (1, 2, or 3),
+`show_favorites_dock`, and `favorites_dock_top`. Multi-row layouts show pinned apps only. The
+dock fills six columns per page in reading order and scrolls for overflow. Right moves up to an
+occupied row if the next column is empty on the selected row. Home fits movable widgets beside
+the dock vertically without changing their anchors. Down from the dock opens the drawer. When
+the dock is removed, an Apps button keeps the drawer accessible. The Add menu restores Favorites.
 Inputs is a separate sidebar section directly
 below Apps, not a widget. Its list and individual input/icon settings retain focus on return.
 Move and Add open a placement preview; arrows browse

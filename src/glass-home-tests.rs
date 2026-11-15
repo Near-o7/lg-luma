@@ -148,6 +148,16 @@ fn favorite_rows_save_and_keep_remote_navigation_aligned_with_the_drawer() {
     }
     assert_eq!(state.focus, Target::FavoriteRows);
     state.activate();
+    assert_eq!(state.focus, Target::ConfigureFavorites);
+    let menu = controls(&state);
+    for action in [
+        Target::ConfigureFavorites,
+        Target::MoveFavorites,
+        Target::RemoveFavorites,
+    ] {
+        assert!(menu.iter().any(|control| control.target == action));
+    }
+    state.activate();
     assert_eq!(state.subpage, Some(Subpage::FavoriteRows));
     assert_eq!(state.focus, Target::Choice(0));
     state.direction(Direction::Down, &controls(&state));
@@ -211,6 +221,7 @@ fn favorite_rows_save_and_keep_remote_navigation_aligned_with_the_drawer() {
     state.pointer_focus(Target::Sidebar(crate::state::WIDGETS_SECTION));
     state.pointer_focus(Target::FavoriteRows);
     state.activate();
+    state.activate();
     assert_eq!(state.focus, Target::Choice(1));
     state.direction(Direction::Down, &controls(&state));
     assert!(matches!(state.activate().as_slice(), [Effect::Save]));
@@ -219,7 +230,13 @@ fn favorite_rows_save_and_keep_remote_navigation_aligned_with_the_drawer() {
 
     state.open(0);
     let dock = state.dock_apps();
-    assert_eq!(dock.len(), 18);
+    assert_eq!(dock.len(), ids.len());
+    assert!(
+        state
+            .drawer_apps()
+            .iter()
+            .any(|app| app.id.starts_with("extra."))
+    );
     let third_row = Target::App(dock[12].id.clone());
     state.direction(Direction::Down, &controls(&state));
     state.direction(Direction::Down, &controls(&state));
@@ -229,6 +246,63 @@ fn favorite_rows_save_and_keep_remote_navigation_aligned_with_the_drawer() {
     state.direction(Direction::Up, &controls(&state));
     assert_eq!(state.page, Page::Home);
     assert_eq!(state.focus, third_row);
+}
+
+#[test]
+fn favorites_widget_can_move_and_be_removed_and_added_without_losing_favorites() {
+    let mut state = ready();
+    state.preferences.reduced_motion = true;
+    state.preferences.home_rows = 3;
+    let favorite_count = state.dock_apps().len();
+    let edit_favorites = |state: &mut State| {
+        state.open(2);
+        state.pointer_focus(Target::Sidebar(crate::state::WIDGETS_SECTION));
+        state.pointer_focus(Target::FavoriteRows);
+        state.activate();
+    };
+
+    edit_favorites(&mut state);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::MoveFavorites);
+    state.activate();
+    assert_eq!(state.subpage, Some(Subpage::FavoritesPosition));
+    assert_eq!(state.focus, Target::Choice(1));
+    state.direction(Direction::Up, &controls(&state));
+    assert!(matches!(state.activate().as_slice(), [Effect::Save]));
+    assert_eq!(state.home_dock_y(), crate::state::DRAWER_DOCK_Y);
+
+    edit_favorites(&mut state);
+    state.direction(Direction::Down, &controls(&state));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::RemoveFavorites);
+    assert!(matches!(state.activate().as_slice(), [Effect::Save]));
+    assert!(!state.preferences.show_favorites_dock);
+    assert!(state.dock_apps().is_empty());
+    assert_eq!(state.drawer_apps().len(), state.inventory.apps.len());
+    state.open(0);
+    assert_eq!(state.focus, Target::OpenDrawer);
+    assert!(
+        controls(&state)
+            .iter()
+            .any(|item| item.target == Target::OpenDrawer)
+    );
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.page, Page::Apps);
+    assert!(matches!(state.focus, Target::App(_)));
+    state.direction(Direction::Up, &controls(&state));
+    assert_eq!(state.page, Page::Home);
+    assert_eq!(state.focus, Target::OpenDrawer);
+
+    state.open(2);
+    state.pointer_focus(Target::Sidebar(crate::state::WIDGETS_SECTION));
+    state.direction(Direction::Right, &controls(&state));
+    state.activate();
+    assert_eq!(state.focus, Target::AddFavorites);
+    assert!(matches!(state.activate().as_slice(), [Effect::Save]));
+    assert!(state.preferences.show_favorites_dock);
+    assert!(state.preferences.favorites_dock_top);
+    assert_eq!(state.preferences.home_rows, 3);
+    assert_eq!(state.dock_apps().len(), favorite_count);
 }
 
 #[test]

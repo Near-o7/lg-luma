@@ -52,9 +52,11 @@ block with a condition icon, temperature, condition, and location. The combined 
 the original small, spaced weekday/date above a large, tightly tracked greeting. Greeting settings
 include a date visibility toggle and date-format choices; Date is not a separate widget.
 
-- In **Settings → Widgets**, select the **Favorites** dock in the grid preview to choose **One row**
-  (default), **Two rows**, or **Three rows**. Each row has six visible slots, and additional
-  favorites continue to the right.
+- In **Settings → Widgets**, select **Favorites** in the grid preview. **Configure** sets
+  **One row** (default), **Two rows**, or **Three rows**. The multi-row layouts show pinned
+  favorites, with six slots per row. Additional favorites continue to the right.
+- **Move** puts the dock at the top or bottom of Home. **Remove widget** hides the dock and
+  leaves an **Apps** button for opening the drawer. Use **Add widget** to restore Favorites.
 - **Left / Right** browses favorites, and **Up / Down** moves between rows. If the next column
   has a card only in a higher row, **Right** moves to that card. Hold **OK** to reorder favorites.
 - **Down** from the bottom row opens the animated six-column app drawer.

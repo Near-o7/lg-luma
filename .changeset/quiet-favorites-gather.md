@@ -2,4 +2,4 @@
 "lg-luma": minor
 ---
 
-Select Favorites in the Widgets editor to use one, two, or three rows on Home. The widget grid fits above the dock, and pressing Down from the bottom row opens the app drawer.
+Configure Favorites in the Widgets grid to use one, two, or three rows. Move the dock to the top or bottom or remove it and keep access to the app drawer.
