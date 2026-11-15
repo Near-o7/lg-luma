@@ -34,11 +34,72 @@ pub const HOME_STRIP_LEFT: f32 = 84.;
 // the strip ends after the sixth tile, so a focused tile never sits in the fade.
 pub const HOME_STRIP_RIGHT: f32 = 1836.;
 pub const HOME_TILE_WIDTH: f32 = 270.;
+pub const HOME_TILE_HEIGHT: f32 = 154.4;
+pub const DOCK_PADDING: f32 = 24.;
+pub const DOCK_ROW_PITCH: f32 = HOME_TILE_HEIGHT + 24.;
+pub const DRAWER_DOCK_Y: f32 = 164.8;
 pub const HOME_TILE_PITCH: f32 = 296.4;
 pub const HOME_FADE_LEFT: f32 = 8.;
 pub const HOME_FADE_RIGHT: f32 = 1910.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 pub const CYCLE_FADE: f32 = 1.6;
+
+pub struct DockLayout {
+    pub rows: usize,
+}
+
+impl DockLayout {
+    pub fn capacity(&self) -> usize {
+        self.rows * APPS_COLUMNS
+    }
+
+    pub fn height(&self) -> f32 {
+        HOME_TILE_HEIGHT + (self.rows - 1) as f32 * DOCK_ROW_PITCH
+    }
+
+    // Fill each six-column page in reading order, then continue to the right.
+    pub fn position(&self, index: usize) -> (usize, usize) {
+        let page = index / self.capacity();
+        (
+            page * APPS_COLUMNS + index % APPS_COLUMNS,
+            index / APPS_COLUMNS % self.rows,
+        )
+    }
+
+    fn index(&self, column: usize, row: usize) -> usize {
+        column / APPS_COLUMNS * self.capacity() + row * APPS_COLUMNS + column % APPS_COLUMNS
+    }
+
+    fn columns(&self, count: usize) -> usize {
+        count / self.capacity() * APPS_COLUMNS + (count % self.capacity()).min(APPS_COLUMNS)
+    }
+
+    fn bottom_index(&self, column: usize, count: usize) -> Option<usize> {
+        let column = column.min(self.columns(count).saturating_sub(1));
+        (0..self.rows)
+            .rev()
+            .find_map(|row| self.index_in_row(column, row, count))
+    }
+
+    fn index_in_row(&self, column: usize, row: usize, count: usize) -> Option<usize> {
+        let start = self.index(column / APPS_COLUMNS * APPS_COLUMNS, row);
+        (start < count).then(|| self.index(column, row).min(count - 1))
+    }
+
+    fn neighbor(&self, index: usize, count: usize, direction: Direction) -> Option<usize> {
+        let (column, row) = self.position(index);
+        match direction {
+            Direction::Left => column.checked_sub(1).map(|column| self.index(column, row)),
+            Direction::Right => Some(self.index(column + 1, row)),
+            Direction::Up => row
+                .checked_sub(1)
+                .and_then(|row| self.index_in_row(column, row, count)),
+            Direction::Down if row + 1 < self.rows => self.index_in_row(column, row + 1, count),
+            Direction::Down => None,
+        }
+        .filter(|next| *next < count)
+    }
+}
 
 pub fn unix_now() -> u64 {
     std::time::SystemTime::now()
@@ -77,6 +138,7 @@ pub enum Target {
     WidgetCell(usize),
     WidgetAdd,
     WidgetReset,
+    FavoriteRows,
     AddWidget(HomeWidget),
     ConfigureWidget(HomeWidget),
     RemoveWidget(HomeWidget),
@@ -172,6 +234,7 @@ pub enum Subpage {
     DateFormat,
     Weather,
     Shortcuts,
+    FavoriteRows,
     Clock,
     ClockFormat,
     TimeFormat,
@@ -592,9 +655,19 @@ impl State {
         t * t * (3. - 2. * t)
     }
 
+    pub fn dock_layout(&self) -> DockLayout {
+        DockLayout {
+            rows: usize::from(self.preferences.home_rows),
+        }
+    }
+
+    pub fn home_dock_y(&self) -> f32 {
+        820. - (self.dock_layout().rows - 1) as f32 * DOCK_ROW_PITCH
+    }
+
     pub fn dock_y(&self) -> f32 {
-        let home_y = 820.;
-        home_y - (home_y - 164.8) * self.drawer_progress()
+        let home_y = self.home_dock_y();
+        home_y - (home_y - DRAWER_DOCK_Y) * self.drawer_progress()
     }
 
     pub fn apps(&self) -> Vec<&App> {
@@ -663,7 +736,8 @@ impl State {
     /// Backfill the six visible dock slots without changing saved favorites.
     pub fn dock_apps(&self) -> Vec<&App> {
         let mut apps = self.favorite_apps();
-        if apps.len() < 6 {
+        let capacity = self.dock_layout().capacity();
+        if apps.len() < capacity {
             let mut remaining: Vec<_> = self
                 .inventory
                 .apps
@@ -674,7 +748,7 @@ impl State {
                 })
                 .collect();
             remaining.sort_by(|a, b| self.preferences.compare_apps(a, b));
-            apps.extend(remaining.into_iter().take(6 - apps.len()));
+            apps.extend(remaining.into_iter().take(capacity - apps.len()));
         }
         apps
     }
@@ -715,13 +789,13 @@ impl State {
     pub fn apps_viewport(&self) -> Rect {
         let content = self.content_viewport();
         // Let scrolling cards continue behind the floating dock, up to its card edge.
-        let top = 164.8;
+        let top = DRAWER_DOCK_Y;
         Rect::new(content.x, top, content.w, content.y + content.h - top)
     }
 
     pub fn drawer_grid_top(&self) -> f32 {
         // Pinned artwork height, glass inset, then the matching outer list padding.
-        164.8 + 154.4 + 24. + DRAWER_PADDING
+        DRAWER_DOCK_Y + self.dock_layout().height() + DOCK_PADDING + DRAWER_PADDING
     }
 
     pub fn app_settings_viewport(&self) -> Rect {
@@ -755,7 +829,13 @@ impl State {
                 } else if self.managing_apps() && matches!(control.target, Target::App(_)) {
                     self.app_settings_viewport()
                 } else if self.page == Page::Apps {
-                    self.apps_viewport()
+                    let mut viewport = self.apps_viewport();
+                    if self.preferences.home_rows == 2 && matches!(control.target, Target::App(_)) {
+                        let top = self.drawer_grid_top() - DRAWER_PADDING;
+                        viewport.h -= top - viewport.y;
+                        viewport.y = top;
+                    }
+                    viewport
                 } else {
                     self.content_viewport()
                 };
@@ -813,7 +893,7 @@ impl State {
     }
 
     pub fn scroll_favorites(&mut self, delta: f32) {
-        let count = self.dock_apps().len();
+        let count = self.dock_layout().columns(self.dock_apps().len());
         let content = if count == 0 {
             0.
         } else {
@@ -940,7 +1020,7 @@ impl State {
         match self.page {
             Page::Home => self
                 .apps()
-                .get(((self.home_scroll - 0.01).max(0.) / HOME_TILE_PITCH).ceil() as usize)
+                .get(self.dock_layout().index(self.first_dock_column(), 0))
                 .map(|app| Target::App(app.id.clone()))
                 .unwrap_or(if self.error.is_some() {
                     Target::Retry
@@ -963,6 +1043,18 @@ impl State {
                 .unwrap_or(Target::SettingsMenu),
             Page::Settings => Target::Sidebar(0),
         }
+    }
+
+    fn above_dock(&self, column: usize) -> Target {
+        if column < 3 {
+            self.first_input_target()
+        } else {
+            Target::SettingsMenu
+        }
+    }
+
+    fn first_dock_column(&self) -> usize {
+        ((self.home_scroll - 0.01).max(0.) / HOME_TILE_PITCH).ceil() as usize
     }
 
     pub fn first_input_target(&self) -> Target {
@@ -1270,6 +1362,7 @@ impl State {
             }
             Some(Subpage::Weather) => Target::WidgetCell(self.preferences.weather_position.cell()),
             Some(Subpage::Shortcuts) => Target::Widget(2),
+            Some(Subpage::FavoriteRows) => Target::FavoriteRows,
             Some(Subpage::Clock) => Target::Setting(1),
             Some(Subpage::ClockFormat) => {
                 self.subpage = Some(Subpage::Clock);
@@ -1331,15 +1424,12 @@ impl State {
                 Direction::Up if index >= HOME_GRID_COLUMNS => {
                     Target::WidgetCell(index - HOME_GRID_COLUMNS)
                 }
-                Direction::Up => {
-                    if index % HOME_GRID_COLUMNS == 0 {
-                        Target::Widget(2)
-                    } else if index % HOME_GRID_COLUMNS == 1 {
-                        Target::WidgetReset
-                    } else {
-                        Target::WidgetAdd
-                    }
-                }
+                Direction::Up => match index % HOME_GRID_COLUMNS {
+                    0 => Target::Widget(2),
+                    1 | 2 => Target::FavoriteRows,
+                    3 => Target::WidgetReset,
+                    _ => Target::WidgetAdd,
+                },
                 Direction::Down if index + HOME_GRID_COLUMNS < HOME_GRID_CELLS => {
                     Target::WidgetCell(index + HOME_GRID_COLUMNS)
                 }
@@ -1354,14 +1444,16 @@ impl State {
             && self.subpage.is_none()
             && matches!(
                 self.focus,
-                Target::WidgetAdd | Target::WidgetReset | Target::Widget(2)
+                Target::WidgetAdd | Target::WidgetReset | Target::FavoriteRows | Target::Widget(2)
             )
         {
             let target = match direction {
                 Direction::Left if self.focus == Target::WidgetAdd => Target::WidgetReset,
-                Direction::Left if self.focus == Target::WidgetReset => Target::Widget(2),
+                Direction::Left if self.focus == Target::WidgetReset => Target::FavoriteRows,
+                Direction::Left if self.focus == Target::FavoriteRows => Target::Widget(2),
                 Direction::Left => Target::Sidebar(WIDGETS_SECTION),
-                Direction::Right if self.focus == Target::Widget(2) => Target::WidgetReset,
+                Direction::Right if self.focus == Target::Widget(2) => Target::FavoriteRows,
+                Direction::Right if self.focus == Target::FavoriteRows => Target::WidgetReset,
                 Direction::Right => Target::WidgetAdd,
                 Direction::Up => Target::SettingsMenu,
                 Direction::Down => Target::WidgetCell(0),
@@ -1427,18 +1519,12 @@ impl State {
                     .then_some(index)
                 })
                 .collect();
-            if let Some(index) = slots.iter().position(|slot| ids[*slot] == id) {
-                let next = match direction {
-                    Direction::Left => index.saturating_sub(1),
-                    Direction::Right => (index + 1).min(slots.len() - 1),
-                    _ => index,
-                };
-                if next != index {
-                    ids.swap(slots[index], slots[next]);
-                    self.preferences.favorites = Some(ids);
-                    self.dirty = true;
-                    return vec![Effect::Save];
-                }
+            if let Some(index) = slots.iter().position(|slot| ids[*slot] == id)
+                && let Some(next) = self.dock_layout().neighbor(index, slots.len(), direction)
+            {
+                ids.swap(slots[index], slots[next]);
+                self.preferences.favorites = Some(ids);
+                return vec![Effect::Save];
             }
             return vec![];
         }
@@ -1448,29 +1534,27 @@ impl State {
             {
                 let apps = self.dock_apps();
                 if let Some(index) = apps.iter().position(|app| &app.id == id) {
-                    let target = match direction {
-                        Direction::Up => {
-                            if index < 3 {
-                                self.first_input_target()
-                            } else {
-                                Target::SettingsMenu
-                            }
-                        }
-                        Direction::Down => self
-                            .apps()
-                            .get(index.min(self.apps().len().saturating_sub(1)))
-                            .map_or_else(|| self.focus.clone(), |app| Target::App(app.id.clone())),
-                        Direction::Left => {
-                            Target::DockApp(apps[index.saturating_sub(1)].id.clone())
-                        }
-                        Direction::Right => {
-                            Target::DockApp(apps[(index + 1).min(apps.len() - 1)].id.clone())
-                        }
-                    };
-                    if matches!(direction, Direction::Up) {
+                    let layout = self.dock_layout();
+                    let column = layout.position(index).0;
+                    if let Some(next) = layout.neighbor(index, apps.len(), direction) {
+                        self.focus(Target::DockApp(apps[next].id.clone()), controls);
+                    } else if matches!(direction, Direction::Up) {
+                        let target = self.above_dock(column);
                         self.open(0);
+                        self.focus(target, controls);
+                    } else if matches!(direction, Direction::Down) {
+                        let apps = self.apps();
+                        let column = if layout.rows == 1 {
+                            column
+                        } else {
+                            column
+                                .saturating_sub(self.first_dock_column())
+                                .min(APPS_COLUMNS - 1)
+                        };
+                        if let Some(app) = apps.get(column.min(apps.len().saturating_sub(1))) {
+                            self.focus(Target::App(app.id.clone()), controls);
+                        }
                     }
-                    self.focus(target, controls);
                     return vec![];
                 }
             }
@@ -1561,28 +1645,27 @@ impl State {
             {
                 let apps = self.apps();
                 if let Some(index) = apps.iter().position(|app| &app.id == id) {
-                    match direction {
-                        Direction::Left | Direction::Right => {
-                            let next = if matches!(direction, Direction::Left) {
-                                index.saturating_sub(1)
-                            } else {
-                                (index + 1).min(apps.len() - 1)
-                            };
-                            let id = apps[next].id.clone();
-                            self.focus(Target::App(id), controls);
-                        }
-                        Direction::Up => self.focus(
-                            if index < 3 {
-                                self.first_input_target()
-                            } else {
-                                Target::SettingsMenu
-                            },
-                            controls,
-                        ),
-                        Direction::Down => {
-                            self.open(1);
-                            self.focus = self.first_content();
-                        }
+                    let layout = self.dock_layout();
+                    if let Some(next) = layout.neighbor(index, apps.len(), direction) {
+                        self.focus(Target::App(apps[next].id.clone()), controls);
+                    } else if matches!(direction, Direction::Up) {
+                        self.focus(self.above_dock(layout.position(index).0), controls);
+                    } else if matches!(direction, Direction::Down) {
+                        let column = layout
+                            .position(index)
+                            .0
+                            .saturating_sub(self.first_dock_column());
+                        self.open(1);
+                        let apps = self.apps();
+                        self.focus = if layout.rows == 2 && !apps.is_empty() {
+                            Target::App(
+                                apps[column.min(APPS_COLUMNS - 1).min(apps.len() - 1)]
+                                    .id
+                                    .clone(),
+                            )
+                        } else {
+                            self.first_content()
+                        };
                     }
                     return vec![];
                 }
@@ -1638,7 +1721,8 @@ impl State {
                         | Subpage::TimeFormat
                         | Subpage::Temperature
                         | Subpage::TextRendering
-                        | Subpage::AppSorting,
+                        | Subpage::AppSorting
+                        | Subpage::FavoriteRows,
                     ) => 2,
                     Some(Subpage::InputIcons(_)) => crate::model::INPUT_ICONS.len() + 1,
                     Some(Subpage::Language) => Language::ALL.len(),
@@ -1882,20 +1966,23 @@ impl State {
                             apps[(index + 1).min(apps.len() - 1)].id.clone(),
                         )),
                         Direction::Up if index < APPS_COLUMNS => {
-                            let target = self
-                                .dock_apps()
-                                .get(index.min(self.dock_apps().len().saturating_sub(1)))
-                                .map_or(
-                                    if index < 3 {
-                                        self.first_input_target()
-                                    } else {
-                                        Target::SettingsMenu
-                                    },
-                                    |app| Target::App(app.id.clone()),
-                                );
-                            // Reaching the favorites row returns to Home immediately,
-                            // preserving the selected column instead of requiring another Up.
+                            let dock = self.dock_apps();
+                            let layout = self.dock_layout();
+                            let scroll = self.home_scroll;
+                            let column = if layout.rows == 2 {
+                                index + self.first_dock_column()
+                            } else {
+                                index
+                            };
+                            let target = layout.bottom_index(column, dock.len()).map_or_else(
+                                || self.above_dock(index),
+                                |favorite| Target::App(dock[favorite].id.clone()),
+                            );
+                            // Return to the dock in the same visible column.
                             self.open(0);
+                            if layout.rows == 2 {
+                                self.home_scroll = scroll;
+                            }
                             Some(target)
                         }
                         Direction::Up => Some(Target::App(apps[index - APPS_COLUMNS].id.clone())),
@@ -2583,6 +2670,12 @@ impl State {
             Target::WidgetAdd => {
                 self.open_widget_catalog(0);
             }
+            Target::FavoriteRows => {
+                self.subpage = Some(Subpage::FavoriteRows);
+                self.focus = Target::Choice(self.dock_layout().rows - 1);
+                self.scroll = 0.;
+                self.panel_started = (!self.preferences.reduced_motion).then(Instant::now);
+            }
             Target::WidgetReset => {
                 if self.preferences.reset_widgets() {
                     return vec![Effect::Save];
@@ -2873,6 +2966,17 @@ impl State {
                             vec![]
                         };
                     }
+                    Some(Subpage::FavoriteRows) => {
+                        if index > 1 {
+                            return vec![];
+                        }
+                        let rows = index as u8 + 1;
+                        let changed = self.preferences.home_rows != rows;
+                        self.preferences.home_rows = rows;
+                        self.home_scroll = 0.;
+                        self.close_subpage();
+                        return if changed { vec![Effect::Save] } else { vec![] };
+                    }
                     Some(Subpage::WeatherStyle) => {
                         self.preferences.weather_style =
                             crate::model::WeatherStyle::ALL[index.min(2)];
@@ -2945,7 +3049,8 @@ impl State {
                     self.open(0);
                     self.focus = Target::App(id.clone());
                     if let Some(index) = self.dock_apps().iter().position(|app| app.id == id) {
-                        self.scroll_favorites(index as f32 * HOME_TILE_PITCH);
+                        let (column, _) = self.dock_layout().position(index);
+                        self.scroll_favorites(column as f32 * HOME_TILE_PITCH);
                     }
                     self.moving = Some(id);
                     self.notice = None;

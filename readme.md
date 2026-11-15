@@ -30,7 +30,7 @@ https://github.com/user-attachments/assets/5b2c6e78-ec77-41f5-a79a-1fcfbe8e524b
 
 ## Home and app drawer
 
-Home widgets use an invisible **6×4 placement grid** above the unchanged six-app favorites dock.
+Home widgets use an invisible **6×4 placement grid** above the favorites dock.
 **Greeting** combines the weekday/date and greeting in **4 columns × 1 row**;
 **Weather** is **2 columns × 2 rows**. By default Greeting sits at the top left and
 Weather at the top right, spanning the first two rows. Empty cells remain transparent.
@@ -52,10 +52,13 @@ block with a condition icon, temperature, condition, and location. The combined 
 the original small, spaced weekday/date above a large, tightly tracked greeting. Greeting settings
 include a date visibility toggle and date-format choices; Date is not a separate widget.
 
-- **Left / Right** browses favorites. Hold **OK** to reorder them.
-- **Down** from favorites opens the animated six-column app drawer.
+- **Settings → Widgets → Favorite rows** saves a choice of **One row** (default) or **Two rows**.
+  Each row has six visible slots. Additional favorites continue to the right.
+- **Left / Right** browses favorites. With two rows, **Up / Down** also moves between them.
+  Hold **OK** to reorder favorites.
+- **Down** from the bottom row opens the animated six-column app drawer.
 - **Up** from the drawer’s first app row returns Home with the corresponding favorite selected.
-- **Up** from favorites reaches the corner controls.
+- **Up** from the top row reaches the corner controls.
 - **Back** closes the drawer and focuses the first favorite.
 - **Settings → General → App sorting** chooses **Alphabetically** (default) or **Usage count**.
   Usage sorts by successful launches from Luma, most used first, with alphabetical ties.

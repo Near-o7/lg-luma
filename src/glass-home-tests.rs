@@ -72,6 +72,8 @@ fn widget_toolbar_pills_are_fixed_ordered_and_remote_and_pointer_accessible() {
     state.back();
     assert_eq!(state.focus, Target::Widget(2));
     state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::FavoriteRows);
+    state.direction(Direction::Right, &controls(&state));
     assert_eq!(state.focus, Target::WidgetReset);
     for language in crate::i18n::Language::ALL {
         state.preferences.language = language;
@@ -95,13 +97,19 @@ fn widget_toolbar_pills_are_fixed_ordered_and_remote_and_pointer_accessible() {
             (shortcuts.rect.x, shortcuts.rect.y, shortcuts.rect.h),
             (640., 164.8, 64.)
         );
-        assert!(shortcuts.rect.x + shortcuts.rect.w + 20. <= reset.rect.x);
+        let rows = rendered
+            .controls
+            .iter()
+            .find(|control| control.target == Target::FavoriteRows)
+            .unwrap();
+        assert!(shortcuts.rect.x + shortcuts.rect.w + 20. <= rows.rect.x);
+        assert!(rows.rect.x + rows.rect.w + 20. <= reset.rect.x);
         assert_eq!((reset.rect.y, reset.rect.h), (164.8, 64.));
         assert!(reset.rect.x >= 640.);
         assert!(reset.rect.x + reset.rect.w + 20. <= add.rect.x);
         assert_eq!(add.rect.x + add.rect.w, 1760.);
-        assert!(!shortcuts.scrollable && !reset.scrollable && !add.scrollable);
-        for control in [shortcuts, reset, add] {
+        assert!(!shortcuts.scrollable && !rows.scrollable && !reset.scrollable && !add.scrollable);
+        for control in [shortcuts, rows, reset, add] {
             let (x, y) = control.rect.center();
             assert_eq!(
                 state.hit_test(&rendered.controls, x, y),
@@ -120,6 +128,86 @@ fn widget_toolbar_pills_are_fixed_ordered_and_remote_and_pointer_accessible() {
         }
         state.scroll = 0.;
     }
+}
+
+#[test]
+fn favorite_rows_save_and_keep_remote_navigation_aligned_with_the_drawer() {
+    let mut state = ready();
+    state.preferences.reduced_motion = true;
+    state.inventory.apps.extend(
+        (0..25).map(|index| {
+            crate::model::App::new(&format!("extra.{index}"), &format!("Extra {index}"))
+        }),
+    );
+    let ids: Vec<_> = state
+        .inventory
+        .apps
+        .iter()
+        .take(13)
+        .map(|app| app.id.clone())
+        .collect();
+    state.preferences.favorites = Some(ids.clone());
+    assert_eq!(state.preferences.home_rows, 1);
+    state.open(2);
+    state.pointer_focus(Target::Sidebar(crate::state::WIDGETS_SECTION));
+    state.direction(Direction::Right, &controls(&state));
+    state.direction(Direction::Left, &controls(&state));
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::FavoriteRows);
+    state.activate();
+    assert_eq!(state.subpage, Some(Subpage::FavoriteRows));
+    assert_eq!(state.focus, Target::Choice(0));
+    state.direction(Direction::Down, &controls(&state));
+    assert!(matches!(state.activate().as_slice(), [Effect::Save]));
+    assert_eq!(state.focus, Target::FavoriteRows);
+    assert_eq!(state.preferences.favorites.as_ref(), Some(&ids));
+    assert_eq!(state.preferences.home_rows, 2);
+    let restored: Preferences = serde_json::from_value(json!(state.preferences)).unwrap();
+    assert_eq!(restored.home_rows, 2);
+
+    state.open(0);
+    let home = controls(&state);
+    let card = |index: usize| {
+        home.iter()
+            .find(|control| control.target == Target::App(ids[index].clone()))
+            .unwrap()
+            .rect
+    };
+    assert_eq!(card(0).x, card(6).x);
+    assert!(card(0).y + card(0).h < card(6).y);
+    assert_eq!(card(0).y, card(12).y);
+    assert!(card(5).x < card(12).x);
+    assert_eq!(card(6).y, 820.);
+    let (x, y) = card(6).center();
+    assert_eq!(
+        state.hit_test(&home, x, y),
+        Some(Target::App(ids[6].clone()))
+    );
+
+    state.direction(Direction::Right, &home);
+    state.direction(Direction::Down, &home);
+    assert_eq!(state.focus, Target::App(ids[7].clone()));
+    state.direction(Direction::Down, &home);
+    assert_eq!(state.page, Page::Apps);
+    assert_eq!(state.focus, Target::App(state.drawer_apps()[1].id.clone()));
+    assert!(state.drawer_grid_top() > 520.);
+    state.direction(Direction::Up, &controls(&state));
+    assert_eq!(state.page, Page::Home);
+    assert_eq!(state.focus, Target::App(ids[7].clone()));
+    state.direction(Direction::Up, &controls(&state));
+    assert_eq!(state.focus, Target::App(ids[1].clone()));
+
+    state.moving = Some(ids[1].clone());
+    assert!(matches!(
+        state.direction(Direction::Down, &home).as_slice(),
+        [Effect::Save]
+    ));
+    assert_eq!(state.dock_apps()[7].id, ids[1]);
+
+    state.open(0);
+    state.scroll_favorites(10000.);
+    assert!((state.home_scroll - crate::state::HOME_TILE_PITCH).abs() < 0.01);
+    assert_eq!(state.first_content(), Target::App(ids[7].clone()));
 }
 
 #[test]

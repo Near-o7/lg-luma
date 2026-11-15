@@ -141,7 +141,7 @@ retain their manual order. The same order fills empty dock slots and the app dra
 `xvfb-run -a pnpm screenshots --sorting` captures the sorting settings, both app orders,
 and the generic disc input icon from the native desktop renderer using seeded local counts.
 
-Home uses a 6×4 placement grid in logical 1920×1080 space above the unchanged six-app dock.
+Home uses a 6×4 placement grid in logical 1920×1080 space above the favorites dock.
 Greeting combines weekday/date and greeting in 4 columns × 1 row; Weather spans 2 columns × 2 rows.
 Greeting uses 90.4px text with 1.05 leading and an 18.4px date in a 32.8px band,
 keeping both lines inside the 128px-tall row; long translations fit to the available width.
@@ -156,7 +156,12 @@ left and Add widget on the right, using the Backgrounds pill style. Empty cells 
 Add catalog directly; it excludes installed widgets. Reset restores the default membership and
 positions, preserving date/weather configuration and the app dock; an already-default reset does not save.
 The preview shows only widget placements over the wallpaper, without a gray dock placeholder.
-Shortcuts uses a fixed pill at the top left of the preview toolbar. Inputs is a separate sidebar section directly
+Shortcuts and Favorite rows sit on the left of the preview toolbar. Favorite rows persists
+`home_rows` (1 by default, or 2). The dock fills six columns per page in reading order and
+scrolls horizontally if more favorites are pinned. When two rows are selected, the four
+widget rows fit above the taller dock without changing their saved anchors. Down opens
+the drawer from the lowest occupied dock row. Above the drawer, the dock keeps both rows.
+Inputs is a separate sidebar section directly
 below Apps, not a widget. Its list and individual input/icon settings retain focus on return.
 Move and Add open a placement preview; arrows browse
 all twenty-four anchors, OK/click saves a valid placement, and Back cancels without changing preferences.

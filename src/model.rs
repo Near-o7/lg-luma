@@ -340,6 +340,7 @@ pub struct Preferences {
     #[serde(rename = "date_position", skip_serializing)]
     pub legacy_date_position: Option<WidgetPosition>,
     pub favorites: Option<Vec<String>>,
+    pub home_rows: u8,
     pub custom_tiles: Vec<CustomTile>,
     pub hidden: Vec<String>,
     pub background: String,
@@ -386,6 +387,7 @@ impl Default for Preferences {
             weather_position: HomeWidget::Weather.default_position(),
             legacy_date_position: None,
             favorites: None,
+            home_rows: 1,
             custom_tiles: vec![],
             hidden: vec![],
             background: "dunes".into(),
@@ -611,6 +613,7 @@ impl Preferences {
     }
 
     pub fn sanitize(&mut self) {
+        self.home_rows = self.home_rows.clamp(1, 2);
         // Collapse the previous draft's untouched separate-Date arrangement.
         // Custom Greeting/Weather anchors remain unchanged.
         if self.legacy_date_position.take().is_some()
