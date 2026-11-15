@@ -320,12 +320,19 @@ pub const KEYS: [&str; 40] = [
     "Delete", "Clear", "Done",
 ];
 
-const DRAWER_SCROLL_DURATION: Duration = Duration::from_millis(220);
+const DRAWER_TRANSITION_SECONDS: f32 = 0.3;
+
+fn animation_frame_delta(previous: Instant, now: Instant) -> f32 {
+    now.saturating_duration_since(previous)
+        .as_secs_f32()
+        .min(0.05)
+}
 
 struct DrawerScrollMotion {
     from: f32,
     presented: f32,
-    started: Instant,
+    progress: f32,
+    updated: Instant,
 }
 
 fn smoothstep(progress: f32) -> f32 {
@@ -513,10 +520,7 @@ impl State {
     pub fn tick(&mut self) {
         let now = Instant::now();
         let goal = if self.page == Page::Apps { 1. } else { 0. };
-        let dt = now
-            .duration_since(self.drawer_updated)
-            .as_secs_f32()
-            .min(0.05);
+        let dt = animation_frame_delta(self.drawer_updated, now);
         self.drawer_updated = now;
         self.animate_input_status(dt);
         self.advance_drawer_scroll(now);
@@ -524,7 +528,7 @@ impl State {
             self.drawer_visibility = if self.preferences.reduced_motion {
                 goal
             } else {
-                let step = dt / 0.3;
+                let step = dt / DRAWER_TRANSITION_SECONDS;
                 if goal > self.drawer_visibility {
                     (self.drawer_visibility + step).min(goal)
                 } else {
@@ -763,7 +767,8 @@ impl State {
             .then(|| DrawerScrollMotion {
                 from,
                 presented: from,
-                started: Instant::now(),
+                progress: 0.,
+                updated: Instant::now(),
             });
         self.scroll = scroll;
         self.dirty = true;
@@ -773,12 +778,14 @@ impl State {
         let Some(motion) = &mut self.drawer_scroll_motion else {
             return;
         };
-        let progress = now.saturating_duration_since(motion.started).as_secs_f32()
-            / DRAWER_SCROLL_DURATION.as_secs_f32();
-        if progress >= 1. || self.preferences.reduced_motion {
+        let dt = animation_frame_delta(motion.updated, now);
+        motion.updated = now;
+        motion.progress += dt / DRAWER_TRANSITION_SECONDS;
+        if motion.progress >= 1. || self.preferences.reduced_motion {
             self.drawer_scroll_motion = None;
         } else {
-            motion.presented = motion.from + (self.scroll - motion.from) * smoothstep(progress);
+            motion.presented =
+                motion.from + (self.scroll - motion.from) * smoothstep(motion.progress);
         }
         self.dirty = true;
     }

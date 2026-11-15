@@ -932,7 +932,10 @@ fn taller_favorites_dock_scrolls_with_the_drawer() {
         assert!(state.animating());
         state.advance_drawer_scroll(Instant::now() + Duration::from_millis(100));
         let midway = state.drawer_scroll();
-        assert!(midway > 0. && midway < state.scroll);
+        assert!(
+            (13. ..14.).contains(&midway),
+            "a late frame advances by at most one 50 ms animation step"
+        );
         let scrolled = scene(&state);
         let card = grid_control(&scrolled);
         assert!((state.dock_y() - (initial_dock_y - midway)).abs() < 0.01);
@@ -953,7 +956,10 @@ fn taller_favorites_dock_scrolls_with_the_drawer() {
             midway,
             "a new target should start at the visible position"
         );
-        state.advance_drawer_scroll(Instant::now() + Duration::from_millis(250));
+        let started = Instant::now();
+        for frame in 1..=16 {
+            state.advance_drawer_scroll(started + Duration::from_millis(frame * 20));
+        }
         assert_eq!(state.drawer_scroll(), 270.);
 
         state.focus = grid_app;
