@@ -1,7 +1,7 @@
 use crate::i18n::Language;
 use crate::model::{
     App, BACKGROUNDS, CUSTOM_TILE_PREFIX, CustomTile, HOME_GRID_CELLS, HOME_GRID_COLUMNS,
-    HomeWidget, INPUT_NAME_LIMIT, InputMode, Inventory, Preferences, WidgetPosition,
+    HomeWidget, INPUT_NAME_LIMIT, InputMode, Inventory, MAX_HOME_ROWS, Preferences, WidgetPosition,
     clean_input_name,
 };
 use crate::text_rendering::TextRendering;
@@ -36,7 +36,6 @@ pub const HOME_STRIP_RIGHT: f32 = 1836.;
 pub const HOME_TILE_WIDTH: f32 = 270.;
 pub const HOME_TILE_HEIGHT: f32 = 154.4;
 pub const DOCK_PADDING: f32 = 24.;
-pub const DOCK_ROW_PITCH: f32 = HOME_TILE_HEIGHT + 24.;
 pub const DRAWER_DOCK_Y: f32 = 164.8;
 pub const HOME_TILE_PITCH: f32 = 296.4;
 pub const HOME_FADE_LEFT: f32 = 8.;
@@ -53,8 +52,39 @@ impl DockLayout {
         self.rows * APPS_COLUMNS
     }
 
+    fn tile_height(&self) -> f32 {
+        if self.rows == 3 {
+            134.
+        } else {
+            HOME_TILE_HEIGHT
+        }
+    }
+
+    fn row_pitch(&self) -> f32 {
+        self.tile_height() + if self.rows == 3 { 18. } else { 24. }
+    }
+
     pub fn height(&self) -> f32 {
-        HOME_TILE_HEIGHT + (self.rows - 1) as f32 * DOCK_ROW_PITCH
+        self.tile_height() + (self.rows - 1) as f32 * self.row_pitch()
+    }
+
+    pub fn bounds(&self, y: f32) -> Rect {
+        Rect::new(
+            HOME_STRIP_LEFT - DOCK_PADDING,
+            y - DOCK_PADDING,
+            HOME_STRIP_RIGHT - HOME_STRIP_LEFT + 2. * DOCK_PADDING,
+            self.height() + 2. * DOCK_PADDING,
+        )
+    }
+
+    pub fn card(&self, index: usize, y: f32, scroll: f32) -> Rect {
+        let (column, row) = self.position(index);
+        Rect::new(
+            HOME_STRIP_LEFT + column as f32 * HOME_TILE_PITCH - scroll,
+            y + row as f32 * self.row_pitch(),
+            HOME_TILE_WIDTH,
+            self.tile_height(),
+        )
     }
 
     // Fill each six-column page in reading order, then continue to the right.
@@ -90,7 +120,10 @@ impl DockLayout {
         let (column, row) = self.position(index);
         match direction {
             Direction::Left => column.checked_sub(1).map(|column| self.index(column, row)),
-            Direction::Right => Some(self.index(column + 1, row)),
+            Direction::Right => (0..=row)
+                .rev()
+                .map(|row| self.index(column + 1, row))
+                .find(|next| *next < count),
             Direction::Up => row
                 .checked_sub(1)
                 .and_then(|row| self.index_in_row(column, row, count)),
@@ -662,7 +695,7 @@ impl State {
     }
 
     pub fn home_dock_y(&self) -> f32 {
-        820. - (self.dock_layout().rows - 1) as f32 * DOCK_ROW_PITCH
+        820. + HOME_TILE_HEIGHT - self.dock_layout().height()
     }
 
     pub fn dock_y(&self) -> f32 {
@@ -830,7 +863,7 @@ impl State {
                     self.app_settings_viewport()
                 } else if self.page == Page::Apps {
                     let mut viewport = self.apps_viewport();
-                    if self.preferences.home_rows == 2 && matches!(control.target, Target::App(_)) {
+                    if self.preferences.home_rows > 1 && matches!(control.target, Target::App(_)) {
                         let top = self.drawer_grid_top() - DRAWER_PADDING;
                         viewport.h -= top - viewport.y;
                         viewport.y = top;
@@ -1424,15 +1457,19 @@ impl State {
                 Direction::Up if index >= HOME_GRID_COLUMNS => {
                     Target::WidgetCell(index - HOME_GRID_COLUMNS)
                 }
-                Direction::Up => match index % HOME_GRID_COLUMNS {
-                    0 => Target::Widget(2),
-                    1 | 2 => Target::FavoriteRows,
-                    3 => Target::WidgetReset,
-                    _ => Target::WidgetAdd,
-                },
+                Direction::Up => {
+                    if index % HOME_GRID_COLUMNS == 0 {
+                        Target::Widget(2)
+                    } else if index % HOME_GRID_COLUMNS == 1 {
+                        Target::WidgetReset
+                    } else {
+                        Target::WidgetAdd
+                    }
+                }
                 Direction::Down if index + HOME_GRID_COLUMNS < HOME_GRID_CELLS => {
                     Target::WidgetCell(index + HOME_GRID_COLUMNS)
                 }
+                Direction::Down => Target::FavoriteRows,
                 _ => self.focus.clone(),
             };
             self.focus(target, controls);
@@ -1444,19 +1481,31 @@ impl State {
             && self.subpage.is_none()
             && matches!(
                 self.focus,
-                Target::WidgetAdd | Target::WidgetReset | Target::FavoriteRows | Target::Widget(2)
+                Target::WidgetAdd | Target::WidgetReset | Target::Widget(2)
             )
         {
             let target = match direction {
                 Direction::Left if self.focus == Target::WidgetAdd => Target::WidgetReset,
-                Direction::Left if self.focus == Target::WidgetReset => Target::FavoriteRows,
-                Direction::Left if self.focus == Target::FavoriteRows => Target::Widget(2),
+                Direction::Left if self.focus == Target::WidgetReset => Target::Widget(2),
                 Direction::Left => Target::Sidebar(WIDGETS_SECTION),
-                Direction::Right if self.focus == Target::Widget(2) => Target::FavoriteRows,
-                Direction::Right if self.focus == Target::FavoriteRows => Target::WidgetReset,
+                Direction::Right if self.focus == Target::Widget(2) => Target::WidgetReset,
                 Direction::Right => Target::WidgetAdd,
                 Direction::Up => Target::SettingsMenu,
                 Direction::Down => Target::WidgetCell(0),
+            };
+            self.focus(target, controls);
+            return vec![];
+        }
+        if self.overlay.is_none()
+            && self.page == Page::Settings
+            && self.section == WIDGETS_SECTION
+            && self.subpage.is_none()
+            && self.focus == Target::FavoriteRows
+        {
+            let target = match direction {
+                Direction::Up => Target::WidgetCell(HOME_GRID_CELLS - HOME_GRID_COLUMNS),
+                Direction::Left => Target::Sidebar(WIDGETS_SECTION),
+                _ => return vec![],
             };
             self.focus(target, controls);
             return vec![];
@@ -1657,7 +1706,7 @@ impl State {
                             .saturating_sub(self.first_dock_column());
                         self.open(1);
                         let apps = self.apps();
-                        self.focus = if layout.rows == 2 && !apps.is_empty() {
+                        self.focus = if layout.rows > 1 && !apps.is_empty() {
                             Target::App(
                                 apps[column.min(APPS_COLUMNS - 1).min(apps.len() - 1)]
                                     .id
@@ -1721,9 +1770,9 @@ impl State {
                         | Subpage::TimeFormat
                         | Subpage::Temperature
                         | Subpage::TextRendering
-                        | Subpage::AppSorting
-                        | Subpage::FavoriteRows,
+                        | Subpage::AppSorting,
                     ) => 2,
+                    Some(Subpage::FavoriteRows) => usize::from(MAX_HOME_ROWS),
                     Some(Subpage::InputIcons(_)) => crate::model::INPUT_ICONS.len() + 1,
                     Some(Subpage::Language) => Language::ALL.len(),
                     Some(Subpage::DateFormat) => crate::model::DateFormat::ALL.len(),
@@ -1969,7 +2018,7 @@ impl State {
                             let dock = self.dock_apps();
                             let layout = self.dock_layout();
                             let scroll = self.home_scroll;
-                            let column = if layout.rows == 2 {
+                            let column = if layout.rows > 1 {
                                 index + self.first_dock_column()
                             } else {
                                 index
@@ -1980,7 +2029,7 @@ impl State {
                             );
                             // Return to the dock in the same visible column.
                             self.open(0);
-                            if layout.rows == 2 {
+                            if layout.rows > 1 {
                                 self.home_scroll = scroll;
                             }
                             Some(target)
@@ -2967,7 +3016,7 @@ impl State {
                         };
                     }
                     Some(Subpage::FavoriteRows) => {
-                        if index > 1 {
+                        if index >= usize::from(MAX_HOME_ROWS) {
                             return vec![];
                         }
                         let rows = index as u8 + 1;

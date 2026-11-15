@@ -386,12 +386,15 @@ try {
   assert.ok(widgets.ui_text.includes('Greeting'));
   assert.ok(!widgets.ui_text.includes('Date'));
 
+  assert.ok(widgets.ui_text.includes('Favorites'));
+
   const previousRowsPreferences = await fs.readFile(preferences, 'utf8');
-  const rowsPage = `${widgetsPage},left,left,enter`;
+  const rowsPage = `${widgetsPage},down,down,down,down,down,enter`;
   const rowsPicker = await scenario('widget-favorite-rows-picker', rowsPage);
-  assert.ok(rowsPicker.ui_text.includes('Favorite rows'));
+  assert.ok(rowsPicker.ui_text.includes('Favorites'));
   assert.ok(rowsPicker.ui_text.includes('One row'));
   assert.ok(rowsPicker.ui_text.includes('Two rows'));
+  assert.ok(rowsPicker.ui_text.includes('Three rows'));
   assert.deepEqual(rowsPicker.focus, { Choice: 0 });
   const twoRows = await scenario('widget-favorite-rows-home', `${rowsPage},down,enter,home,down`);
   assert.equal(twoRows.preferences.home_rows, 2);
@@ -517,7 +520,7 @@ try {
       favorites: [...beforeShortcut.favorites, 'custom.sandmann'],
     }),
   );
-  const shortcutsPage = `${widgetsPage},left,left,left,enter`;
+  const shortcutsPage = `${widgetsPage},left,left,enter`;
   const shortcut = await scenario('shortcut-settings', shortcutsPage);
   assert.equal(shortcut.focus, 'TileEditor');
   assert.equal(shortcut.subpage, 'Shortcuts');

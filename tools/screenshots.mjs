@@ -48,7 +48,7 @@ const captures = widgetPreviews
       ['home-layout-settings', widgetsPage],
       ['home-widget-actions', `${widgetsPage},down,enter`],
       ['home-widget-add', `${widgetsPage},enter`],
-      ['home-widget-shortcuts', `${widgetsPage},left,left,left,enter`],
+      ['home-widget-shortcuts', `${widgetsPage},left,left,enter`],
       ['input-settings', 'settings,down,down,right'],
     ]
   : weatherPreviews

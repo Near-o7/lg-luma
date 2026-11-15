@@ -52,10 +52,11 @@ block with a condition icon, temperature, condition, and location. The combined 
 the original small, spaced weekday/date above a large, tightly tracked greeting. Greeting settings
 include a date visibility toggle and date-format choices; Date is not a separate widget.
 
-- **Settings → Widgets → Favorite rows** saves a choice of **One row** (default) or **Two rows**.
-  Each row has six visible slots. Additional favorites continue to the right.
-- **Left / Right** browses favorites. With two rows, **Up / Down** also moves between them.
-  Hold **OK** to reorder favorites.
+- In **Settings → Widgets**, select the **Favorites** dock in the grid preview to choose **One row**
+  (default), **Two rows**, or **Three rows**. Each row has six visible slots, and additional
+  favorites continue to the right.
+- **Left / Right** browses favorites, and **Up / Down** moves between rows. If the next column
+  has a card only in a higher row, **Right** moves to that card. Hold **OK** to reorder favorites.
 - **Down** from the bottom row opens the animated six-column app drawer.
 - **Up** from the drawer’s first app row returns Home with the corresponding favorite selected.
 - **Up** from the top row reaches the corner controls.

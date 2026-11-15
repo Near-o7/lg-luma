@@ -72,8 +72,6 @@ fn widget_toolbar_pills_are_fixed_ordered_and_remote_and_pointer_accessible() {
     state.back();
     assert_eq!(state.focus, Target::Widget(2));
     state.direction(Direction::Right, &controls(&state));
-    assert_eq!(state.focus, Target::FavoriteRows);
-    state.direction(Direction::Right, &controls(&state));
     assert_eq!(state.focus, Target::WidgetReset);
     for language in crate::i18n::Language::ALL {
         state.preferences.language = language;
@@ -97,19 +95,13 @@ fn widget_toolbar_pills_are_fixed_ordered_and_remote_and_pointer_accessible() {
             (shortcuts.rect.x, shortcuts.rect.y, shortcuts.rect.h),
             (640., 164.8, 64.)
         );
-        let rows = rendered
-            .controls
-            .iter()
-            .find(|control| control.target == Target::FavoriteRows)
-            .unwrap();
-        assert!(shortcuts.rect.x + shortcuts.rect.w + 20. <= rows.rect.x);
-        assert!(rows.rect.x + rows.rect.w + 20. <= reset.rect.x);
+        assert!(shortcuts.rect.x + shortcuts.rect.w + 20. <= reset.rect.x);
         assert_eq!((reset.rect.y, reset.rect.h), (164.8, 64.));
         assert!(reset.rect.x >= 640.);
         assert!(reset.rect.x + reset.rect.w + 20. <= add.rect.x);
         assert_eq!(add.rect.x + add.rect.w, 1760.);
-        assert!(!shortcuts.scrollable && !rows.scrollable && !reset.scrollable && !add.scrollable);
-        for control in [shortcuts, rows, reset, add] {
+        assert!(!shortcuts.scrollable && !reset.scrollable && !add.scrollable);
+        for control in [shortcuts, reset, add] {
             let (x, y) = control.rect.center();
             assert_eq!(
                 state.hit_test(&rendered.controls, x, y),
@@ -151,8 +143,9 @@ fn favorite_rows_save_and_keep_remote_navigation_aligned_with_the_drawer() {
     state.open(2);
     state.pointer_focus(Target::Sidebar(crate::state::WIDGETS_SECTION));
     state.direction(Direction::Right, &controls(&state));
-    state.direction(Direction::Left, &controls(&state));
-    state.direction(Direction::Left, &controls(&state));
+    for _ in 0..=crate::model::HOME_GRID_ROWS {
+        state.direction(Direction::Down, &controls(&state));
+    }
     assert_eq!(state.focus, Target::FavoriteRows);
     state.activate();
     assert_eq!(state.subpage, Some(Subpage::FavoriteRows));
@@ -208,6 +201,34 @@ fn favorite_rows_save_and_keep_remote_navigation_aligned_with_the_drawer() {
     state.scroll_favorites(10000.);
     assert!((state.home_scroll - crate::state::HOME_TILE_PITCH).abs() < 0.01);
     assert_eq!(state.first_content(), Target::App(ids[7].clone()));
+
+    // The next page holds a top-row card but no card in the lower row.
+    state.focus = Target::App(state.dock_apps()[11].id.clone());
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::App(ids[12].clone()));
+
+    state.open(2);
+    state.pointer_focus(Target::Sidebar(crate::state::WIDGETS_SECTION));
+    state.pointer_focus(Target::FavoriteRows);
+    state.activate();
+    assert_eq!(state.focus, Target::Choice(1));
+    state.direction(Direction::Down, &controls(&state));
+    assert!(matches!(state.activate().as_slice(), [Effect::Save]));
+    assert_eq!(state.preferences.home_rows, 3);
+    assert_eq!(state.focus, Target::FavoriteRows);
+
+    state.open(0);
+    let dock = state.dock_apps();
+    assert_eq!(dock.len(), 18);
+    let third_row = Target::App(dock[12].id.clone());
+    state.direction(Direction::Down, &controls(&state));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, third_row);
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.page, Page::Apps);
+    state.direction(Direction::Up, &controls(&state));
+    assert_eq!(state.page, Page::Home);
+    assert_eq!(state.focus, third_row);
 }
 
 #[test]

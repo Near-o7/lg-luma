@@ -155,12 +155,11 @@ Configure/Move/Remove popup. A fixed, right-aligned toolbar above the preview co
 left and Add widget on the right, using the Backgrounds pill style. Empty cells also open the
 Add catalog directly; it excludes installed widgets. Reset restores the default membership and
 positions, preserving date/weather configuration and the app dock; an already-default reset does not save.
-The preview shows only widget placements over the wallpaper, without a gray dock placeholder.
-Shortcuts and Favorite rows sit on the left of the preview toolbar. Favorite rows persists
-`home_rows` (1 by default, or 2). The dock fills six columns per page in reading order and
-scrolls horizontally if more favorites are pinned. When two rows are selected, the four
-widget rows fit above the taller dock without changing their saved anchors. Down opens
-the drawer from the lowest occupied dock row. Above the drawer, the dock keeps both rows.
+The preview shows the Favorites dock beneath the widget placements. Select it to persist
+`home_rows` (1 by default, or 2 or 3). The dock fills six columns per page in reading order and
+scrolls if more favorites are pinned. Right moves up to an occupied row if the next column is
+empty on the selected row. With multiple rows, widget cells fit above the taller dock without
+changing saved anchors. Down opens the drawer from the lowest occupied row.
 Inputs is a separate sidebar section directly
 below Apps, not a widget. Its list and individual input/icon settings retain focus on return.
 Move and Add open a placement preview; arrows browse

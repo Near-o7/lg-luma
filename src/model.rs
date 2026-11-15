@@ -255,6 +255,7 @@ impl WeatherStyle {
     }
 }
 
+pub const MAX_HOME_ROWS: u8 = 3;
 pub const HOME_GRID_COLUMNS: usize = 6;
 pub const HOME_GRID_ROWS: usize = 4;
 pub const HOME_GRID_CELLS: usize = HOME_GRID_COLUMNS * HOME_GRID_ROWS;
@@ -613,7 +614,7 @@ impl Preferences {
     }
 
     pub fn sanitize(&mut self) {
-        self.home_rows = self.home_rows.clamp(1, 2);
+        self.home_rows = self.home_rows.clamp(1, MAX_HOME_ROWS);
         // Collapse the previous draft's untouched separate-Date arrangement.
         // Custom Greeting/Weather anchors remain unchanged.
         if self.legacy_date_position.take().is_some()
