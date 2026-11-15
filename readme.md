@@ -30,7 +30,7 @@ https://github.com/user-attachments/assets/5b2c6e78-ec77-41f5-a79a-1fcfbe8e524b
 
 ## Home and app drawer
 
-Home widgets use an invisible **6×4 placement grid** above the favorites dock.
+Home widgets use an invisible **6×5 placement grid**, including the Favorites dock.
 **Greeting** combines the weekday/date and greeting in **4 columns × 1 row**;
 **Weather** is **2 columns × 2 rows**. By default Greeting sits at the top left and
 Weather at the top right, spanning the first two rows. Empty cells remain transparent.
@@ -41,7 +41,7 @@ widgets not already on Home; empty cells also open it directly. Configure opens 
 without a show/hide switch; removing frees its cells but keeps its configuration for re-adding.
 Use the arrows or point at a cell to choose its top-left anchor, then **OK / click** to save;
 **Back** cancels. Red placements overlap the other widget or exceed the grid and cannot be saved.
-Widget sizes cannot be changed. Reset restores the default widgets and their positions without
+Greeting and Weather have fixed sizes. Reset restores the default widgets and their positions without
 clearing their configuration. A **Shortcuts** pill sits at the top left. Inputs has its own sidebar section,
 directly below Apps, and is not a widget.
 There is no configurable greeting name;
@@ -55,7 +55,7 @@ include a date visibility toggle and date-format choices; Date is not a separate
 - In **Settings → Widgets**, select **Favorites** in the grid preview. **Configure** sets
   **One row** (default), **Two rows**, or **Three rows**. The multi-row layouts show pinned
   favorites, with six slots per row. Additional favorites continue to the right.
-- **Move** puts the dock at the top or bottom of Home. **Remove widget** hides the dock and
+- **Move** uses the same grid editor as the other widgets. Favorites spans all six columns. **Remove widget** hides the dock and
   leaves an **Apps** button for opening the drawer. Use **Add widget** to restore Favorites.
 - **Left / Right** browses favorites, and **Up / Down** moves between rows. If the next column
   has a card only in a higher row, **Right** moves to that card. Hold **OK** to reorder favorites.

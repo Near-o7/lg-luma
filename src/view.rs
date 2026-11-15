@@ -2,14 +2,15 @@
 use crate::{
     i18n::Language,
     model::{
-        App, BACKGROUNDS, HOME_GRID_CELLS, HOME_GRID_COLUMNS, HOME_GRID_ROWS, HomeWidget, Input,
-        InputMode, WidgetPosition,
+        App, BACKGROUNDS, HOME_GRID_CELLS, HOME_GRID_COLUMNS, HomeWidget, Input, InputMode,
+        WidgetPosition,
     },
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
-        APPS_COLUMNS, APPS_SECTION, Control, DOCK_PADDING, DRAWER_DOCK_Y, HOME_FADE_LEFT,
-        HOME_FADE_RIGHT, HOME_STRIP_LEFT, HOME_STRIP_RIGHT, HOME_TILE_HEIGHT, INPUTS_SECTION, KEYS,
-        Overlay, Page, Rect, SYSTEM_SECTION, State, Subpage, Target, TextField, WIDGETS_SECTION,
+        APPS_COLUMNS, APPS_SECTION, Control, DRAWER_DOCK_Y, HOME_FADE_LEFT, HOME_FADE_RIGHT,
+        HOME_GRID_PITCH_Y, HOME_GRID_TOP, HOME_STRIP_LEFT, HOME_STRIP_RIGHT, HOME_TILE_HEIGHT,
+        INPUTS_SECTION, KEYS, Overlay, Page, Rect, SYSTEM_SECTION, State, Subpage, Target,
+        TextField, WIDGETS_SECTION,
     },
     weather::{self, Unit},
 };
@@ -612,7 +613,6 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         | Overlay::BackgroundOptions { .. }
         | Overlay::BackgroundDelete { .. }
         | Overlay::WidgetOptions { .. }
-        | Overlay::FavoritesOptions
         | Overlay::WidgetCatalog { .. }
         | Overlay::Keyboard
         | Overlay::WallpaperUpload
@@ -643,12 +643,9 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
         }
         match overlay {
-            Overlay::WidgetOptions { cell } => {
-                widget_menu(&mut out, state, assets, Some(*cell), false)
-            }
-            Overlay::FavoritesOptions => widget_menu(&mut out, state, assets, None, false),
+            Overlay::WidgetOptions { cell } => widget_menu(&mut out, state, assets, *cell, false),
             Overlay::WidgetCatalog { cell, .. } => {
-                widget_menu(&mut out, state, assets, Some(*cell), true)
+                widget_menu(&mut out, state, assets, *cell, true)
             }
             Overlay::Options { id, .. } | Overlay::BackgroundOptions { id, .. } => {
                 options(&mut out, state, assets, id, anchor)
@@ -1188,7 +1185,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     if state.preferences.show_favorites_dock {
         favorites_dock(out, state, assets);
     } else {
-        let rect = Rect::new(836., 898., 248., 64.);
+        let rect = Rect::new(836., 993., 248., 60.);
         let focused = state.focus == Target::OpenDrawer;
         out.pill(rect, focused, false);
         let color = if focused { c(0x242424, 1.) } else { WHITE };
@@ -1203,93 +1200,35 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     }
 }
 
-#[derive(Clone, Copy)]
-struct WidgetGrid {
-    top: f32,
-    bottom: f32,
-    gap: f32,
-}
-
-impl WidgetGrid {
-    const DEFAULT: Self = Self {
-        top: 188.,
-        bottom: 772.,
-        gap: 24.,
-    };
-
-    fn home(state: &State) -> Self {
-        if !state.preferences.show_favorites_dock {
-            Self::DEFAULT
-        } else if state.preferences.favorites_dock_top {
-            let top = state.home_dock_y() + state.dock_layout().height() + DOCK_PADDING + 24.;
-            let bottom = (top + 584.).min(984.);
-            Self {
-                top,
-                bottom,
-                gap: if bottom - top >= 584. { 24. } else { 12. },
-            }
-        } else if state.dock_layout().rows > 1 {
-            Self {
-                top: 156.,
-                bottom: state.home_dock_y() - DOCK_PADDING - 24.,
-                gap: 12.,
-            }
-        } else {
-            Self::DEFAULT
-        }
-    }
-
-    // Keep placement targets at a consistent size throughout the editor.
-    fn editor(state: &State) -> Self {
-        if state.preferences.show_favorites_dock && state.preferences.favorites_dock_top {
-            Self {
-                top: Self::DEFAULT.top + 160.,
-                bottom: Self::DEFAULT.bottom + 160.,
-                ..Self::DEFAULT
-            }
-        } else {
-            Self::DEFAULT
-        }
-    }
-
-    fn cell(self, position: WidgetPosition) -> Rect {
-        let width = (1752. - (HOME_GRID_COLUMNS - 1) as f32 * 24.) / HOME_GRID_COLUMNS as f32;
-        let height = (self.bottom - self.top - (HOME_GRID_ROWS - 1) as f32 * self.gap)
-            / HOME_GRID_ROWS as f32;
-        Rect::new(
-            84. + f32::from(position.column) * (width + 24.),
-            self.top + f32::from(position.row) * (height + self.gap),
-            width,
-            height,
-        )
-    }
-
-    fn widget(self, widget: HomeWidget, position: WidgetPosition) -> Rect {
-        let (width, height) = widget.span();
-        let cell = self.cell(position);
-        Rect::new(
-            cell.x,
-            cell.y,
-            f32::from(width) * (cell.w + 24.) - 24.,
-            f32::from(height) * (cell.h + self.gap) - self.gap,
-        )
-    }
+fn home_grid_cell_rect(position: WidgetPosition) -> Rect {
+    let width = (1752. - (HOME_GRID_COLUMNS - 1) as f32 * 24.) / HOME_GRID_COLUMNS as f32;
+    Rect::new(
+        84. + f32::from(position.column) * (width + 24.),
+        HOME_GRID_TOP + f32::from(position.row) * HOME_GRID_PITCH_Y,
+        width,
+        128.,
+    )
 }
 
 fn home_widget_rect(state: &State, widget: HomeWidget, position: WidgetPosition) -> Rect {
-    WidgetGrid::home(state).widget(widget, position)
+    let (width, height) = state.preferences.widget_span(widget);
+    let cell = home_grid_cell_rect(position);
+    Rect::new(
+        cell.x,
+        cell.y,
+        f32::from(width) * (cell.w + 24.) - 24.,
+        cell.h + f32::from(height - 1) * HOME_GRID_PITCH_Y,
+    )
 }
 
 fn home_widgets(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let start = out.draw.len();
     let language = state.preferences.language;
-    for widget in HomeWidget::ALL {
-        let cell = home_widget_rect(state, widget, state.preferences.widget_position(widget));
-        if (widget == HomeWidget::Greeting && !state.preferences.show_greeting)
-            || (widget == HomeWidget::Weather && !state.preferences.show_weather)
-        {
+    for widget in [HomeWidget::Greeting, HomeWidget::Weather] {
+        if !state.preferences.has_widget(widget) {
             continue;
         }
+        let cell = home_widget_rect(state, widget, state.preferences.widget_position(widget));
         if widget == HomeWidget::Weather {
             let mut summary = weather_summary_layout(state, assets);
             // Reflow rather than shrinking the entire widget: text remains legible
@@ -2290,7 +2229,7 @@ fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
                 Some(Subpage::Greeting) => language.t("greeting"),
                 Some(Subpage::Weather) => language.t("weather"),
                 Some(Subpage::Shortcuts) => language.t("shortcuts"),
-                Some(Subpage::FavoriteRows | Subpage::FavoritesPosition) => language.t("favorites"),
+                Some(Subpage::FavoriteRows) => language.t("favorites"),
                 Some(Subpage::Clock) => language.t("clock"),
                 Some(Subpage::Language) => language.t("language"),
                 Some(Subpage::AppSorting) => language.t("appSorting"),
@@ -2403,18 +2342,6 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     )
                 })
                 .collect(),
-            Subpage::FavoritesPosition => vec![
-                (
-                    language.t("dockTop"),
-                    None,
-                    state.preferences.favorites_dock_top,
-                ),
-                (
-                    language.t("dockBottom"),
-                    None,
-                    !state.preferences.favorites_dock_top,
-                ),
-            ],
             Subpage::FavoriteRows => ["oneRow", "twoRows", "threeRows"]
                 .into_iter()
                 .enumerate()
@@ -2996,36 +2923,11 @@ fn widget_preview_top(state: &State) -> f32 {
     }
 }
 
-const DOCK_PREVIEW_HEIGHT: f32 = 32.;
-const DOCK_PREVIEW_PITCH: f32 = 42.;
-const DOCK_PREVIEW_INSET: f32 = 14.;
-
-fn widget_preview_rect(state: &State) -> Rect {
-    Rect::new(640., widget_preview_top(state) - state.scroll, 1120., 630.)
-}
-
-fn favorites_preview_rect(state: &State) -> Rect {
-    let preview = widget_preview_rect(state);
-    let scale = preview.w / 1920.;
-    let layout = state.dock_layout();
-    let logical = layout.bounds(0.);
-    let height = 2. * DOCK_PREVIEW_INSET
-        + DOCK_PREVIEW_HEIGHT
-        + (layout.rows - 1) as f32 * DOCK_PREVIEW_PITCH;
-    let y = if state.preferences.favorites_dock_top {
-        preview.y + 20.
-    } else {
-        preview.y + preview.h - 20. - height
-    };
-    Rect::new(preview.x + logical.x * scale, y, logical.w * scale, height)
-}
-
 fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<HomeWidget>) {
     let language = state.preferences.language;
     // A scaled Home canvas: cell anchors remain separate hit targets even when
     // the preview widget spans multiple cells. Browsing never changes saved positions.
-    let preview = widget_preview_rect(state);
-    let grid = WidgetGrid::editor(state);
+    let preview = Rect::new(640., widget_preview_top(state) - state.scroll, 1120., 630.);
     let background = state
         .wallpapers
         .iter()
@@ -3047,11 +2949,15 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
     };
     for cell in 0..HOME_GRID_CELLS {
         let position = WidgetPosition::from_cell(cell).unwrap();
-        let rect = map(grid.cell(position));
+        let rect = map(home_grid_cell_rect(position));
         out.border(rect, 8., 1., c(0xffffff, 0.24));
         out.control(
             if moving.is_some() {
-                Target::Choice(cell)
+                Target::Choice(if moving == Some(HomeWidget::Favorites) {
+                    cell - cell % HOME_GRID_COLUMNS
+                } else {
+                    cell
+                })
             } else {
                 Target::WidgetCell(cell)
             },
@@ -3063,69 +2969,64 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
         .into_iter()
         .filter(|other| Some(*other) != moving && state.preferences.has_widget(*other))
     {
-        let rect = map(grid.widget(other, state.preferences.widget_position(other)));
-        out.shape(rect, 8., c(0x69737c, 0.65));
+        let position = state.preferences.widget_position(other);
+        let rect = map(home_widget_rect(state, other, position));
+        if other == HomeWidget::Favorites {
+            let layout = state.dock_layout();
+            let occupied = state.dock_apps().len();
+            out.shape(rect, 8., c(0x1c232b, 0.84));
+            for index in 0..layout.capacity() {
+                let (column, row) = layout.position(index);
+                let tile = map(home_grid_cell_rect(WidgetPosition {
+                    column: column as u8,
+                    row: position.row + row as u8,
+                }))
+                .inset(6.);
+                if index < occupied {
+                    out.shape(tile, 8., c(0xe2e9ef, 0.20));
+                } else {
+                    out.border(tile, 8., 1., c(0xffffff, 0.24));
+                }
+            }
+        } else {
+            out.shape(rect, 8., c(0x69737c, 0.65));
+        }
         let (label, style) = assets.fit_line(
             language.t(other.key()),
-            text(22., 500, 0.),
+            text(22., 550, 0.),
             rect.w - 24.,
             16.,
         );
-        out.text(label, rect.inset(12.), style, WHITE, true);
-    }
-    if state.preferences.show_favorites_dock {
-        let layout = state.dock_layout();
-        let dock = favorites_preview_rect(state);
-        let occupied = state.dock_apps().len();
-        out.shape(dock, 12., c(0x1c232b, 0.84));
-        for index in 0..layout.capacity() {
-            let (_, row) = layout.position(index);
-            let card = map(layout.card(index, 0., 0.));
-            let card = Rect::new(
-                card.x,
-                dock.y + DOCK_PREVIEW_INSET + row as f32 * DOCK_PREVIEW_PITCH,
-                card.w,
-                DOCK_PREVIEW_HEIGHT,
-            );
-            if index < occupied {
-                out.shape(card, 8., c(0xe2e9ef, 0.18));
-            } else {
-                out.border(card, 8., 1., c(0xffffff, 0.20));
-            }
-        }
-        let label = language.t("favorites");
-        let style = text(23., 550, 0.);
-        let label_width = (assets.width(label, style) + 44.).min(dock.w - 32.);
-        let caption = Rect::new(
-            dock.x + (dock.w - label_width) / 2.,
-            dock.y + (dock.h - 40.) / 2.,
-            label_width,
-            40.,
-        );
-        out.shape(caption, 20., c(0x151b21, 0.95));
-        let (label, style) = assets.fit_line(label, style, caption.w - 32., 16.);
-        out.text(label, caption, style, WHITE, true);
-        if moving.is_none() {
-            if state.focus == Target::FavoriteRows {
-                out.ring(dock, 12.);
-            }
-            out.control(Target::FavoriteRows, dock, false);
-        }
+        let label_rect = if other == HomeWidget::Favorites {
+            let width = (assets.width(&label, style) + 36.).min(rect.w);
+            let (x, y) = rect.center();
+            let pill = Rect::new(x - width / 2., y - 20., width, 40.);
+            out.shape(pill, 20., c(0x151b21, 0.95));
+            pill
+        } else {
+            rect.inset(12.)
+        };
+        out.text(label, label_rect, style, WHITE, true);
     }
     let Some(widget) = moving else {
         if let Target::WidgetCell(cell) = state.focus
             && let Some(position) = WidgetPosition::from_cell(cell)
         {
             let rect = state.preferences.widget_at(position).map_or_else(
-                || map(grid.cell(position)),
-                |widget| map(grid.widget(widget, state.preferences.widget_position(widget))),
+                || map(home_grid_cell_rect(position)),
+                |widget| {
+                    map(home_widget_rect(
+                        state,
+                        widget,
+                        state.preferences.widget_position(widget),
+                    ))
+                },
             );
             out.ring(rect, 8.);
             if state.preferences.widget_at(position).is_none()
-                && (!state.preferences.show_favorites_dock
-                    || HomeWidget::ALL
-                        .into_iter()
-                        .any(|widget| !state.preferences.has_widget(widget)))
+                && HomeWidget::ALL
+                    .into_iter()
+                    .any(|widget| !state.preferences.has_widget(widget))
             {
                 out.text(
                     "+",
@@ -3140,16 +3041,21 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
     };
     let saved = state.preferences.widget_position(widget);
     if state.preferences.has_widget(widget) {
-        out.border(map(grid.widget(widget, saved)), 8., 2., c(0xffffff, 0.4));
+        out.border(
+            map(home_widget_rect(state, widget, saved)),
+            8.,
+            2.,
+            c(0xffffff, 0.4),
+        );
     }
     if let Target::Choice(cell) = state.focus
         && let Some(position) = WidgetPosition::from_cell(cell)
     {
         let valid = state.preferences.can_place_widget(widget, position);
-        let rect = if position.fits(widget) {
-            map(grid.widget(widget, position))
+        let rect = if position.fits(state.preferences.widget_span(widget)) {
+            map(home_widget_rect(state, widget, position))
         } else {
-            map(grid.cell(position))
+            map(home_grid_cell_rect(position))
         };
         out.shape(
             rect,
@@ -3161,7 +3067,7 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
             },
         );
         out.border(rect, 8., 3., if valid { WHITE } else { c(0xffa3a3, 1.) });
-        let (w, h) = widget.span();
+        let (w, h) = state.preferences.widget_span(widget);
         let (label, style) = assets.fit_line(
             &format!("{}  {w} × {h}", language.t(widget.key())),
             text(24., 550, 0.),
@@ -3575,16 +3481,10 @@ fn empty(out: &mut Scene, state: &State, assets: &Assets, content: EmptyState<'_
     }
 }
 
-fn widget_menu(
-    out: &mut Scene,
-    state: &State,
-    assets: &Assets,
-    cell: Option<usize>,
-    catalog: bool,
-) {
+fn widget_menu(out: &mut Scene, state: &State, assets: &Assets, cell: usize, catalog: bool) {
     let language = state.preferences.language;
-    let position = cell.and_then(WidgetPosition::from_cell);
-    let widget = position.and_then(|position| state.preferences.widget_at(position));
+    let widget =
+        WidgetPosition::from_cell(cell).and_then(|position| state.preferences.widget_at(position));
     let mut actions = Vec::new();
     if catalog {
         for widget in HomeWidget::ALL
@@ -3593,15 +3493,6 @@ fn widget_menu(
         {
             actions.push((Target::AddWidget(widget), widget.key(), "grid"));
         }
-        if !state.preferences.show_favorites_dock {
-            actions.push((Target::AddFavorites, "favorites", "grid"));
-        }
-    } else if cell.is_none() {
-        actions.extend([
-            (Target::ConfigureFavorites, "configure", "settings"),
-            (Target::MoveFavorites, "move", "left"),
-            (Target::RemoveFavorites, "removeWidget", "circle-minus"),
-        ]);
     } else if let Some(widget) = widget {
         actions.extend([
             (Target::ConfigureWidget(widget), "configure", "settings"),
@@ -3613,26 +3504,22 @@ fn widget_menu(
     if empty {
         actions.push((Target::CloseDialog, "close", "left"));
     }
-    let card = if let Some(position) = position {
-        let grid = WidgetGrid::editor(state);
-        let logical = widget.map_or_else(
-            || grid.cell(position),
-            |widget| grid.widget(widget, state.preferences.widget_position(widget)),
-        );
-        let preview = widget_preview_rect(state);
-        let scale = preview.w / 1920.;
-        Rect::new(
-            preview.x + logical.x * scale,
-            preview.y + logical.y * scale,
-            logical.w * scale,
-            logical.h * scale,
-        )
-    } else {
-        favorites_preview_rect(state)
-    };
+    let position = WidgetPosition::from_cell(cell).unwrap_or_default();
+    let logical = widget.map_or_else(
+        || home_grid_cell_rect(position),
+        |widget| home_widget_rect(state, widget, state.preferences.widget_position(widget)),
+    );
+    let scale = 1120. / 1920.;
+    let card = Rect::new(
+        640. + logical.x * scale,
+        widget_preview_top(state) - state.scroll + logical.y * scale,
+        logical.w * scale,
+        logical.h * scale,
+    );
     if !catalog {
+        out.shape(card, 8., c(0x69737c, 1.));
+        out.border(card, 8., 2., WHITE);
         if let Some(widget) = widget {
-            out.shape(card, 8., c(0x69737c, 1.));
             out.text(
                 language.t(widget.key()),
                 card.inset(12.),
@@ -3641,7 +3528,6 @@ fn widget_menu(
                 true,
             );
         }
-        out.border(card, 8., 2., WHITE);
     }
     let height = 92. + actions.len() as f32 * 76.8;
     let x = if card.x + card.w + 552. <= 1836. {
@@ -3658,8 +3544,6 @@ fn widget_menu(
         "allWidgetsAdded"
     } else if catalog {
         "addWidget"
-    } else if cell.is_none() {
-        "favorites"
     } else {
         widget.map_or("widgets", HomeWidget::key)
     });
@@ -3679,7 +3563,7 @@ fn widget_menu(
             67.2,
         );
         let focused = state.focus == target;
-        let destructive = matches!(target, Target::RemoveWidget(_) | Target::RemoveFavorites);
+        let destructive = matches!(target, Target::RemoveWidget(_));
         let color = if focused && !destructive {
             c(0x242424, 1.)
         } else {
@@ -4634,84 +4518,69 @@ mod tests {
     }
 
     #[test]
-    fn fixed_widget_spans_fit_above_dock_in_every_legal_position() {
+    fn valid_widget_positions_do_not_overlap_the_dock() {
         let mut state = State::new(Preferences::default());
         for rows in 1..=crate::model::MAX_HOME_ROWS {
-            state.preferences.home_rows = rows;
-            for widget in HomeWidget::ALL {
-                for cell in 0..HOME_GRID_CELLS {
-                    let position = WidgetPosition::from_cell(cell).unwrap();
-                    if !position.fits(widget) {
+            state.preferences.set_favorite_rows(rows);
+            let dock = state.dock_layout().bounds(state.home_dock_y());
+            for widget in [HomeWidget::Greeting, HomeWidget::Weather] {
+                for position in (0..HOME_GRID_CELLS).filter_map(WidgetPosition::from_cell) {
+                    if !state.preferences.can_place_widget(widget, position) {
                         continue;
                     }
                     let rect = home_widget_rect(&state, widget, position);
                     assert!(rect.x >= 84. && rect.x + rect.w <= 1836.);
-                    assert!(
-                        rect.y >= 156. && rect.y + rect.h <= state.home_dock_y() - DOCK_PADDING
-                    );
-                    assert_eq!(
-                        rect.w,
-                        if widget != HomeWidget::Weather {
-                            1160.
-                        } else {
-                            568.
-                        }
-                    );
+                    assert!(rect.y >= HOME_GRID_TOP && rect.y + rect.h <= dock.y);
                 }
             }
         }
     }
 
     #[test]
-    fn widget_editor_shows_the_dock_and_exposes_a_single_configuration_target() {
+    fn favorites_preview_uses_the_same_full_width_grid_cells_as_other_widgets() {
         let assets = assets();
         let mut state = State::new(Preferences::default());
         state.open(2);
         state.section = WIDGETS_SECTION;
         state.preferences.language = Language::Es;
-        let mut stable_sizes = None;
+        let mut geometry = None;
         for rows in 1..=crate::model::MAX_HOME_ROWS {
-            state.preferences.home_rows = rows;
-            for moving in [None, Some(HomeWidget::Greeting)] {
-                let mut scene = Scene::new();
-                widget_grid(&mut scene, &state, &assets, moving);
-                assert!(
-                    scene.draw.iter().any(|draw| {
-                        matches!(draw, Draw::Text(label, ..) if label == "Favoritos")
-                    })
-                );
-                if moving.is_none() {
-                    let sizes: Vec<_> = scene
-                        .controls
-                        .iter()
-                        .filter_map(|control| {
-                            matches!(control.target, Target::WidgetCell(_))
-                                .then_some((control.rect.w, control.rect.h))
-                        })
-                        .collect();
-                    assert_eq!(sizes.len(), HOME_GRID_CELLS);
-                    assert_eq!(stable_sizes.get_or_insert_with(|| sizes.clone()), &sizes);
-                }
-                let dock = scene
-                    .controls
+            state.preferences.set_favorite_rows(rows);
+            let anchor = state.preferences.widget_position(HomeWidget::Favorites);
+            let mut scene = Scene::new();
+            widget_grid(&mut scene, &state, &assets, None);
+            assert!(
+                scene
+                    .draw
                     .iter()
-                    .find(|control| control.target == Target::FavoriteRows);
-                assert_eq!(dock.is_some(), moving.is_none());
-                if let Some(dock) = dock {
-                    let (x, y) = dock.rect.center();
-                    assert_eq!(
-                        state.hit_test(&scene.controls, x, y),
-                        Some(Target::FavoriteRows)
-                    );
-                    assert!(
-                        scene
-                            .controls
-                            .iter()
-                            .filter(|c| matches!(c.target, Target::WidgetCell(_)))
-                            .all(|c| c.rect.y + c.rect.h < dock.rect.y)
-                    );
-                }
-            }
+                    .any(|draw| { matches!(draw, Draw::Text(label, ..) if label == "Favoritos") })
+            );
+            let cells: Vec<_> = scene
+                .controls
+                .iter()
+                .map(|control| {
+                    (
+                        control.rect.x,
+                        control.rect.y,
+                        control.rect.w,
+                        control.rect.h,
+                    )
+                })
+                .collect();
+            assert_eq!(cells.len(), HOME_GRID_CELLS);
+            assert_eq!(geometry.get_or_insert_with(|| cells.clone()), &cells);
+            let (x, y) = scene.controls[anchor.cell() + 5].rect.center();
+            assert_eq!(
+                state.hit_test(&scene.controls, x, y),
+                Some(Target::WidgetCell(anchor.cell() + 5))
+            );
+
+            let mut moving = Scene::new();
+            widget_grid(&mut moving, &state, &assets, Some(HomeWidget::Favorites));
+            assert_eq!(
+                state.hit_test(&moving.controls, x, y),
+                Some(Target::Choice(anchor.cell()))
+            );
         }
     }
 
@@ -4769,7 +4638,10 @@ mod tests {
             state.preferences.weather_style = style;
             for slot in 0..HOME_GRID_CELLS {
                 let position = WidgetPosition::from_cell(slot).unwrap();
-                if !position.fits(HomeWidget::Weather) {
+                if !state
+                    .preferences
+                    .can_place_widget(HomeWidget::Weather, position)
+                {
                     continue;
                 }
                 state.preferences.weather_position = position;

@@ -141,7 +141,7 @@ retain their manual order. The same order fills empty dock slots and the app dra
 `xvfb-run -a pnpm screenshots --sorting` captures the sorting settings, both app orders,
 and the generic disc input icon from the native desktop renderer using seeded local counts.
 
-Home uses a 6×4 placement grid in logical 1920×1080 space above the favorites dock.
+Home uses a 6×5 placement grid in logical 1920×1080 space.
 Greeting combines weekday/date and greeting in 4 columns × 1 row; Weather spans 2 columns × 2 rows.
 Greeting uses 90.4px text with 1.05 leading and an 18.4px date in a 32.8px band,
 keeping both lines inside the 128px-tall row; long translations fit to the available width.
@@ -154,18 +154,17 @@ Settings → Widgets opens the scaled Home grid by default. Each occupied cell o
 Configure/Move/Remove popup. A fixed, right-aligned toolbar above the preview contains Reset to defaults on the
 left and Add widget on the right, using the Backgrounds pill style. Empty cells also open the
 Add catalog directly; it excludes installed widgets. Reset restores the default membership and
-positions, preserving date/weather configuration and the app dock; an already-default reset does not save.
+positions, preserving date/weather configuration and favorite order and row count; an already-default reset does not save.
 Select Favorites in the grid preview for Configure, Move, and Remove. The editor keeps the
 placement cells the same size as the dock changes height. Luma persists `home_rows` (1, 2, or 3),
-`show_favorites_dock`, and `favorites_dock_top`. Multi-row layouts show pinned apps only. The
+`show_favorites_dock`, and the dock anchor in `favorites_dock_row`. Multi-row layouts show pinned apps only. The
 dock fills six columns per page in reading order and scrolls for overflow. Right moves up to an
-occupied row if the next column is empty on the selected row. Home fits movable widgets beside
-the dock vertically without changing their anchors. Down from the dock opens the drawer. When
+occupied row if the next column is empty on the selected row. The dock spans all six columns and takes one grid row per configured dock row. Resizing keeps widget anchors where they still fit and places displaced widgets in available cells. Down from the dock opens the drawer. When
 the dock is removed, an Apps button keeps the drawer accessible. The Add menu restores Favorites.
 Inputs is a separate sidebar section directly
 below Apps, not a widget. Its list and individual input/icon settings retain focus on return.
 Move and Add open a placement preview; arrows browse
-all twenty-four anchors, OK/click saves a valid placement, and Back cancels without changing preferences.
+all thirty anchors, OK/click saves a valid placement, and Back cancels without changing preferences.
 Invalid positions are red and cannot be committed. Removing a widget frees its cells while keeping
 its settings. Adding is atomic: browsing/cancelling placement does not install or save a widget.
 The legacy `show_greeting` and `show_weather` fields now store whether each widget is installed;
