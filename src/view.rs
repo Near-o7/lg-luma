@@ -7,10 +7,9 @@ use crate::{
     },
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
-        APPS_COLUMNS, APPS_SECTION, Control, DRAWER_DOCK_Y, HOME_FADE_LEFT, HOME_FADE_RIGHT,
-        HOME_GRID_PITCH_Y, HOME_GRID_TOP, HOME_STRIP_LEFT, HOME_STRIP_RIGHT, HOME_TILE_HEIGHT,
-        INPUTS_SECTION, KEYS, Overlay, Page, Rect, SYSTEM_SECTION, State, Subpage, Target,
-        TextField, WIDGETS_SECTION,
+        APPS_COLUMNS, APPS_SECTION, Control, HOME_FADE_LEFT, HOME_FADE_RIGHT, HOME_GRID_PITCH_Y,
+        HOME_GRID_TOP, HOME_STRIP_LEFT, HOME_STRIP_RIGHT, HOME_TILE_HEIGHT, INPUTS_SECTION, KEYS,
+        Overlay, Page, Rect, SYSTEM_SECTION, State, Subpage, Target, TextField, WIDGETS_SECTION,
     },
     weather::{self, Unit},
 };
@@ -1312,8 +1311,16 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
     let layout = state.dock_layout();
     let dock = layout.bounds(dock_y);
     let card = |index| layout.card(index, dock_y, state.home_scroll);
-    // The card extends beyond the content viewport; clip only its scrolling contents.
-    out.draw.push(Draw::Clip(None));
+    let clip = if state.drawer_scrolls_dock() && state.drawer_visibility > 0. {
+        let viewport = state.apps_viewport();
+        if dock.y + dock.h <= viewport.y {
+            return;
+        }
+        Some(Rect::new(0., viewport.y, 1920., viewport.h))
+    } else {
+        None
+    };
+    out.draw.push(Draw::Clip(clip));
     out.shadow(dock, 40., 38., 12., 0.22);
     out.glass(dock, 40.);
     let apps = state.dock_apps();
@@ -1644,13 +1651,12 @@ fn library(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime)
     let start = out.draw.len();
     library_grid(out, state, assets);
     out.fade(start, state.drawer_progress(), 1.);
-    // The scrolling grid continues underneath the floating glass and pinned cards.
     favorites_dock(out, state, assets);
 }
 
 fn library_grid(out: &mut Scene, state: &State, assets: &Assets) {
     let language = state.preferences.language;
-    let s = state.scroll;
+    let s = state.drawer_scroll();
     let apps = state.drawer_apps();
     if apps.is_empty() && state.dock_apps().is_empty() {
         let title = if state.loading {
@@ -1673,7 +1679,7 @@ fn library_grid(out: &mut Scene, state: &State, assets: &Assets) {
         );
     }
     out.draw.push(Draw::Clip(Some(state.apps_viewport())));
-    let offset = state.dock_y() - DRAWER_DOCK_Y;
+    let offset = state.drawer_slide();
     let mut y = state.drawer_grid_top();
     for row in apps.chunks(APPS_COLUMNS) {
         let row_height = FACE_HEIGHT;

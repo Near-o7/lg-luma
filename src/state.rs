@@ -330,6 +330,7 @@ pub struct State {
     pub scroll: f32,
     pub home_scroll: f32,
     pub drawer_visibility: f32,
+    closing_drawer_scroll: f32,
     drawer_updated: Instant,
     input_status_visibility: std::collections::BTreeMap<String, f32>,
     pub overlay: Option<Overlay>,
@@ -382,6 +383,7 @@ impl State {
             scroll: 0.,
             home_scroll: 0.,
             drawer_visibility: 0.,
+            closing_drawer_scroll: 0.,
             drawer_updated: Instant::now(),
             input_status_visibility: std::collections::BTreeMap::new(),
             overlay: None,
@@ -645,11 +647,22 @@ impl State {
 
     pub fn open(&mut self, index: usize) {
         self.weather.cancel_search();
+        let previous_page = self.page;
         self.page = match index {
             1 => Page::Apps,
             2 => Page::Settings,
             _ => Page::Home,
         };
+        if self.page != previous_page {
+            self.closing_drawer_scroll = if previous_page == Page::Apps
+                && self.page == Page::Home
+                && self.drawer_scrolls_dock()
+            {
+                self.scroll
+            } else {
+                0.
+            };
+        }
         self.focus = Target::Nav(self.page_index());
         self.scroll = 0.;
         if self.page == Page::Home {
@@ -698,9 +711,30 @@ impl State {
                 * HOME_GRID_PITCH_Y
     }
 
+    pub fn drawer_scrolls_dock(&self) -> bool {
+        self.preferences.show_favorites_dock && self.preferences.home_rows > 1
+    }
+
+    pub fn drawer_slide(&self) -> f32 {
+        (self.home_dock_y() - DRAWER_DOCK_Y) * (1. - self.drawer_progress())
+    }
+
+    pub fn drawer_scroll(&self) -> f32 {
+        if self.page == Page::Home {
+            // Keep the prior scroll offset at the start of the Home return.
+            self.closing_drawer_scroll * self.drawer_progress()
+        } else {
+            self.scroll
+        }
+    }
+
     pub fn dock_y(&self) -> f32 {
-        let home_y = self.home_dock_y();
-        home_y - (home_y - DRAWER_DOCK_Y) * self.drawer_progress()
+        let scroll = if self.drawer_scrolls_dock() {
+            self.drawer_scroll()
+        } else {
+            0.
+        };
+        DRAWER_DOCK_Y + self.drawer_slide() - scroll
     }
 
     pub fn apps(&self) -> Vec<&App> {
@@ -823,9 +857,13 @@ impl State {
 
     pub fn apps_viewport(&self) -> Rect {
         let content = self.content_viewport();
-        // Let scrolling cards continue behind the floating dock, up to its card edge.
-        let top = DRAWER_DOCK_Y;
-        Rect::new(content.x, top, content.w, content.y + content.h - top)
+        if self.drawer_scrolls_dock() {
+            content
+        } else {
+            // The single-row dock floats above its app grid.
+            let top = DRAWER_DOCK_Y;
+            Rect::new(content.x, top, content.w, content.y + content.h - top)
+        }
     }
 
     pub fn drawer_grid_top(&self) -> f32 {
@@ -868,16 +906,7 @@ impl State {
                 } else if self.managing_apps() && matches!(control.target, Target::App(_)) {
                     self.app_settings_viewport()
                 } else if self.page == Page::Apps {
-                    let mut viewport = self.apps_viewport();
-                    if self.preferences.show_favorites_dock
-                        && self.preferences.home_rows > 1
-                        && matches!(control.target, Target::App(_))
-                    {
-                        let top = self.drawer_grid_top() - DRAWER_PADDING;
-                        viewport.h -= top - viewport.y;
-                        viewport.y = top;
-                    }
-                    viewport
+                    self.apps_viewport()
                 } else {
                     self.content_viewport()
                 };
@@ -914,8 +943,9 @@ impl State {
                             && control.rect.contains(x, y)
                     })
             });
-        let favorites =
-            (self.page == Page::Home || self.page == Page::Apps) && (x != 0 || over_favorites);
+        let drawer_scrolls_dock = self.page == Page::Apps && self.drawer_scrolls_dock();
+        let favorites = (self.page == Page::Home || self.page == Page::Apps)
+            && (x != 0 || (over_favorites && !drawer_scrolls_dock));
         if favorites {
             self.scroll_favorites((if x != 0 { x } else { -y }) as f32 * HOME_TILE_PITCH);
         } else {
@@ -1149,7 +1179,10 @@ impl State {
                     | Target::Filter(_)
                     | Target::Search
                     | Target::Sidebar(_)
-            ) {
+            ) || (self.page == Page::Apps
+                && self.drawer_scrolls_dock()
+                && matches!(self.focus, Target::DockApp(_)))
+            {
                 self.scroll = 0.;
             } else if control.scrollable
                 && !matches!(self.focus, Target::DockApp(_))
@@ -1159,8 +1192,10 @@ impl State {
                     self.app_settings_viewport().y + 16.
                 } else if matches!(self.focus, Target::Background(_)) {
                     self.backgrounds_viewport().y + 8.
+                } else if self.page == Page::Apps && self.drawer_scrolls_dock() {
+                    self.apps_viewport().y + 8.
                 } else if self.page == Page::Apps {
-                    // Remote focus stays below the dock even though cards can draw behind it.
+                    // Keep remote focus below the fixed single-row dock.
                     self.drawer_grid_top() - 8.
                 } else {
                     120.8

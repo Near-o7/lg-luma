@@ -893,6 +893,73 @@ fn scrolling_drawer_continues_behind_dock_without_obscuring_remote_focus() {
 }
 
 #[test]
+fn taller_favorites_dock_scrolls_with_the_drawer() {
+    for rows in [2, 3] {
+        let mut state = ready();
+        state.preferences.set_favorite_rows(rows);
+        state.inventory.apps.extend((0..60).map(|index| {
+            crate::model::App::new(&format!("extra.{index}"), &format!("Extra {index}"))
+        }));
+        state.open(1);
+        state.drawer_visibility = 1.;
+        let rendered = scene(&state);
+        let initial_dock_y = state.dock_y();
+        let dock_card = rendered
+            .controls
+            .iter()
+            .find(|control| matches!(control.target, Target::DockApp(_)))
+            .unwrap();
+        let grid_app = state.first_content();
+        let grid_rect = |controls: &[crate::state::Control]| {
+            controls
+                .iter()
+                .find(|control| control.target == grid_app)
+                .unwrap()
+                .rect
+        };
+        let initial_grid = grid_rect(&rendered.controls);
+        assert!(!state.wheel_scroll(&rendered.controls, Some(dock_card.rect.center()), 0, -2));
+        assert_eq!(state.scroll, 180.);
+        let scrolled = scene(&state);
+        assert!((state.dock_y() - (initial_dock_y - state.scroll)).abs() < 0.01);
+        let first_grid_rect = grid_rect(&scrolled.controls);
+        assert!((initial_grid.y - first_grid_rect.y - state.scroll).abs() < 0.01);
+        assert_eq!(
+            state.hit_test(
+                &scrolled.controls,
+                first_grid_rect.center().0,
+                first_grid_rect.center().1
+            ),
+            Some(grid_app.clone())
+        );
+
+        state.focus = grid_app;
+        let mut prior_scroll = state.scroll;
+        for _ in 0..8 {
+            state.direction(Direction::Down, &controls(&state));
+            let rendered = scene(&state);
+            let selected = rendered
+                .controls
+                .iter()
+                .find(|control| control.target == state.focus)
+                .unwrap();
+            assert!(selected.rect.y >= state.apps_viewport().y);
+            assert!(selected.rect.y + selected.rect.h <= 1056.1);
+            assert!(state.scroll >= prior_scroll);
+            prior_scroll = state.scroll;
+        }
+        assert!(state.scroll > 180.);
+        let scrolled_dock_y = state.dock_y();
+        state.back();
+        assert_eq!(state.page, Page::Home);
+        assert_eq!(state.scroll, 0.);
+        assert_eq!(state.dock_y(), scrolled_dock_y);
+        state.drawer_visibility = 0.;
+        assert_eq!(state.dock_y(), state.home_dock_y());
+    }
+}
+
+#[test]
 fn settings_sidebar_places_apps_immediately_after_general() {
     let mut state = ready();
     state.open(2);

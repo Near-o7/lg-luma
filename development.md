@@ -249,8 +249,9 @@ icons are original Breezy Weather PNGs, including clear/partly-cloudy night vari
 with their LGPL-3.0 license, attribution and source hashes in `assets/weather/`. No icons are fetched at runtime.
 Disabled weather
 is hidden. Enabled weather without a location uses the same large 144px artwork and a prominent setup action.
-Settings lists render behind fixed controls. The drawer grid is clipped below its fixed dock so
-offscreen cards cannot capture pointer events there. Input name removal uses **Clear name**.
+Settings lists render behind fixed controls. The drawer keeps a one-row dock fixed. With multiple
+favorite rows, the dock shares the app grid's vertical scroll and both clip beneath the header.
+Input name removal uses **Clear name**.
 Choice checkmarks identify saved values, while the bright row fill identifies only the current focus.
 Input connection dots are amber when a connected cable explicitly reports no signal, green for
 other connected inputs, and gray for disconnected or unknown cable states. An unknown signal

@@ -59,7 +59,8 @@ include a date visibility toggle and date-format choices; Date is not a separate
   leaves an **Apps** button for opening the drawer. Use **Add widget** to restore Favorites.
 - **Left / Right** browses favorites, and **Up / Down** moves between rows. If the next column
   has a card only in a higher row, **Right** moves to that card. Hold **OK** to reorder favorites.
-- **Down** from the bottom row opens the animated six-column app drawer.
+- **Down** from the bottom row opens the animated six-column app drawer. Two- and three-row docks
+  scroll with the drawer so more app rows can use the screen.
 - **Up** from the drawer’s first app row returns Home with the corresponding favorite selected.
 - **Up** from the top row reaches the corner controls.
 - **Back** closes the drawer and focuses the first favorite.
