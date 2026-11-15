@@ -235,6 +235,8 @@ impl Rect {
 pub struct Control {
     pub target: Target,
     pub rect: Rect,
+    /// Drawn position for pointer input when the drawer is still in motion.
+    pub presented_y: f32,
     pub scrollable: bool,
 }
 
@@ -318,6 +320,18 @@ pub const KEYS: [&str; 40] = [
     "Delete", "Clear", "Done",
 ];
 
+const DRAWER_SCROLL_DURATION: Duration = Duration::from_millis(220);
+
+struct DrawerScrollMotion {
+    from: f32,
+    presented: f32,
+    started: Instant,
+}
+
+fn smoothstep(progress: f32) -> f32 {
+    progress * progress * (3. - 2. * progress)
+}
+
 pub struct State {
     pub page: Page,
     pub focus: Target,
@@ -331,6 +345,7 @@ pub struct State {
     pub home_scroll: f32,
     pub drawer_visibility: f32,
     closing_drawer_scroll: f32,
+    drawer_scroll_motion: Option<DrawerScrollMotion>,
     drawer_updated: Instant,
     input_status_visibility: std::collections::BTreeMap<String, f32>,
     pub overlay: Option<Overlay>,
@@ -384,6 +399,7 @@ impl State {
             home_scroll: 0.,
             drawer_visibility: 0.,
             closing_drawer_scroll: 0.,
+            drawer_scroll_motion: None,
             drawer_updated: Instant::now(),
             input_status_visibility: std::collections::BTreeMap::new(),
             overlay: None,
@@ -503,6 +519,7 @@ impl State {
             .min(0.05);
         self.drawer_updated = now;
         self.animate_input_status(dt);
+        self.advance_drawer_scroll(now);
         if self.drawer_visibility != goal {
             self.drawer_visibility = if self.preferences.reduced_motion {
                 goal
@@ -614,7 +631,8 @@ impl State {
     }
 
     pub fn animating(&self) -> bool {
-        (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
+        self.drawer_scroll_motion.is_some()
+            || (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
             || (!self.preferences.reduced_motion
                 && self.input_status_visibility.iter().any(|(id, value)| {
                     *value != if self.input_status_active(id) { 1. } else { 0. }
@@ -648,6 +666,8 @@ impl State {
     pub fn open(&mut self, index: usize) {
         self.weather.cancel_search();
         let previous_page = self.page;
+        let previous_drawer_scroll = self.drawer_scroll();
+        self.drawer_scroll_motion = None;
         self.page = match index {
             1 => Page::Apps,
             2 => Page::Settings,
@@ -658,7 +678,7 @@ impl State {
                 && self.page == Page::Home
                 && self.drawer_scrolls_dock()
             {
-                self.scroll
+                previous_drawer_scroll
             } else {
                 0.
             };
@@ -692,8 +712,7 @@ impl State {
     }
 
     pub fn drawer_progress(&self) -> f32 {
-        let t = self.drawer_visibility;
-        t * t * (3. - 2. * t)
+        smoothstep(self.drawer_visibility)
     }
 
     pub fn dock_layout(&self) -> DockLayout {
@@ -719,13 +738,49 @@ impl State {
         (self.home_dock_y() - DRAWER_DOCK_Y) * (1. - self.drawer_progress())
     }
 
+    /// Frame-stable presentation offset. The logical scroll can move ahead on a key press.
     pub fn drawer_scroll(&self) -> f32 {
         if self.page == Page::Home {
-            // Keep the prior scroll offset at the start of the Home return.
             self.closing_drawer_scroll * self.drawer_progress()
+        } else if self.page == Page::Apps && !self.preferences.reduced_motion {
+            self.drawer_scroll_motion
+                .as_ref()
+                .map_or(self.scroll, |motion| motion.presented)
         } else {
             self.scroll
         }
+    }
+
+    fn set_scroll(&mut self, scroll: f32) {
+        if self.scroll == scroll {
+            return;
+        }
+        let from = self.drawer_scroll();
+        self.drawer_scroll_motion = (self.page == Page::Apps
+            && self.drawer_scrolls_dock()
+            && !self.preferences.reduced_motion
+            && from != scroll)
+            .then(|| DrawerScrollMotion {
+                from,
+                presented: from,
+                started: Instant::now(),
+            });
+        self.scroll = scroll;
+        self.dirty = true;
+    }
+
+    pub(crate) fn advance_drawer_scroll(&mut self, now: Instant) {
+        let Some(motion) = &mut self.drawer_scroll_motion else {
+            return;
+        };
+        let progress = now.saturating_duration_since(motion.started).as_secs_f32()
+            / DRAWER_SCROLL_DURATION.as_secs_f32();
+        if progress >= 1. || self.preferences.reduced_motion {
+            self.drawer_scroll_motion = None;
+        } else {
+            motion.presented = motion.from + (self.scroll - motion.from) * smoothstep(progress);
+        }
+        self.dirty = true;
     }
 
     pub fn dock_y(&self) -> f32 {
@@ -910,12 +965,16 @@ impl State {
                 } else {
                     self.content_viewport()
                 };
-                control.rect.contains(x, y) && (!control.scrollable || viewport.contains(x, y))
+                let rect = Rect {
+                    y: control.presented_y,
+                    ..control.rect
+                };
+                rect.contains(x, y) && (!control.scrollable || viewport.contains(x, y))
             })
             .map(|control| control.target.clone())
     }
 
-    /// Returns whether this wheel event scrolled favorites, so a pending card press is cancelled.
+    /// Returns whether this wheel event should cancel a pending card press.
     pub fn wheel_scroll(
         &mut self,
         controls: &[Control],
@@ -946,6 +1005,7 @@ impl State {
         let drawer_scrolls_dock = self.page == Page::Apps && self.drawer_scrolls_dock();
         let favorites = (self.page == Page::Home || self.page == Page::Apps)
             && (x != 0 || (over_favorites && !drawer_scrolls_dock));
+        let previous_scroll = self.scroll;
         if favorites {
             self.scroll_favorites((if x != 0 { x } else { -y }) as f32 * HOME_TILE_PITCH);
         } else {
@@ -953,15 +1013,17 @@ impl State {
             let max = controls
                 .iter()
                 .filter(|c| {
-                    c.scrollable && (!backgrounds || matches!(c.target, Target::Background(_)))
+                    c.scrollable
+                        && (!backgrounds || matches!(c.target, Target::Background(_)))
+                        && (!drawer_scrolls_dock || matches!(c.target, Target::App(_)))
                 })
                 .map(|c| c.rect.y + c.rect.h + self.scroll - bottom)
                 .fold(0., f32::max);
-            self.scroll = (self.scroll - y as f32 * 90.).clamp(0., max.max(0.));
+            self.set_scroll((self.scroll - y as f32 * 90.).clamp(0., max.max(0.)));
         }
         self.pointer = true;
         self.dirty = true;
-        favorites
+        favorites || (drawer_scrolls_dock && self.scroll != previous_scroll)
     }
 
     pub fn scroll_favorites(&mut self, delta: f32) {
@@ -1183,7 +1245,7 @@ impl State {
                 && self.drawer_scrolls_dock()
                 && matches!(self.focus, Target::DockApp(_)))
             {
-                self.scroll = 0.;
+                self.set_scroll(0.);
             } else if control.scrollable
                 && !matches!(self.focus, Target::DockApp(_))
                 && self.page != Page::Home
@@ -1200,13 +1262,15 @@ impl State {
                 } else {
                     120.8
                 };
-                if control.rect.y < top {
-                    self.scroll = (self.scroll + control.rect.y - top).max(0.);
-                }
                 let bottom = self.scroll_bottom();
-                if control.rect.y + control.rect.h > bottom {
-                    self.scroll += control.rect.y + control.rect.h - bottom;
-                }
+                let next = if control.rect.y < top {
+                    (self.scroll + control.rect.y - top).max(0.)
+                } else if control.rect.y + control.rect.h > bottom {
+                    self.scroll + control.rect.y + control.rect.h - bottom
+                } else {
+                    self.scroll
+                };
+                self.set_scroll(next);
             }
         }
         if self.page == Page::Home || self.page == Page::Apps {
@@ -2410,7 +2474,7 @@ impl State {
                     .filter(|c| !c.is_control())
                     .take(120usize.saturating_sub(self.query.chars().count())),
             );
-            self.scroll = 0.;
+            self.set_scroll(0.);
             self.dirty = true;
         }
     }
@@ -2550,7 +2614,7 @@ impl State {
             self.input_name = query;
         } else {
             self.query = query;
-            self.scroll = 0.;
+            self.set_scroll(0.);
         }
         self.dirty = true;
     }
@@ -2692,7 +2756,7 @@ impl State {
             }
             Target::Filter(index) => {
                 self.filter = if self.filter == index { 0 } else { index };
-                self.scroll = 0.;
+                self.set_scroll(0.);
             }
             Target::Search => {
                 self.open_keyboard(TextField::Apps);

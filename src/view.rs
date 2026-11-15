@@ -250,6 +250,7 @@ impl Scene {
         self.controls.push(Control {
             target,
             rect,
+            presented_y: rect.y,
             scrollable,
         });
     }
@@ -1697,9 +1698,9 @@ fn library_grid(out: &mut Scene, state: &State, assets: &Assets) {
                 ),
                 false,
             );
-            // Reveal/scroll against the final layout, not the moving presentation.
+            // Focus and wheel bounds use the destination; pointer input uses the drawn position.
             if let Some(control) = out.controls.last_mut() {
-                control.rect.y = y - s;
+                control.rect.y = y - state.scroll;
             }
         }
         y += row_height + 38.4;

@@ -250,8 +250,9 @@ with their LGPL-3.0 license, attribution and source hashes in `assets/weather/`.
 Disabled weather
 is hidden. Enabled weather without a location uses the same large 144px artwork and a prominent setup action.
 Settings lists render behind fixed controls. The drawer keeps a one-row dock fixed. With multiple
-favorite rows, the dock shares the app grid's vertical scroll and both clip beneath the header.
-Input name removal uses **Clear name**.
+favorite rows, the dock and app grid animate the same vertical offset over 220 ms and clip beneath
+the header. Focus uses the destination, pointer hit testing uses the drawn position, and reduced motion
+applies the new position immediately. Input name removal uses **Clear name**.
 Choice checkmarks identify saved values, while the bright row fill identifies only the current focus.
 Input connection dots are amber when a connected cable explicitly reports no signal, green for
 other connected inputs, and gray for disconnected or unknown cable states. An unknown signal
