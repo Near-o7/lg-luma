@@ -213,6 +213,26 @@ impl DateFormat {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+pub enum AppDrawerStyle {
+    #[default]
+    #[serde(rename = "tvos")]
+    Tvos,
+    Minimal,
+}
+
+impl AppDrawerStyle {
+    pub const ALL: [Self; 2] = [Self::Tvos, Self::Minimal];
+
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::Tvos => "appDrawerTvos",
+            Self::Minimal => "appDrawerMinimal",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AppSorting {
     #[default]
     Alphabetical,
@@ -257,6 +277,27 @@ impl WeatherStyle {
 
 pub const MAX_HOME_ROWS: u8 = 3;
 pub const HOME_GRID_COLUMNS: usize = 6;
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecentAppsBehavior {
+    ShortPress,
+    #[default]
+    LongPress,
+    Off,
+}
+
+impl RecentAppsBehavior {
+    pub const ALL: [Self; 3] = [Self::ShortPress, Self::LongPress, Self::Off];
+
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::ShortPress => "shortPress",
+            Self::LongPress => "longPress",
+            Self::Off => "stateOff",
+        }
+    }
+}
+
 pub const HOME_GRID_ROWS: usize = 5;
 pub const HOME_GRID_CELLS: usize = HOME_GRID_COLUMNS * HOME_GRID_ROWS;
 
@@ -265,41 +306,82 @@ pub const HOME_GRID_CELLS: usize = HOME_GRID_COLUMNS * HOME_GRID_ROWS;
 pub enum HomeWidget {
     Weather,
     Greeting,
+    Crypto,
+    Stocks,
+    ExtraWeather(u8),
+    ExtraCrypto(u8),
+    ExtraStocks(u8),
     Favorites,
 }
 
 impl HomeWidget {
-    pub const ALL: [Self; 3] = [Self::Greeting, Self::Weather, Self::Favorites];
-
-    pub fn span(self, favorite_rows: u8) -> (u8, u8) {
+    pub fn kind(self) -> Self {
         match self {
+            Self::ExtraWeather(_) => Self::Weather,
+            Self::ExtraCrypto(_) => Self::Crypto,
+            Self::ExtraStocks(_) => Self::Stocks,
+            kind => kind,
+        }
+    }
+
+    pub const ALL: [Self; 5] = [
+        Self::Greeting,
+        Self::Weather,
+        Self::Crypto,
+        Self::Stocks,
+        Self::Favorites,
+    ];
+
+    pub fn span(self) -> (u8, u8) {
+        match self.kind() {
             Self::Greeting => (4, 1),
             Self::Weather => (2, 2),
-            Self::Favorites => (HOME_GRID_COLUMNS as u8, favorite_rows),
+            Self::Crypto | Self::Stocks => (1, 1),
+            Self::Favorites => (HOME_GRID_COLUMNS as u8, 1),
+            _ => unreachable!(),
         }
     }
 
     pub fn key(self) -> &'static str {
-        match self {
+        match self.kind() {
             Self::Weather => "weather",
             Self::Greeting => "greeting",
             Self::Favorites => "favorites",
+            Self::Crypto => "crypto",
+            Self::Stocks => "stocks",
+            _ => unreachable!(),
         }
     }
 
     pub fn default_position(self) -> WidgetPosition {
         WidgetPosition {
-            column: match self {
+            column: match self.kind() {
                 Self::Greeting | Self::Favorites => 0,
                 Self::Weather => 4,
+                Self::Crypto => 0,
+                Self::Stocks => 1,
+                _ => unreachable!(),
             },
-            row: if self == Self::Favorites {
-                HOME_GRID_ROWS as u8 - 1
-            } else {
-                0
+            row: match self.kind() {
+                Self::Crypto | Self::Stocks => 2,
+                Self::Favorites => HOME_GRID_ROWS as u8 - 1,
+                _ => 0,
             },
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct WeatherWidgetSettings {
+    pub enabled: bool,
+    pub position: WidgetPosition,
+    #[serde(deserialize_with = "crate::weather::deserialize_location")]
+    pub location: Option<Location>,
+    #[serde(deserialize_with = "crate::weather::deserialize_unit")]
+    pub unit: Unit,
+    pub small: bool,
+    pub style: WeatherStyle,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -336,8 +418,18 @@ impl WidgetPosition {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Preferences {
+    pub extra_crypto: Vec<crate::markets::Settings>,
+    pub extra_stocks: Vec<crate::markets::Settings>,
+    pub extra_weather: Vec<WeatherWidgetSettings>,
+    #[serde(deserialize_with = "crate::markets::deserialize_settings")]
+    pub crypto: crate::markets::Settings,
+    #[serde(deserialize_with = "crate::markets::deserialize_settings")]
+    pub stocks: crate::markets::Settings,
+    pub weather_small: bool,
+    pub recent_apps_behavior: RecentAppsBehavior,
     pub weather_style: WeatherStyle,
     pub app_sorting: AppSorting,
+    pub app_drawer_style: AppDrawerStyle,
     pub app_launch_counts: BTreeMap<String, u64>,
     pub greeting_position: WidgetPosition,
     pub weather_position: WidgetPosition,
@@ -389,8 +481,19 @@ pub struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
+            extra_crypto: vec![],
+            extra_stocks: vec![],
+            extra_weather: vec![],
             weather_style: WeatherStyle::default(),
+            crypto: crate::markets::Settings::default(),
+            stocks: crate::markets::Settings {
+                position: HomeWidget::Stocks.default_position(),
+                ..Default::default()
+            },
+            weather_small: false,
+            recent_apps_behavior: RecentAppsBehavior::default(),
             app_sorting: AppSorting::default(),
+            app_drawer_style: AppDrawerStyle::default(),
             app_launch_counts: BTreeMap::new(),
             greeting_position: HomeWidget::Greeting.default_position(),
             weather_position: HomeWidget::Weather.default_position(),
@@ -428,6 +531,115 @@ impl Default for Preferences {
 }
 
 impl Preferences {
+    pub fn widgets(&self) -> Vec<HomeWidget> {
+        HomeWidget::ALL
+            .into_iter()
+            .chain((0..self.extra_crypto.len()).map(|i| HomeWidget::ExtraCrypto(i as u8)))
+            .chain((0..self.extra_stocks.len()).map(|i| HomeWidget::ExtraStocks(i as u8)))
+            .chain((0..self.extra_weather.len()).map(|i| HomeWidget::ExtraWeather(i as u8)))
+            .collect()
+    }
+
+    pub fn weather_settings(&self, widget: HomeWidget) -> WeatherWidgetSettings {
+        if let HomeWidget::ExtraWeather(i) = widget {
+            return self.extra_weather[usize::from(i)].clone();
+        }
+        WeatherWidgetSettings {
+            enabled: self.show_weather,
+            position: self.weather_position,
+            location: self.weather_location.clone(),
+            unit: self.temperature_unit,
+            small: self.weather_small,
+            style: self.weather_style,
+        }
+    }
+
+    pub fn edit_weather(
+        &mut self,
+        widget: HomeWidget,
+        edit: impl FnOnce(&mut WeatherWidgetSettings),
+    ) {
+        let mut config = self.weather_settings(widget);
+        edit(&mut config);
+        if let HomeWidget::ExtraWeather(i) = widget {
+            self.extra_weather[usize::from(i)] = config;
+        } else {
+            self.show_weather = config.enabled;
+            self.weather_position = config.position;
+            self.weather_location = config.location;
+            self.temperature_unit = config.unit;
+            self.weather_small = config.small;
+            self.weather_style = config.style;
+        }
+    }
+
+    pub fn available_widget(&self, kind: HomeWidget) -> Option<HomeWidget> {
+        self.widgets()
+            .into_iter()
+            .find(|widget| widget.kind() == kind && !self.has_widget(*widget))
+            .or(match kind {
+                HomeWidget::Weather if self.extra_weather.len() < HOME_GRID_CELLS => {
+                    Some(HomeWidget::ExtraWeather(self.extra_weather.len() as u8))
+                }
+                HomeWidget::Crypto if self.extra_crypto.len() < HOME_GRID_CELLS => {
+                    Some(HomeWidget::ExtraCrypto(self.extra_crypto.len() as u8))
+                }
+                HomeWidget::Stocks if self.extra_stocks.len() < HOME_GRID_CELLS => {
+                    Some(HomeWidget::ExtraStocks(self.extra_stocks.len() as u8))
+                }
+                _ => None,
+            })
+    }
+
+    pub fn prepare_widget(&mut self, widget: HomeWidget) {
+        match widget {
+            HomeWidget::ExtraWeather(i) if usize::from(i) == self.extra_weather.len() => {
+                self.extra_weather.push(WeatherWidgetSettings::default())
+            }
+            HomeWidget::ExtraCrypto(i) if usize::from(i) == self.extra_crypto.len() => {
+                self.extra_crypto.push(Default::default())
+            }
+            HomeWidget::ExtraStocks(i) if usize::from(i) == self.extra_stocks.len() => {
+                self.extra_stocks.push(Default::default())
+            }
+            _ => {}
+        }
+    }
+
+    pub fn widget_span(&self, widget: HomeWidget) -> (u8, u8) {
+        if widget == HomeWidget::Favorites {
+            (HOME_GRID_COLUMNS as u8, self.home_rows)
+        } else if widget.kind() == HomeWidget::Weather && self.weather_settings(widget).small {
+            (1, 1)
+        } else {
+            widget.span()
+        }
+    }
+
+    pub fn widget_fits(&self, widget: HomeWidget, position: WidgetPosition) -> bool {
+        position.fits(self.widget_span(widget))
+    }
+
+    #[cfg(test)]
+    pub fn toggle_weather_size(&mut self) {
+        self.toggle_weather_widget_size(HomeWidget::Weather);
+    }
+
+    pub fn toggle_weather_widget_size(&mut self, widget: HomeWidget) {
+        self.edit_weather(widget, |config| config.small = !config.small);
+        // Expanding at an edge or beside Greeting needs a new valid anchor.
+        if !self.can_place_widget(widget, self.widget_position(widget)) {
+            if let Some(position) = (0..HOME_GRID_CELLS)
+                .filter_map(WidgetPosition::from_cell)
+                .find(|position| self.can_place_widget(widget, *position))
+            {
+                self.set_widget_position(widget, position);
+            } else {
+                self.edit_weather(widget, |config| config.small = !config.small);
+            }
+        }
+    }
+
     pub fn compare_apps(&self, a: &App, b: &App) -> std::cmp::Ordering {
         let usage = |app: &App| self.app_launch_counts.get(&app.id).copied().unwrap_or(0);
         let count = match self.app_sorting {
@@ -454,10 +666,6 @@ impl Preferences {
         }
     }
 
-    pub fn widget_span(&self, widget: HomeWidget) -> (u8, u8) {
-        widget.span(self.home_rows)
-    }
-
     pub fn widget_position(&self, widget: HomeWidget) -> WidgetPosition {
         match widget {
             HomeWidget::Greeting => self.greeting_position,
@@ -466,6 +674,11 @@ impl Preferences {
                 || self.default_widget_position(widget),
                 |row| WidgetPosition { column: 0, row },
             ),
+            HomeWidget::Crypto => self.crypto.position,
+            HomeWidget::Stocks => self.stocks.position,
+            HomeWidget::ExtraWeather(i) => self.extra_weather[usize::from(i)].position,
+            HomeWidget::ExtraCrypto(i) => self.extra_crypto[usize::from(i)].position,
+            HomeWidget::ExtraStocks(i) => self.extra_stocks[usize::from(i)].position,
         }
     }
 
@@ -474,18 +687,38 @@ impl Preferences {
             HomeWidget::Greeting => self.show_greeting,
             HomeWidget::Weather => self.show_weather,
             HomeWidget::Favorites => self.show_favorites_dock,
+            HomeWidget::Crypto => self.crypto.enabled,
+            HomeWidget::Stocks => self.stocks.enabled,
+            HomeWidget::ExtraWeather(i) => self
+                .extra_weather
+                .get(usize::from(i))
+                .is_some_and(|s| s.enabled),
+            HomeWidget::ExtraCrypto(i) => self
+                .extra_crypto
+                .get(usize::from(i))
+                .is_some_and(|s| s.enabled),
+            HomeWidget::ExtraStocks(i) => self
+                .extra_stocks
+                .get(usize::from(i))
+                .is_some_and(|s| s.enabled),
         }
     }
 
     /// Restore widget membership and placement without discarding configuration.
     pub fn reset_widgets(&mut self) -> bool {
-        let changed = HomeWidget::ALL.into_iter().any(|widget| {
-            !self.has_widget(widget)
-                || self.widget_position(widget) != self.default_widget_position(widget)
-        });
-        for widget in HomeWidget::ALL {
-            self.set_widget_present(widget, true);
-            self.set_widget_position(widget, self.default_widget_position(widget));
+        let by_default = |widget| {
+            matches!(
+                widget,
+                HomeWidget::Greeting | HomeWidget::Weather | HomeWidget::Favorites
+            )
+        };
+        let mut changed = false;
+        for widget in self.widgets() {
+            let position = self.default_widget_position(widget);
+            changed |= self.has_widget(widget) != by_default(widget)
+                || self.widget_position(widget) != position;
+            self.set_widget_present(widget, by_default(widget));
+            self.set_widget_position(widget, position);
         }
         self.legacy_date_position = None;
         changed
@@ -496,11 +729,16 @@ impl Preferences {
             HomeWidget::Greeting => self.show_greeting = present,
             HomeWidget::Weather => self.show_weather = present,
             HomeWidget::Favorites => self.show_favorites_dock = present,
+            HomeWidget::Crypto => self.crypto.enabled = present,
+            HomeWidget::Stocks => self.stocks.enabled = present,
+            HomeWidget::ExtraWeather(i) => self.extra_weather[usize::from(i)].enabled = present,
+            HomeWidget::ExtraCrypto(i) => self.extra_crypto[usize::from(i)].enabled = present,
+            HomeWidget::ExtraStocks(i) => self.extra_stocks[usize::from(i)].enabled = present,
         }
     }
 
     pub fn widget_at(&self, position: WidgetPosition) -> Option<HomeWidget> {
-        HomeWidget::ALL.into_iter().find(|widget| {
+        self.widgets().into_iter().find(|widget| {
             let anchor = self.widget_position(*widget);
             let (w, h) = self.widget_span(*widget);
             self.has_widget(*widget)
@@ -512,8 +750,9 @@ impl Preferences {
     }
 
     pub fn can_place_widget(&self, widget: HomeWidget, position: WidgetPosition) -> bool {
-        position.fits(self.widget_span(widget))
-            && HomeWidget::ALL
+        self.widget_fits(widget, position)
+            && self
+                .widgets()
                 .into_iter()
                 .filter(|other| *other != widget && self.has_widget(*other))
                 .all(|other| {
@@ -541,6 +780,11 @@ impl Preferences {
                 self.favorites_dock_row =
                     (position != self.default_widget_position(widget)).then_some(position.row);
             }
+            HomeWidget::Crypto => self.crypto.position = position,
+            HomeWidget::Stocks => self.stocks.position = position,
+            HomeWidget::ExtraWeather(i) => self.extra_weather[usize::from(i)].position = position,
+            HomeWidget::ExtraCrypto(i) => self.extra_crypto[usize::from(i)].position = position,
+            HomeWidget::ExtraStocks(i) => self.extra_stocks[usize::from(i)].position = position,
         }
     }
 
@@ -660,67 +904,98 @@ impl Preferences {
         if self.home_rows == rows || !(1..=MAX_HOME_ROWS).contains(&rows) {
             return false;
         }
-        self.home_rows = rows;
-        self.repair_widget_positions();
+        let mut resized = self.clone();
+        resized.home_rows = rows;
+        if !resized.repair_widget_positions(false) {
+            return false;
+        }
+        *self = resized;
         true
     }
 
-    fn repair_widget_positions(&mut self) {
+    fn repair_widget_positions(&mut self, allow_hide: bool) -> bool {
         let dock = HomeWidget::Favorites;
         let last = self.default_widget_position(dock).row;
         let preferred = self.widget_position(dock).row.min(last);
         let mut rows: Vec<_> = (0..=last).collect();
         rows.sort_by_key(|row| row.abs_diff(preferred));
-
         for row in rows {
-            let dock_position = WidgetPosition { column: 0, row };
-            if let Some((greeting, weather)) = self.arrange_widgets(dock_position) {
-                self.set_widget_position(dock, dock_position);
-                self.greeting_position = greeting;
-                self.weather_position = weather;
-                return;
+            let mut candidate = self.clone();
+            candidate.set_widget_position(dock, WidgetPosition { column: 0, row });
+            if candidate.arrange_widgets(false) {
+                *self = candidate;
+                return true;
             }
         }
+        // Invalid saved layouts may contain more widgets than fit at once. Retain their
+        // configuration, even if some have to be disabled. Interactive resizing never drops one.
+        if allow_hide {
+            self.set_widget_position(dock, self.default_widget_position(dock));
+            return self.arrange_widgets(true);
+        }
+        false
     }
 
-    fn arrange_widgets(
-        &self,
-        dock_position: WidgetPosition,
-    ) -> Option<(WidgetPosition, WidgetPosition)> {
+    fn arrange_widgets(&mut self, allow_hide: bool) -> bool {
         let dock = HomeWidget::Favorites;
-        let (greeting, weather) = (HomeWidget::Greeting, HomeWidget::Weather);
-        let candidates = |widget| {
+        let mut placed = Vec::new();
+        if self.has_widget(dock) {
+            placed.push(dock);
+        }
+        let mut widgets = self.widgets();
+        // Reserve space for the larger widgets before filling remaining cells with 1×1 widgets.
+        widgets.sort_by_key(|widget| {
+            let (width, height) = self.widget_span(*widget);
+            std::cmp::Reverse(width * height)
+        });
+        for widget in widgets.into_iter().filter(|widget| *widget != dock) {
             let current = self.widget_position(widget);
-            let size = self.widget_span(widget);
-            std::iter::once(current)
-                .chain(std::iter::once(self.default_widget_position(widget)))
+            let default = self.default_widget_position(widget);
+            if !self.has_widget(widget) {
+                if !self.widget_fits(widget, current) {
+                    self.set_widget_position(widget, default);
+                }
+                continue;
+            }
+            let span = self.widget_span(widget);
+            let position = [current, default]
+                .into_iter()
                 .chain((0..HOME_GRID_CELLS).filter_map(WidgetPosition::from_cell))
-                .filter(move |position| {
-                    position.fits(size)
-                        && (!self.has_widget(widget)
-                            || !self.has_widget(dock)
-                            || !position.overlaps(size, dock_position, self.widget_span(dock)))
-                })
-        };
-
-        for greeting_position in candidates(greeting) {
-            if let Some(weather_position) = candidates(weather).find(|position| {
-                !self.has_widget(greeting)
-                    || !self.has_widget(weather)
-                    || !greeting_position.overlaps(
-                        self.widget_span(greeting),
-                        *position,
-                        self.widget_span(weather),
-                    )
-            }) {
-                return Some((greeting_position, weather_position));
+                .find(|position| {
+                    position.fits(span)
+                        && placed.iter().all(|other| {
+                            !position.overlaps(
+                                span,
+                                self.widget_position(*other),
+                                self.widget_span(*other),
+                            )
+                        })
+                });
+            if let Some(position) = position {
+                self.set_widget_position(widget, position);
+                placed.push(widget);
+            } else if allow_hide {
+                self.set_widget_present(widget, false);
+            } else {
+                return false;
             }
         }
-        None
+        true
     }
 
     pub fn sanitize(&mut self) {
         self.home_rows = self.home_rows.clamp(1, MAX_HOME_ROWS);
+        self.extra_crypto.truncate(HOME_GRID_CELLS);
+        self.extra_stocks.truncate(HOME_GRID_CELLS);
+        self.extra_weather.truncate(HOME_GRID_CELLS);
+        for config in &mut self.extra_crypto {
+            config.sanitize(HomeWidget::Crypto);
+        }
+        for config in &mut self.extra_stocks {
+            config.sanitize(HomeWidget::Stocks);
+        }
+        self.crypto.sanitize(HomeWidget::Crypto);
+        self.stocks.sanitize(HomeWidget::Stocks);
         // Collapse the previous draft's untouched separate-Date arrangement.
         // Custom Greeting/Weather anchors remain unchanged.
         if self.legacy_date_position.take().is_some()
@@ -736,7 +1011,7 @@ impl Preferences {
         {
             self.favorites_dock_row = Some(0);
         }
-        self.repair_widget_positions();
+        self.repair_widget_positions(true);
         if self.splash_background.as_ref().is_some_and(|id| {
             !BACKGROUNDS.iter().any(|(known, _)| *known == id) && !crate::wallpapers::valid_id(id)
         }) {
@@ -795,7 +1070,7 @@ impl Preferences {
 }
 
 /// Every bundled device SVG offered by the native input icon picker.
-pub const INPUT_ICONS: [(&str, &str); 15] = [
+pub const INPUT_ICONS: [(&str, &str); 16] = [
     ("hdmi", "inputIconHdmi"),
     ("usb", "inputIconUsb"),
     ("apple-tv", "inputIconAppleTv"),
@@ -803,6 +1078,7 @@ pub const INPUT_ICONS: [(&str, &str); 15] = [
     ("console", "inputIconConsole"),
     ("playstation", "inputIconPlaystation"),
     ("shield", "inputIconShield"),
+    ("steam", "inputIconSteam"),
     ("streamer", "inputIconStreamer"),
     ("switch", "inputIconSwitch"),
     ("switch2", "inputIconSwitch2"),

@@ -26,7 +26,9 @@
   bundled at `assets/licenses/lucide.txt`. The Luma upload icon and the small `luma-mark.svg` reuse
   original project artwork under MIT. PlayStation/Apple TV input paths were supplied by the user;
   the brand marks belong to Sony/Apple. The Shield and Xbox input icons are the NVIDIA eye and Xbox logo from Simple
-  Icons (CC0); the marks belong to NVIDIA and Microsoft. The Switch and Switch 2 input icons are the
+  Icons (CC0); the marks belong to NVIDIA and Microsoft. The Steam input icon is from
+  [Simple Icons](https://github.com/simple-icons/simple-icons/blob/develop/icons/steam.svg)
+  (CC0); the mark belongs to Valve. The Switch and Switch 2 input icons are the
   Wikimedia Commons logo files `Nintendo_Switch_Logo.svg` and
   `Nintendo_Switch_2_logo_transparent_black.svg`, recoloured to `currentColor`; the marks belong to
   Nintendo. Spotify/Kodi symbol treatments use the original native
@@ -39,6 +41,7 @@
 - `assets/ui-icons/upload.svg`, `assets/ui-icons/input-disk.svg` and `assets/wallpaper-upload/`: original Luma artwork/UI, MIT.
 - `assets/ui-icons/volume.svg` and the synthesized UI cues in `src/feedback.rs`: original Luma
   artwork/audio, MIT. No Apple/tvOS sound recordings are included.
+- `assets/ui-icons/market-up.svg` and `market-down.svg`: original Luma direction arrows, MIT.
 
 The bundled icon/logo SVG sources are compiled into derived `.lvec` triangles with the same
 source licenses. Apple TV, Disney+, Prime Video and Das Erste retain the white display treatment.
@@ -112,8 +115,8 @@ to compiled `.lvec` derivatives.
 ### Live TV and browser cards
 
 `live-tv.svg` and `browser.svg` are original Luma artwork, MIT. Both share a blue/cyan material
-with a light rim and white details. Live TV uses a rounded display, play symbol and live
-indicator. Browser uses a globe with a navigation pointer. The gradients and highlights are vector
+with a light rim and white details. Live TV uses a centered rounded display without a stand,
+with a play symbol and live indicator. Browser uses a globe with a navigation pointer. The gradients and highlights are vector
 geometry, with no embedded images, runtime fonts, filters or raster effects. Each utility card
 uses its native app's exact ID.
 

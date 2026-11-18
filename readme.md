@@ -2,7 +2,7 @@
 
 A native launcher for rooted LG webOS TVs, inspired by Apple TV.
 
-https://github.com/user-attachments/assets/5b2c6e78-ec77-41f5-a79a-1fcfbe8e524b
+https://github.com/user-attachments/assets/cae57643-f6b4-47b5-ad7d-0483b32eeb2d
 
 <details>
 <summary>Screenshots</summary>
@@ -28,61 +28,12 @@ https://github.com/user-attachments/assets/5b2c6e78-ec77-41f5-a79a-1fcfbe8e524b
 
 </details>
 
-## Home and app drawer
+## Features
 
-Home widgets use an invisible **6×5 placement grid**, including the Favorites dock.
-**Greeting** combines the weekday/date and greeting in **4 columns × 1 row**;
-**Weather** is **2 columns × 2 rows**. By default Greeting sits at the top left and
-Weather at the top right, spanning the first two rows. Empty cells remain transparent.
-Open **Settings → Widgets** to see the Home placement grid. Select a widget for an
-app-style **Configure / Move / Remove** menu. At the top right above the grid, **Reset to defaults** sits to the
-left of **Add widget**, using the same pill controls as Backgrounds. The Add menu only lists
-widgets not already on Home; empty cells also open it directly. Configure opens the existing options,
-without a show/hide switch; removing frees its cells but keeps its configuration for re-adding.
-Use the arrows or point at a cell to choose its top-left anchor, then **OK / click** to save;
-**Back** cancels. Red placements overlap the other widget or exceed the grid and cannot be saved.
-Greeting and Weather have fixed sizes. Reset restores the default widgets and their positions without
-clearing their configuration. A **Shortcuts** pill sits at the top left. Inputs has its own sidebar section,
-directly below Apps, and is not a widget.
-There is no configurable greeting name;
-names stored by earlier drafts are ignored and removed on the next preferences save.
-
-Home uses Liquid Glass controls over your wallpaper, a floating favorites dock, and a weather
-block with a condition icon, temperature, condition, and location. The combined Greeting restores
-the original small, spaced weekday/date above a large, tightly tracked greeting. Greeting settings
-include a date visibility toggle and date-format choices; Date is not a separate widget.
-
-- In **Settings → Widgets**, select **Favorites** in the grid preview. **Configure** sets
-  **One row** (default), **Two rows**, or **Three rows**. The multi-row layouts show pinned
-  favorites, with six slots per row. Additional favorites continue to the right.
-- **Move** uses the same grid editor as the other widgets. Favorites spans all six columns. **Remove widget** hides the dock and
-  leaves an **Apps** button for opening the drawer. Use **Add widget** to restore Favorites.
-- **Left / Right** browses favorites, and **Up / Down** moves between rows. If the next column
-  has a card only in a higher row, **Right** moves to that card. Hold **OK** to reorder favorites.
-- **Down** from the bottom row opens the animated six-column app drawer. Two- and three-row docks
-  scroll with the drawer so more app rows can use the screen.
-- **Up** from the drawer’s first app row returns Home with the corresponding favorite selected.
-- **Up** from the top row reaches the corner controls.
-- **Back** closes the drawer and focuses the first favorite.
-- **Settings → General → App sorting** chooses **Alphabetically** (default) or **Usage count**.
-  Usage sorts by successful launches from Luma, most used first, with alphabetical ties.
-  Counts stay local and persist across restarts. Favorites keep their manual order.
-- **Settings → General → UI sounds** enables soft, tvOS-inspired navigation, select, and back
-  feedback. Off by default; uses original synthesized sounds, not Apple recordings.
-- **Settings → Widgets → select Weather → Configure → Widget style** offers **Standard**, **No icon**,
-  and **Compact**, with a preview of every design before choosing. Compact
-  places a small condition icon on the second line beside the condition and location.
-- **OK / click** launches apps directly. Manage favorites, hidden apps, and uninstall actions in
-  **Luma Settings → Apps**. Hidden apps remain listed there.
-- Direct **input pills** at the top left show names, icons, and connection dots, respecting
-  each input's Auto / On / Off visibility setting.
-- The **clock** opens floating Control Center-style actions for **Luma Settings** or LG's native
-  **TV settings**. LG's native settings UI is unchanged.
-
-Screenshots are native desktop previews, not hardware performance claims.
-
-If installed app icons look stale, use **Settings → System → Reset icon cache** to
-clear cached artwork and reload it without changing your preferences.
+- Customizable app drawer, input icons and recent app switching.
+- Movable greeting, weather, stock and crypto widgets. Configure one to three rows of Favorites in Settings → Widgets.
+- Built-in and uploaded backgrounds, with optional rotation.
+- Webhook shortcuts and 16 interface languages.
 
 ## Compatibility
 
@@ -172,10 +123,10 @@ clear cached artwork and reload it without changing your preferences.
 
 ### Homebrew Channel
 
-Add this custom repository URL to Homebrew Channel:
+After a stable release is published from this fork, add its repository URL to Homebrew Channel:
 
 ```text
-https://github.com/ecklf/lg-luma/releases/latest/download/repo.json
+https://github.com/Near-o7/lg-luma/releases/latest/download/repo.json
 ```
 
 Upvote [the official Homebrew Channel repository PR](https://github.com/webosbrew/apps-repo/pull/343)
@@ -186,7 +137,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.3.0_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.5.1_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -259,6 +210,10 @@ helper to mount Luma and then opens Home. If this fails, the cold-boot hook moun
 Keys pass through the filter unchanged, and `home.sh disable` removes both. The early-boot timing
 has not been verified on webOS 24.
 
+On webOS 5/6, Home takeover preserves the TV's input policy. An experimental
+[power-on and Back/Exit policy](#optional-power-on-and-backexit-policy-webos-56) can open Luma
+instead of the last input; tested on webOS 5.6.2 only, not verified on webOS 24.
+
 </details>
 
 <details>
@@ -290,6 +245,27 @@ Disable before enabling takeover or uninstalling Luma:
 sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/autostart.sh disable
 ```
 
+### Optional power-on and Back/Exit policy (webOS 5/6)
+
+Requires executable Home takeover; this command is not supported on webOS 25/26's manifest method.
+On webOS 25, LG provides **Settings → General → System → Additional Settings → Home Settings →
+Power On Screen → Home** for startup selection ([LG guide](https://www.lg.com/us/support/help-library/lg-tv-choosing-your-power-on-screen--20154629491064)).
+That setting does not configure Back/Exit behavior or guarantee Luma launches after takeover.
+
+Home takeover alone preserves the TV's input policy. After enabling Home takeover, owners who
+want Luma instead of the last TV input at power-on and after leaving apps can explicitly run:
+
+```sh
+sh /var/lib/luma-home/home.sh startup-home on
+# Restore the saved power-on and Back/Exit input while keeping Home takeover:
+sh /var/lib/luma-home/home.sh startup-home off
+```
+
+Select the desired fallback TV input before opting in. This experimental policy pins EIM's
+last-input file read-only; tested on webOS 5.6.2 only. Disabling takeover also restores the saved
+input. Existing draft installations without a saved prior setting use the input recorded in
+EIM's `appId` as their migration fallback.
+
 ### LG Input Hook Method
 
 You can use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputhook/), configure an Execute action with this one-line command:
@@ -299,56 +275,6 @@ You can use [LG Input Hook](https://repo.webosbrew.org/apps/org.webosbrew.inputh
 ```
 
 Test on a spare button first. Disable the mapping in Input Hook to restore normal Home behavior.
-
-## Features
-
-Choose the interface language in **Settings → General → Language**. Luma supports Catalan,
-Czech, Dutch, English, French, German, Italian, Polish, Portuguese (Brazil), Russian,
-Simplified Chinese, Spanish, Swedish, Traditional Chinese and Vietnamese.
-
-### Backgrounds
-
-Open **Settings → Background → Upload**, then scan the QR code or open the shown
-address on a phone or computer on the same network. Choose a JPEG, PNG or WebP and adjust
-its 16:9 crop before choosing **Save to TV**.
-
-The upload link works only while its TV dialog is open and focused.
-
-Enable **Rotation** beside **Upload** to cycle through backgrounds on each Luma restart and every
-15 minutes with a slow cross-fade. Rotation is off by default and leaves your manually chosen
-LG splash unchanged.
-
-Toggle **Gradient** beside **Rotation** to turn background shading on or off. It defaults to On
-and remembers your choice. Older uploads without an unshaded copy keep their full-resolution
-shaded image. This does not change LG's launch splash.
-
-### Input icons
-
-Open **Settings → Inputs**, select an input, then choose
-**Icon** to open a native picker for bundled SVG icons. Choices are **Automatic** (the default,
-using label detection), **HDMI**, **USB**, **Apple TV**, **Computer**, **Console**, **PlayStation**,
-**NVIDIA Shield**, **Streaming device**, **Nintendo Switch**, **Nintendo Switch 2**, and **Xbox**.
-
-An explicit icon choice is saved separately for each input and persists across restarts.
-Choose **Automatic** to clear that input's override and restore label-based icon detection.
-
-### Recent app switching
-
-Hold **Back** for 0.6 seconds from any page to open Recent apps. A short press never opens it,
-including on Home.
-
-- **Left / Right**, the pointer, or the scroll wheel browses recent apps and inputs.
-- **OK** or a pointer click opens the selected app or input.
-- **Up** closes the selected app and removes its card.
-- **Back** dismisses the switcher and restores the previous page and focus.
-
-These shortcuts work while Luma is focused. From another app, return to Luma first.
-
-### Shortcut tiles
-
-Shortcut tiles sit on Home like apps but send a web request when selected, for example to a Home
-Assistant webhook. Open **Settings → Widgets → Shortcuts → Configure** and scan
-the QR code.
 
 ## Development
 
@@ -370,7 +296,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.3.0_arm.ipk
+dist/com.ecklf.luma_3.5.1_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png
@@ -405,10 +331,6 @@ pnpm dev --test-extra-apps 120
 
 Preview preferences are separate from normal preferences. See [development.md](development.md)
 for controls, vector rendering, diagnostics, tests and the source layout.
-
-For release-worthy changes, include a file generated by `pnpm changeset` in your PR. The automated
-Version Packages PR synchronizes app versions and publishes after merging and passing CI.
-See [Releases](development.md#releases) for the workflow and repository setup.
 
 ## License
 

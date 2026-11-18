@@ -7,9 +7,9 @@ use crate::{
     },
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
-        APPS_COLUMNS, APPS_SECTION, Control, HOME_FADE_LEFT, HOME_FADE_RIGHT, HOME_GRID_PITCH_Y,
-        HOME_GRID_TOP, HOME_STRIP_LEFT, HOME_STRIP_RIGHT, HOME_TILE_HEIGHT, INPUTS_SECTION, KEYS,
-        Overlay, Page, Rect, SYSTEM_SECTION, State, Subpage, Target, TextField, WIDGETS_SECTION,
+        APPS_COLUMNS, APPS_SECTION, Control, HOME_GRID_PITCH_Y, HOME_GRID_TOP, HOME_TILE_HEIGHT,
+        INPUTS_SECTION, KEYS, Overlay, Page, Rect, SYSTEM_SECTION, State, Subpage, Target,
+        TextField, WIDGETS_SECTION,
     },
     weather::{self, Unit},
 };
@@ -307,7 +307,7 @@ impl Scene {
                         [brightness, brightness, brightness, alpha],
                     );
                 }
-                Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => {}
+                Draw::Clip(_) | Draw::EdgeFade(_) => {}
             }
         }
     }
@@ -939,7 +939,7 @@ fn tile(out: &mut Scene, state: &State, assets: &Assets, app: &App, rect: Rect, 
         MAIN_TOP
     };
     if rect.y + rect.h < top
-        || rect.y > 1054.
+        || rect.y > viewport.y + viewport.h
         || rect.x + rect.w + 40. < viewport.x
         || rect.x - 40. > viewport.x + viewport.w
     {
@@ -1175,11 +1175,15 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect, language:
 
 fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     home_widgets(out, state, assets, now);
-    if state.drawer_visibility > 0. {
+    let peek = state.drawer_peeks();
+    if peek || state.drawer_visibility > 0. {
         let controls = out.controls.len();
         let start = out.draw.len();
         library_grid(out, state, assets);
-        out.fade(start, state.drawer_progress(), 1.);
+        if !peek {
+            out.fade(start, state.drawer_progress(), 1.);
+        }
+        // The Home peek is decorative, including while the drawer settles closed.
         out.controls.truncate(controls);
     }
     if state.preferences.show_favorites_dock {
@@ -1224,13 +1228,21 @@ fn home_widget_rect(state: &State, widget: HomeWidget, position: WidgetPosition)
 fn home_widgets(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let start = out.draw.len();
     let language = state.preferences.language;
-    for widget in [HomeWidget::Greeting, HomeWidget::Weather] {
-        if !state.preferences.has_widget(widget) {
+    for widget in state.preferences.widgets() {
+        if widget == HomeWidget::Favorites || !state.preferences.has_widget(widget) {
             continue;
         }
         let cell = home_widget_rect(state, widget, state.preferences.widget_position(widget));
-        if widget == HomeWidget::Weather {
-            let mut summary = weather_summary_layout(state, assets);
+        if matches!(widget.kind(), HomeWidget::Crypto | HomeWidget::Stocks) {
+            market_widget(out, state, assets, widget, cell);
+            continue;
+        }
+        if widget.kind() == HomeWidget::Weather {
+            if state.preferences.weather_settings(widget).small {
+                small_weather(out, state, assets, cell, widget);
+                continue;
+            }
+            let mut summary = weather_summary_layout(state, assets, widget);
             // Reflow rather than shrinking the entire widget: text remains legible
             // even when a translated condition or location name is unusually long.
             // Keep the original temperature size unless width fitting requires
@@ -1248,7 +1260,11 @@ fn home_widgets(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDate
                 rect.w = cell.w - inset;
             }
             for (label, style, _, rect) in &mut summary.parts {
-                if state.preferences.weather_location.is_none()
+                if state
+                    .preferences
+                    .weather_settings(widget)
+                    .location
+                    .is_none()
                     && label == language.t("setWeatherLocation")
                 {
                     // Setup is an action, not expendable metadata: keep its full
@@ -1261,7 +1277,7 @@ fn home_widgets(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDate
                     (*label, *style) = assets.fit_line(label, *style, rect.w, 24.);
                 }
             }
-            weather_summary(out, state, assets, summary, cell);
+            weather_summary(out, state, assets, summary, cell, widget);
             continue;
         }
         // Keep the original typography within the wider 4×1 footprint,
@@ -1301,6 +1317,126 @@ fn home_widgets(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDate
         );
     }
     out.fade(start, 1. - state.drawer_progress(), 1.);
+}
+
+fn market_widget(out: &mut Scene, state: &State, assets: &Assets, kind: HomeWidget, cell: Rect) {
+    let language = state.preferences.language;
+    let config = crate::markets::settings(&state.preferences, kind);
+    let slot = &state.markets.slots[crate::markets::index(kind)];
+    let symbol = if config.symbol.is_empty() {
+        language.t(kind.key())
+    } else {
+        &config.symbol
+    };
+    let value = slot
+        .quote
+        .as_ref()
+        .map(crate::markets::format_price)
+        .unwrap_or_else(|| {
+            language
+                .t(if config.symbol.is_empty() {
+                    "notSet"
+                } else if slot.failed {
+                    "marketUnavailable"
+                } else {
+                    "marketLoading"
+                })
+                .to_owned()
+        });
+    let age = slot
+        .quote
+        .as_ref()
+        .map(|quote| {
+            crate::markets::relative_age(
+                language,
+                quote.timestamp,
+                OffsetDateTime::now_utc().unix_timestamp(),
+            )
+        })
+        .unwrap_or_default();
+    let status = if slot.failed && slot.quote.is_some() {
+        language.t("lastReading")
+    } else {
+        ""
+    };
+    for (label, y, size, height) in [
+        (symbol, 0., 20., 24.),
+        (value.as_str(), 26., 34., 42.),
+        (status, 96., 10., 14.),
+    ] {
+        let (label, style) = assets.fit_line(label, text(size, 500, -0.02), cell.w, 10.);
+        out.text(
+            label,
+            Rect::new(cell.x, cell.y + y, cell.w, height),
+            style,
+            WHITE,
+            false,
+        );
+    }
+    let change = slot
+        .quote
+        .as_ref()
+        .and_then(|quote| quote.change_percent)
+        .filter(|change| change.is_finite());
+    let (label, color, icon) = if let Some(change) = change {
+        // Values rounding to zero are neutral, not misleading green/red zeroes.
+        let change = if change.abs() < 0.005 { 0. } else { change };
+        if change > 0. {
+            (format!("+{change:.2}%"), c(0x32d583, 1.), Some("market-up"))
+        } else if change < 0. {
+            (
+                format!("{change:.2}%"),
+                c(0xf97066, 1.),
+                Some("market-down"),
+            )
+        } else {
+            ("0.00%".into(), WHITE, None)
+        }
+    } else {
+        (
+            language
+                .t(if config.symbol.is_empty() {
+                    "configureInSettings"
+                } else {
+                    "marketChangeUnavailable"
+                })
+                .to_owned(),
+            c(0xf5f5f5, 0.65),
+            None,
+        )
+    };
+    let inset = if icon.is_some() { 23. } else { 0. };
+    if let Some(icon) = icon {
+        out.icon(
+            assets,
+            icon,
+            Rect::new(cell.x, cell.y + 73., 18., 18.),
+            color,
+        );
+    }
+    let change_space = if config.symbol.is_empty() {
+        cell.w
+    } else {
+        152.
+    } - inset;
+    let (label, style) = assets.fit_line(&label, text(18., 550, 0.), change_space, 12.);
+    let change_width = assets.width(&label, style);
+    out.text(
+        label,
+        Rect::new(cell.x + inset, cell.y + 70., change_space, 24.),
+        style,
+        color,
+        false,
+    );
+    let age_offset = inset + change_width + 16.;
+    let (age, style) = assets.fit_line(&age, text(14., 450, 0.), cell.w - age_offset, 10.);
+    out.text(
+        age,
+        Rect::new(cell.x + age_offset, cell.y + 73., cell.w - age_offset, 20.),
+        style,
+        c(0xf5f5f5, 0.78),
+        false,
+    );
 }
 
 fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
@@ -1358,27 +1494,95 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
             },
         );
     }
-    // Like Apple TV's rows, the favourites run to the screen edge: the next tile shows cut off
-    // at the right (and a scrolled-away one at the left), so it is clear the row continues.
-    out.draw.push(Draw::Clip(Some(state.favorites_viewport())));
-    // Soft edges: out to the right from the end of the sixth tile, and in from the left once
-    // the row has scrolled.
-    let left = if state.home_scroll > 0. {
-        [HOME_FADE_LEFT, HOME_STRIP_LEFT]
-    } else {
-        [0., 0.]
-    };
-    out.draw.push(Draw::EdgeFadeX(Some([
-        left[0],
-        left[1],
-        HOME_STRIP_RIGHT,
-        HOME_FADE_RIGHT,
-    ])));
+    // The favourites scroll inside their glass card and slide under its edges.
+    let mut viewport = state.favorites_viewport();
+    if let Some(clip) = clip {
+        let bottom = viewport.y + viewport.h;
+        viewport.y = viewport.y.max(clip.y);
+        viewport.h = (bottom.min(clip.y + clip.h) - viewport.y).max(0.);
+    }
+    out.draw.push(Draw::Clip(Some(viewport)));
     for (index, app) in apps.iter().enumerate() {
         tile(out, state, assets, app, card(index), true);
     }
-    out.draw.push(Draw::EdgeFadeX(None));
     out.draw.push(Draw::Clip(Some(state.content_viewport())));
+}
+
+fn small_weather(out: &mut Scene, state: &State, assets: &Assets, cell: Rect, widget: HomeWidget) {
+    let language = state.preferences.language;
+    let config = state.preferences.weather_settings(widget);
+    let weather = state.widget_weather(widget);
+    let place = config.location.as_ref();
+    let reading = place.and_then(|place| weather.reading(place));
+    let label = reading.map_or_else(
+        || {
+            language
+                .t(if place.is_none() {
+                    "setWeatherLocation"
+                } else if weather.loading {
+                    "loadingWeather"
+                } else {
+                    "weatherUnavailable"
+                })
+                .to_owned()
+        },
+        |reading| weather::format_temperature(reading.temperature, config.unit),
+    );
+    let icon = reading.map_or("partly-cloudy", |reading| weather::condition(reading).icon);
+    out.image(
+        assets.path(format!("weather/{icon}.png")),
+        Rect::new(cell.x, cell.y, 48., 48.),
+        0.,
+        true,
+    );
+    let (label, style) = if reading.is_some() {
+        assets.fit_line(&label, text(48., 500, -0.025), cell.w - 60., 16.)
+    } else {
+        // Keep the complete setup/loading/error action, wrapping within its cell.
+        let mut style = text(20., 500, -0.025).leading(1.2);
+        while assets.lines(&label, style, cell.w - 60.) > 2 && style.size > 14. {
+            style.size -= 1.;
+        }
+        (label, style)
+    };
+    out.text(
+        label,
+        Rect::new(cell.x + 60., cell.y, cell.w - 60., 58.),
+        style,
+        WHITE,
+        false,
+    );
+    let detail = place.map_or(language.t("weather"), |place| place.name.as_str());
+    let (detail, style) = assets.fit_line(detail, text(18., 450, 0.), cell.w, 14.);
+    out.text(
+        detail,
+        Rect::new(cell.x, cell.y + 66., cell.w, 26.),
+        style,
+        c(0xf5f5f5, 0.78),
+        false,
+    );
+    if weather.failed && reading.is_some() {
+        let (label, style) =
+            assets.fit_line(language.t("lastReading"), text(16., 400, 0.), cell.w, 14.);
+        out.text(
+            label,
+            Rect::new(cell.x, cell.y + 96., cell.w, 24.),
+            style,
+            c(0xf5f5f5, 0.65),
+            false,
+        );
+    }
+    if place.is_none() {
+        let target = if widget == HomeWidget::Weather {
+            Target::WeatherConfigure
+        } else {
+            Target::ConfigureWidget(widget)
+        };
+        if state.focus == target && !state.pointer {
+            out.border(cell.inset(-5.), 8.6, 2., WHITE);
+        }
+        out.control(target, cell, true);
+    }
 }
 
 struct WeatherSummary {
@@ -1389,8 +1593,14 @@ struct WeatherSummary {
     show_icon: bool,
     parts: Vec<(String, TextStyle, Color, Rect)>,
 }
-fn weather_summary_layout(state: &State, assets: &Assets) -> WeatherSummary {
-    weather_summary_layout_for(state, assets, state.preferences.weather_style, false)
+fn weather_summary_layout(state: &State, assets: &Assets, widget: HomeWidget) -> WeatherSummary {
+    weather_summary_layout_for(
+        state,
+        assets,
+        state.preferences.weather_settings(widget).style,
+        false,
+        widget,
+    )
 }
 
 fn weather_summary_layout_for(
@@ -1398,9 +1608,12 @@ fn weather_summary_layout_for(
     assets: &Assets,
     style: crate::model::WeatherStyle,
     preview: bool,
+    widget: HomeWidget,
 ) -> WeatherSummary {
     use crate::model::WeatherStyle;
     let language = state.preferences.language;
+    let config = state.preferences.weather_settings(widget);
+    let weather = state.widget_weather(widget);
     // Settings previews are deliberately offline samples, even before a location is configured.
     let sample = weather::Location {
         name: "Vienna".into(),
@@ -1412,7 +1625,7 @@ fn weather_summary_layout_for(
     let place = if preview {
         Some(&sample)
     } else {
-        state.preferences.weather_location.as_ref()
+        config.location.as_ref()
     };
     let reading = if preview {
         Some(weather::Reading {
@@ -1421,7 +1634,7 @@ fn weather_summary_layout_for(
             is_day: true,
         })
     } else {
-        place.and_then(|place| state.weather.reading(place))
+        place.and_then(|place| weather.reading(place))
     };
     let mut parts = Vec::new();
     let mut add = |label: String, style: TextStyle, x: f32, y: f32, width: f32, opacity: f32| {
@@ -1448,10 +1661,7 @@ fn weather_summary_layout_for(
             let condition = weather::condition(reading);
             icon = format!("weather/{}.png", condition.icon);
             add(
-                weather::format_temperature(
-                    reading.temperature,
-                    state.preferences.temperature_unit,
-                ),
+                weather::format_temperature(reading.temperature, config.unit),
                 text(112., 500, -0.055),
                 252.,
                 46.,
@@ -1466,7 +1676,7 @@ fn weather_summary_layout_for(
                 760.,
                 0.78,
             );
-            if state.weather.failed && !preview {
+            if weather.failed && !preview {
                 add(
                     language.t("lastReading").into(),
                     text(24., 400, 0.),
@@ -1478,7 +1688,7 @@ fn weather_summary_layout_for(
             }
         } else {
             add(
-                if state.weather.loading {
+                if weather.loading {
                     language.t("loadingWeather")
                 } else {
                     language.t("weatherUnavailable")
@@ -1596,6 +1806,7 @@ fn weather_summary(
     assets: &Assets,
     summary: WeatherSummary,
     cell: Rect,
+    widget: HomeWidget,
 ) {
     let scale = if state.dock_layout().rows > 1 {
         let height = summary
@@ -1626,20 +1837,30 @@ fn weather_summary(
         )
     });
     paint_weather_summary(out, assets, &summary, x, cell.y, scale);
-    if state.preferences.weather_location.is_none() {
+    if state
+        .preferences
+        .weather_settings(widget)
+        .location
+        .is_none()
+    {
+        let target = if widget == HomeWidget::Weather {
+            Target::WeatherConfigure
+        } else {
+            Target::ConfigureWidget(widget)
+        };
         let rect = Rect::new(
             cell.x,
             cell.y,
             summary.width * scale,
             summary.height * scale,
         );
-        if state.focus == Target::WeatherConfigure
+        if state.focus == target
             && !state.pointer
             && let Some(label) = label_focus
         {
             out.border(label.inset(-5.), 8.6, 2., c(0xf0f0f0, 0.95));
         }
-        out.control(Target::WeatherConfigure, rect, true);
+        out.control(target, rect, true);
     }
 }
 
@@ -1651,7 +1872,10 @@ fn library(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime)
     }
     let start = out.draw.len();
     library_grid(out, state, assets);
-    out.fade(start, state.drawer_progress(), 1.);
+    if !state.drawer_peeks() {
+        out.fade(start, state.drawer_progress(), 1.);
+    }
+    // The single-row dock floats over the scrolling grid. Taller docks scroll with it.
     favorites_dock(out, state, assets);
 }
 
@@ -1680,9 +1904,22 @@ fn library_grid(out: &mut Scene, state: &State, assets: &Assets) {
         );
     }
     out.draw.push(Draw::Clip(Some(state.apps_viewport())));
-    let offset = state.drawer_slide();
+    // Show just 24px of the next row on tvOS Home. Ease the extra inset away
+    // with the dock lift so the fully opened grid keeps its existing geometry.
+    let peek_offset = if state.drawer_peeks() {
+        9.6 * (1. - state.drawer_progress())
+    } else {
+        0.
+    };
+    let offset = state.drawer_slide() + peek_offset;
     let mut y = state.drawer_grid_top();
-    for row in apps.chunks(APPS_COLUMNS) {
+    // A settled Home only needs the first preview row, not offscreen app artwork.
+    let rows = if state.page == Page::Home && state.drawer_visibility == 0. {
+        1
+    } else {
+        usize::MAX
+    };
+    for row in apps.chunks(APPS_COLUMNS).take(rows) {
         let row_height = FACE_HEIGHT;
         for (column, app) in row.iter().enumerate() {
             tile(
@@ -1889,13 +2126,10 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
 }
 
 fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let config = state.preferences.weather_settings(state.active_weather);
     let language = state.preferences.language;
     let s = state.scroll;
-    let city = state
-        .preferences
-        .weather_location
-        .as_ref()
-        .map(|place| place.name.as_str());
+    let city = config.location.as_ref().map(|place| place.name.as_str());
     let style = text(18.4, 450, 0.).leading(1.4);
     let city_lines = city.map_or(1, |city| assets.lines(city, style, 450.));
     let height = (34. + city_lines as f32 * 25.76).max(72.);
@@ -1943,7 +2177,7 @@ fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
             rect: Rect::new(640., y, 1120., 72.),
             title: language.t("temperature"),
             icon: Some("thermometer"),
-            value: Some(state.preferences.temperature_unit.symbol()),
+            value: Some(config.unit.symbol()),
             description: None,
             selected: false,
             chevron: true,
@@ -1958,10 +2192,25 @@ fn weather_settings(out: &mut Scene, state: &State, assets: &Assets) {
             rect: Rect::new(640., y + 84., 1120., 72.),
             title: language.t("weatherStyle"),
             icon: Some("grid"),
-            value: Some(language.t(state.preferences.weather_style.label_key())),
+            value: Some(language.t(config.style.label_key())),
             description: None,
             selected: false,
             chevron: true,
+        },
+    );
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::WeatherSize,
+            rect: Rect::new(640., y + 168., 1120., 72.),
+            title: language.t("widgetSize"),
+            icon: Some("grid"),
+            value: Some(if config.small { "1 × 1" } else { "2 × 2" }),
+            description: None,
+            selected: false,
+            chevron: false,
         },
     );
 }
@@ -1993,7 +2242,7 @@ fn weather_style_settings(out: &mut Scene, state: &State, assets: &Assets) {
         // A dark inset keeps the real weather treatment readable on the white focus surface.
         let preview = Rect::new(1040., rect.y + 12., 700., 208.);
         out.shape(preview, 16., c(0x192129, 1.));
-        let summary = weather_summary_layout_for(state, assets, style, true);
+        let summary = weather_summary_layout_for(state, assets, style, true, state.active_weather);
         let scale = 0.58_f32.min((preview.w - 64.) / summary.width);
         paint_weather_summary(
             out,
@@ -2003,7 +2252,12 @@ fn weather_style_settings(out: &mut Scene, state: &State, assets: &Assets) {
             preview.y + (preview.h - summary.height * scale) / 2.,
             scale,
         );
-        if style == state.preferences.weather_style {
+        if style
+            == state
+                .preferences
+                .weather_settings(state.active_weather)
+                .style
+        {
             out.icon(
                 assets,
                 "check",
@@ -2015,9 +2269,10 @@ fn weather_style_settings(out: &mut Scene, state: &State, assets: &Assets) {
 }
 
 fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let config = state.preferences.weather_settings(state.active_weather);
     let language = state.preferences.language;
     let mut y = 164.8 - state.scroll;
-    if let Some(place) = &state.preferences.weather_location {
+    if let Some(place) = &config.location {
         let rect = Rect::new(640., y, 1120., 76.2);
         out.glass(rect, 20.);
         out.border(rect, 20., 1., c(0xffffff, 0.04));
@@ -2233,6 +2488,7 @@ fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
                 _ => None,
             };
             let sub = match &state.subpage {
+                Some(Subpage::Market(kind)) => language.t(kind.key()),
                 Some(Subpage::Greeting) => language.t("greeting"),
                 Some(Subpage::Weather) => language.t("weather"),
                 Some(Subpage::Shortcuts) => language.t("shortcuts"),
@@ -2240,6 +2496,8 @@ fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
                 Some(Subpage::Clock) => language.t("clock"),
                 Some(Subpage::Language) => language.t("language"),
                 Some(Subpage::AppSorting) => language.t("appSorting"),
+                Some(Subpage::AppDrawer) => language.t("appDrawer"),
+                Some(Subpage::RecentApps) => language.t("recentApps"),
                 Some(Subpage::TextRendering) => language.t("textRendering"),
                 _ => "",
             };
@@ -2314,6 +2572,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
         if matches!(
             subpage,
             Subpage::WeatherLocation
+                | Subpage::Market(_)
                 | Subpage::Weather
                 | Subpage::WeatherStyle
                 | Subpage::Shortcuts
@@ -2322,6 +2581,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 | Subpage::WidgetPosition(_)
         ) {
             match subpage {
+                Subpage::Market(kind) => market_settings(out, state, assets, *kind),
                 Subpage::WeatherLocation => location_settings(out, state, assets),
                 Subpage::Weather => weather_settings(out, state, assets),
                 Subpage::WeatherStyle => weather_style_settings(out, state, assets),
@@ -2401,12 +2661,20 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 (
                     language.t("celsius"),
                     None,
-                    state.preferences.temperature_unit == Unit::Celsius,
+                    state
+                        .preferences
+                        .weather_settings(state.active_weather)
+                        .unit
+                        == Unit::Celsius,
                 ),
                 (
                     language.t("fahrenheit"),
                     None,
-                    state.preferences.temperature_unit == Unit::Fahrenheit,
+                    state
+                        .preferences
+                        .weather_settings(state.active_weather)
+                        .unit
+                        == Unit::Fahrenheit,
                 ),
             ],
             Subpage::WeatherLocation
@@ -2414,13 +2682,24 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
             | Subpage::WeatherStyle
             | Subpage::Shortcuts
             | Subpage::Greeting
-            | Subpage::Clock => {
+            | Subpage::Clock
+            | Subpage::Market(_) => {
                 unreachable!()
             }
             Subpage::WidgetPosition(_) => unreachable!(),
             Subpage::Language => Language::ALL
                 .into_iter()
                 .map(|option| (option.name(), None, option == language))
+                .collect(),
+            Subpage::AppDrawer => crate::model::AppDrawerStyle::ALL
+                .into_iter()
+                .map(|style| {
+                    (
+                        language.t(style.label_key()),
+                        None,
+                        style == state.preferences.app_drawer_style,
+                    )
+                })
                 .collect(),
             Subpage::AppSorting => crate::model::AppSorting::ALL
                 .into_iter()
@@ -2429,6 +2708,16 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                         language.t(mode.label_key()),
                         None,
                         mode == state.preferences.app_sorting,
+                    )
+                })
+                .collect(),
+            Subpage::RecentApps => crate::model::RecentAppsBehavior::ALL
+                .into_iter()
+                .map(|mode| {
+                    (
+                        language.t(mode.label_key()),
+                        None,
+                        mode == state.preferences.recent_apps_behavior,
                     )
                 })
                 .collect(),
@@ -2499,6 +2788,13 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 (1, "clock", "clock", None, true),
                 (4, "language", "language", Some(language.name()), true),
                 (
+                    13,
+                    "appDrawer",
+                    "grid",
+                    Some(language.t(state.preferences.app_drawer_style.label_key())),
+                    true,
+                ),
+                (
                     10,
                     "appSorting",
                     "arrow-up-down",
@@ -2526,6 +2822,13 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                         "stateOff"
                     })),
                     false,
+                ),
+                (
+                    12,
+                    "recentApps",
+                    "clock",
+                    Some(language.t(state.preferences.recent_apps_behavior.label_key())),
+                    true,
                 ),
             ]
             .into_iter()
@@ -2913,25 +3216,54 @@ fn inputs_settings(out: &mut Scene, state: &State, assets: &Assets) {
 
 fn widget_position_settings(out: &mut Scene, state: &State, assets: &Assets, widget: HomeWidget) {
     widget_grid(out, state, assets, Some(widget));
-    out.text(
-        state.preferences.language.t("widgetPlacementHelp"),
-        Rect::new(640., 840., 1120., 100.),
-        text(20., 450, 0.).leading(1.4),
-        c(0xeeeeee, 0.8),
-        false,
-    );
-}
-
-fn widget_preview_top(state: &State) -> f32 {
-    if matches!(state.subpage, Some(Subpage::WidgetPosition(_))) {
-        180.
-    } else {
-        252.8
+    let language = state.preferences.language;
+    let style = text(20.8, 500, -0.02);
+    let mut x = 640.;
+    for (key, action) in [("← ↑ → ↓", "move"), ("OK", "confirm"), ("", "cancel")] {
+        let key_width = if key.is_empty() {
+            out.icon(assets, "backspace", Rect::new(x, 184., 28., 28.), WHITE);
+            28.
+        } else {
+            let width = assets.width(key, style);
+            out.text(key, Rect::new(x, 184., width, 28.), style, WHITE, false);
+            width
+        };
+        let label = format!("— {}", language.t(action));
+        let width = assets.width(&label, style);
+        out.text(
+            &label,
+            Rect::new(x + key_width + 10., 184., width, 28.),
+            style,
+            c(0xf5f5f5, 0.72),
+            false,
+        );
+        x += key_width + 10. + width + 40.;
     }
 }
 
+fn widget_preview_top(_state: &State) -> f32 {
+    252.8
+}
+
+fn widget_label(state: &State, widget: HomeWidget) -> String {
+    let detail = match widget.kind() {
+        HomeWidget::Weather => state
+            .preferences
+            .weather_settings(widget)
+            .location
+            .map(|place| place.name),
+        HomeWidget::Crypto | HomeWidget::Stocks => Some(
+            crate::markets::settings(&state.preferences, widget)
+                .symbol
+                .clone(),
+        )
+        .filter(|symbol| !symbol.is_empty()),
+        _ => None,
+    };
+    detail.unwrap_or_else(|| state.preferences.language.t(widget.key()).to_owned())
+}
+
 fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<HomeWidget>) {
-    let language = state.preferences.language;
     // A scaled Home canvas: cell anchors remain separate hit targets even when
     // the preview widget spans multiple cells. Browsing never changes saved positions.
     let preview = Rect::new(640., widget_preview_top(state) - state.scroll, 1120., 630.);
@@ -2972,7 +3304,9 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
             false,
         );
     }
-    for other in HomeWidget::ALL
+    for other in state
+        .preferences
+        .widgets()
         .into_iter()
         .filter(|other| Some(*other) != moving && state.preferences.has_widget(*other))
     {
@@ -2999,8 +3333,8 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
             out.shape(rect, 8., c(0x69737c, 0.65));
         }
         let (label, style) = assets.fit_line(
-            language.t(other.key()),
-            text(22., 550, 0.),
+            &widget_label(state, other),
+            text(22., 500, 0.),
             rect.w - 24.,
             16.,
         );
@@ -3033,7 +3367,7 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
             if state.preferences.widget_at(position).is_none()
                 && HomeWidget::ALL
                     .into_iter()
-                    .any(|widget| !state.preferences.has_widget(widget))
+                    .any(|widget| state.preferences.available_widget(widget).is_some())
             {
                 out.text(
                     "+",
@@ -3055,11 +3389,14 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
             c(0xffffff, 0.4),
         );
     }
-    if let Target::Choice(cell) = state.focus
-        && let Some(position) = WidgetPosition::from_cell(cell)
-    {
+    let cell = if let Target::Choice(cell) = state.focus {
+        cell
+    } else {
+        state.widget_position_cell
+    };
+    if let Some(position) = WidgetPosition::from_cell(cell) {
         let valid = state.preferences.can_place_widget(widget, position);
-        let rect = if position.fits(state.preferences.widget_span(widget)) {
+        let rect = if state.preferences.widget_fits(widget, position) {
             map(home_widget_rect(state, widget, position))
         } else {
             map(home_grid_cell_rect(position))
@@ -3076,12 +3413,104 @@ fn widget_grid(out: &mut Scene, state: &State, assets: &Assets, moving: Option<H
         out.border(rect, 8., 3., if valid { WHITE } else { c(0xffa3a3, 1.) });
         let (w, h) = state.preferences.widget_span(widget);
         let (label, style) = assets.fit_line(
-            &format!("{}  {w} × {h}", language.t(widget.key())),
+            &format!("{}  {w} × {h}", widget_label(state, widget)),
             text(24., 550, 0.),
             rect.w - 24.,
             16.,
         );
         out.text(label, rect.inset(12.), style, WHITE, true);
+    }
+}
+
+fn market_settings(out: &mut Scene, state: &State, assets: &Assets, kind: HomeWidget) {
+    let language = state.preferences.language;
+    let config = crate::markets::settings(&state.preferences, kind);
+    let editing = state.text_input_active() && state.keyboard_field == TextField::Market(kind);
+    let draft = if editing {
+        format!("{}|", state.editing_text())
+    } else {
+        config.symbol.clone()
+    };
+    let (symbol, _) = assets.fit_line(&draft, text(18.4, 450, 0.), 170., 18.4);
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::MarketSymbol(kind),
+            rect: Rect::new(640., 164.8 - state.scroll, 1120., 72.),
+            title: language.t("marketSymbol"),
+            icon: Some("type"),
+            value: Some(&symbol),
+            description: None,
+            selected: false,
+            chevron: true,
+        },
+    );
+    if kind.kind() == HomeWidget::Crypto {
+        row(
+            out,
+            state,
+            assets,
+            Row {
+                target: Target::MarketCurrency,
+                rect: Rect::new(640., 248.8 - state.scroll, 1120., 72.),
+                title: language.t("marketCurrency"),
+                icon: Some("grid"),
+                value: Some(&config.currency),
+                description: None,
+                selected: false,
+                chevron: false,
+            },
+        );
+    }
+    let crypto = kind.kind() == HomeWidget::Crypto;
+    let top = if crypto { 352.8 } else { 268.8 } - state.scroll;
+    let style = text(18., 400, 0.).leading(1.45);
+    let notes = [
+        ("refresh", language.t("marketRefreshHelp")),
+        (
+            "clock",
+            language.t(if crypto {
+                "cryptoDailyBasis"
+            } else {
+                "stocksDailyBasis"
+            }),
+        ),
+    ];
+    let heights = notes.map(|(_, label)| {
+        assets.lines(label, style, 1000.) as f32 * style.size * style.line_height
+    });
+    let panel = Rect::new(640., top, 1120., 96. + heights.iter().sum::<f32>() + 16.);
+    out.glass(panel, 20.);
+    out.border(panel, 20., 1., c(0xffffff, 0.07));
+    out.text(
+        if crypto {
+            "Coinbase · BTC, ETH"
+        } else {
+            "Yahoo Finance · AAPL, SAP.DE"
+        },
+        Rect::new(664., top + 24., 1072., 28.),
+        text(20., 550, -0.02),
+        WHITE,
+        false,
+    );
+    let mut y = top + 72.;
+    for ((icon, label), height) in notes.into_iter().zip(heights) {
+        out.icon(
+            assets,
+            icon,
+            Rect::new(664., y + 3., 20., 20.),
+            c(0xffffff, 0.55),
+        );
+        out.text(
+            label,
+            Rect::new(700., y, 1000., height),
+            style,
+            c(0xf5f5f5, 0.72),
+            false,
+        );
+        y += height + 16.;
     }
 }
 
@@ -3346,12 +3775,17 @@ fn device_icon(name: &str) -> &'static str {
             .iter()
             .any(|alias| word.eq_ignore_ascii_case(alias))
     });
+    let steam_alias = name
+        .split(|ch: char| !ch.is_alphanumeric())
+        .any(|word| word.eq_ignore_ascii_case("steam"));
     let name = name.to_lowercase().replace(' ', "");
     if playstation_alias
         || name.contains("playstation")
         || ["ps1", "ps2", "ps3", "ps4", "ps5"].contains(&name.as_str())
     {
         "playstation"
+    } else if steam_alias {
+        "steam"
     } else if name.contains("appletv") {
         "apple-tv"
     } else if name.contains("usb") {
@@ -3496,7 +3930,7 @@ fn widget_menu(out: &mut Scene, state: &State, assets: &Assets, cell: usize, cat
     if catalog {
         for widget in HomeWidget::ALL
             .into_iter()
-            .filter(|widget| !state.preferences.has_widget(*widget))
+            .filter_map(|widget| state.preferences.available_widget(widget))
         {
             actions.push((Target::AddWidget(widget), widget.key(), "grid"));
         }
@@ -3504,8 +3938,11 @@ fn widget_menu(out: &mut Scene, state: &State, assets: &Assets, cell: usize, cat
         actions.extend([
             (Target::ConfigureWidget(widget), "configure", "settings"),
             (Target::MoveWidget(widget), "move", "left"),
-            (Target::RemoveWidget(widget), "removeWidget", "circle-minus"),
         ]);
+        if widget.kind() == HomeWidget::Weather {
+            actions.push((Target::WeatherSize, "widgetSize", "grid"));
+        }
+        actions.push((Target::RemoveWidget(widget), "removeWidget", "circle-minus"));
     }
     let empty = actions.is_empty();
     if empty {
@@ -3528,7 +3965,7 @@ fn widget_menu(out: &mut Scene, state: &State, assets: &Assets, cell: usize, cat
         out.border(card, 8., 2., WHITE);
         if let Some(widget) = widget {
             out.text(
-                language.t(widget.key()),
+                widget_label(state, widget),
                 card.inset(12.),
                 text(22., 500, 0.),
                 WHITE,
@@ -3585,8 +4022,20 @@ fn widget_menu(out: &mut Scene, state: &State, assets: &Assets, cell: usize, cat
                 c(0xffffff, if focused { 0.96 } else { 0.10 })
             },
         );
-        let (label, style) =
-            assets.fit_line(language.t(key), text(20.8, 600, -0.02), rect.w - 88., 16.);
+        let label = if target == Target::WeatherSize {
+            format!(
+                "{} · {}",
+                language.t(key),
+                if state.preferences.weather_settings(widget.unwrap()).small {
+                    "1 × 1"
+                } else {
+                    "2 × 2"
+                }
+            )
+        } else {
+            language.t(key).to_owned()
+        };
+        let (label, style) = assets.fit_line(&label, text(20.8, 600, -0.02), rect.w - 88., 16.);
         out.text(
             label,
             Rect::new(rect.x + 24., rect.y + 20., rect.w - 88., 28.),
@@ -3904,6 +4353,7 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
         match state.keyboard_field {
             TextField::Location => language.t("cityPostcode"),
             TextField::InputName => language.t("inputName"),
+            TextField::Market(_) => language.t("marketSymbol"),
             TextField::Apps => language.t("findApp"),
         },
         Rect::new(389., 324., 1000., 44.),
@@ -4008,6 +4458,32 @@ fn full_screen_fill(draw: &Draw) -> bool {
 mod tests {
     use super::*;
     use crate::model::{Input, InputMode, Preferences, demo_inventory};
+
+    #[test]
+    fn hungarian_home_renders_localized_date_and_honors_date_toggle() {
+        let assets = assets();
+        let mut state = State::new(Preferences {
+            language: Language::Hu,
+            ..Default::default()
+        });
+        state.set_inventory(demo_inventory(), None);
+        let now = OffsetDateTime::parse(
+            "2026-10-21T20:41:00+02:00",
+            &time::format_description::well_known::Rfc3339,
+        )
+        .unwrap();
+        assert!(state.preferences.show_date);
+        for visible in [true, false] {
+            state.preferences.show_date = visible;
+            let rendered = scene(&state, &assets, now);
+            assert_eq!(
+                rendered.draw.iter().any(|draw| matches!(draw,
+                    Draw::Text(label, ..) if label == "2026. OKTÓBER 21., SZERDA"
+                )),
+                visible
+            );
+        }
+    }
 
     #[test]
     fn header_clock_keeps_every_digit_on_one_line() {
@@ -4671,7 +5147,7 @@ mod tests {
                         .controls
                         .iter()
                         .filter(|control| matches!(control.target, Target::App(_)))
-                        .all(|control| control.rect.y == 820.)
+                        .all(|control| control.rect.y == state.dock_y())
                 );
             }
         }
