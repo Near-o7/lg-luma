@@ -123,10 +123,10 @@ https://github.com/user-attachments/assets/cae57643-f6b4-47b5-ad7d-0483b32eeb2d
 
 ### Homebrew Channel
 
-Add this custom repository URL to Homebrew Channel:
+After a stable release is published from this fork, add its repository URL to Homebrew Channel:
 
 ```text
-https://github.com/ecklf/lg-luma/releases/latest/download/repo.json
+https://github.com/Near-o7/lg-luma/releases/latest/download/repo.json
 ```
 
 Upvote [the official Homebrew Channel repository PR](https://github.com/webosbrew/apps-repo/pull/343)
