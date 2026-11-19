@@ -26,6 +26,8 @@ pub const SETTINGS_BOTTOM_PADDING: f32 = 64.;
 pub const SETTINGS_LIST_BOTTOM_PADDING: f32 = 48.;
 pub const APPS_COLUMNS: usize = 6;
 pub const DRAWER_PADDING: f32 = 24.;
+pub const DRAWER_NAME_TOP: f32 = 12.;
+pub const DRAWER_NAME_HEIGHT: f32 = 28.;
 /// Automatic inventory retries before the error shows: with the 6.5 s Luna timeout about 50 s.
 pub const INVENTORY_RETRIES: u32 = 5;
 pub const INVENTORY_RETRY_DELAY: Duration = Duration::from_secs(2);
@@ -171,6 +173,8 @@ pub enum Target {
     RemoveWidget(HomeWidget),
     MoveWidget(HomeWidget),
     DateToggle,
+    GreetingName,
+    GreetingNameReset,
     DateFormat,
     ClockFormat,
     ClockTimeFormat,
@@ -276,6 +280,7 @@ pub enum Subpage {
     WeatherStyle,
     Language,
     AppSorting,
+    AppDrawerStyle,
     AppDrawer,
     RecentApps,
     TextRendering,
@@ -283,6 +288,7 @@ pub enum Subpage {
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum TextField {
+    GreetingName,
     Market(HomeWidget),
     Apps,
     Location,
@@ -690,6 +696,9 @@ impl State {
         self.pointer = false;
         self.pressed = None;
         self.open(0);
+        // A system relaunch reveals Home directly, not the previous app's drawer
+        // closing over it. Ordinary navigation keeps its open/close animation.
+        self.drawer_visibility = 0.;
         pending
     }
 
@@ -943,7 +952,13 @@ impl State {
                     SETTINGS_BOTTOM_PADDING
                 }
             } else if self.page == Page::Apps {
+                // Scroll card-only hit regions far enough to reveal their names too.
                 DRAWER_PADDING
+                    + if self.preferences.show_drawer_app_names {
+                        DRAWER_NAME_TOP + DRAWER_NAME_HEIGHT
+                    } else {
+                        0.
+                    }
             } else {
                 12.
             }
@@ -1601,7 +1616,14 @@ impl State {
             }
             Some(Subpage::Language) => Target::Setting(4),
             Some(Subpage::TextRendering) => Target::Setting(7),
-            Some(Subpage::AppSorting) => Target::Setting(10),
+            Some(Subpage::AppSorting) => {
+                self.subpage = Some(Subpage::AppDrawer);
+                Target::Setting(10)
+            }
+            Some(Subpage::AppDrawerStyle) => {
+                self.subpage = Some(Subpage::AppDrawer);
+                Target::Setting(15)
+            }
             Some(Subpage::AppDrawer) => Target::Setting(13),
             Some(Subpage::RecentApps) => Target::Setting(12),
             None => Target::Sidebar(self.section),
@@ -1912,7 +1934,12 @@ impl State {
                     Some(&[Target::MarketSymbol(kind), Target::MarketCurrency])
                 }
                 Some(Subpage::Market(kind)) => Some(&[Target::MarketSymbol(kind)]),
-                Some(Subpage::Greeting) => Some(&[Target::DateToggle, Target::DateFormat]),
+                Some(Subpage::Greeting) => Some(&[
+                    Target::DateToggle,
+                    Target::DateFormat,
+                    Target::GreetingName,
+                    Target::GreetingNameReset,
+                ]),
                 Some(Subpage::Weather) => Some(&[
                     Target::WeatherLocation,
                     Target::WeatherTemperature,
@@ -1944,6 +1971,7 @@ impl State {
                             Target::ClockFormat
                                 | Target::ClockTimeFormat
                                 | Target::DateFormat
+                                | Target::GreetingName
                                 | Target::WeatherLocation
                                 | Target::WeatherTemperature
                                 | Target::WeatherStyle
@@ -1965,7 +1993,7 @@ impl State {
                         | Subpage::Temperature
                         | Subpage::TextRendering
                         | Subpage::AppSorting
-                        | Subpage::AppDrawer,
+                        | Subpage::AppDrawerStyle,
                     ) => 2,
                     Some(Subpage::FavoriteRows) => usize::from(MAX_HOME_ROWS),
                     Some(Subpage::RecentApps) => crate::model::RecentAppsBehavior::ALL.len(),
@@ -2076,7 +2104,7 @@ impl State {
             }
             if matches!(
                 self.focus,
-                Target::Setting(0 | 1 | 4 | 7 | 10)
+                Target::Setting(0 | 1 | 4 | 7 | 10 | 13 | 15)
                     | Target::Widget(_)
                     | Target::MoveWidget(_)
                     | Target::InputMode(_)
@@ -2086,6 +2114,13 @@ impl State {
             ) && matches!(direction, Direction::Right)
             {
                 return self.activate();
+            }
+            if self.subpage == Some(Subpage::AppDrawer)
+                && matches!(self.focus, Target::Setting(_))
+                && matches!(direction, Direction::Left)
+            {
+                self.close_subpage();
+                return vec![];
             }
             if matches!(self.focus, Target::Setting(_)) && matches!(direction, Direction::Right) {
                 return vec![];
@@ -2537,7 +2572,7 @@ impl State {
             }
             if matches!(
                 self.keyboard_field,
-                TextField::InputName | TextField::Market(_)
+                TextField::InputName | TextField::GreetingName | TextField::Market(_)
             ) {
                 let length = self.input_name.chars().count();
                 self.input_name.extend(
@@ -2566,7 +2601,7 @@ impl State {
                 self.weather.edit(query);
             } else if matches!(
                 self.keyboard_field,
-                TextField::InputName | TextField::Market(_)
+                TextField::InputName | TextField::GreetingName | TextField::Market(_)
             ) {
                 self.input_name.pop();
             } else {
@@ -2596,6 +2631,14 @@ impl State {
     }
 
     fn commit_text_input(&mut self) -> Vec<Effect> {
+        if self.keyboard_field == TextField::GreetingName {
+            let name = clean_input_name(&std::mem::take(&mut self.input_name));
+            if !name.is_empty() && self.preferences.greeting_name != name {
+                self.preferences.greeting_name = name;
+                return vec![Effect::Save];
+            }
+            return vec![];
+        }
         if let TextField::Market(kind) = self.keyboard_field {
             let draft = std::mem::take(&mut self.input_name);
             if draft.trim().is_empty() {
@@ -2710,7 +2753,7 @@ impl State {
             self.weather.edit(query);
         } else if matches!(
             self.keyboard_field,
-            TextField::InputName | TextField::Market(_)
+            TextField::InputName | TextField::GreetingName | TextField::Market(_)
         ) {
             self.input_name = query;
         } else {
@@ -2724,13 +2767,17 @@ impl State {
         match self.keyboard_field {
             TextField::Location => &self.weather.query,
             TextField::InputName => &self.input_name,
+            TextField::GreetingName => &self.input_name,
             TextField::Market(_) => &self.input_name,
             TextField::Apps => &self.query,
         }
     }
     pub fn open_keyboard(&mut self, field: TextField) {
         self.keyboard_field = field;
-        if matches!(field, TextField::InputName | TextField::Market(_)) {
+        if matches!(
+            field,
+            TextField::InputName | TextField::GreetingName | TextField::Market(_)
+        ) {
             // The TV keyboard starts empty, so a new name replaces the old one.
             self.input_name.clear();
         }
@@ -2743,6 +2790,7 @@ impl State {
             self.focus = match field {
                 TextField::Location => Target::WeatherQuery,
                 TextField::InputName => Target::InputRename,
+                TextField::GreetingName => Target::GreetingName,
                 TextField::Market(kind) => Target::MarketSymbol(kind),
                 TextField::Apps => Target::Search,
             };
@@ -2771,6 +2819,7 @@ impl State {
         match self.keyboard_field {
             TextField::Location => Target::WeatherSearch,
             TextField::InputName => Target::InputRename,
+            TextField::GreetingName => Target::GreetingName,
             TextField::Market(kind) => Target::MarketSymbol(kind),
             TextField::Apps => Target::Search,
         }
@@ -2981,6 +3030,14 @@ impl State {
                 }
             }
             Target::InputRename => self.open_keyboard(TextField::InputName),
+            Target::GreetingName => self.open_keyboard(TextField::GreetingName),
+            Target::GreetingNameReset => {
+                self.focus = Target::GreetingName;
+                if !self.preferences.greeting_name.is_empty() {
+                    self.preferences.greeting_name.clear();
+                    return vec![Effect::Save];
+                }
+            }
             Target::WidgetCell(cell) if cell < HOME_GRID_CELLS => {
                 if let Some(widget) = WidgetPosition::from_cell(cell)
                     .and_then(|position| self.preferences.widget_at(position))
@@ -3197,8 +3254,19 @@ impl State {
             }
             Target::Setting(index) => {
                 match index {
+                    14 => {
+                        self.preferences.show_drawer_app_names =
+                            !self.preferences.show_drawer_app_names
+                    }
                     13 => {
                         self.subpage = Some(Subpage::AppDrawer);
+                        self.focus = Target::Setting(15);
+                        self.scroll = 0.;
+                        self.panel_started = (!self.preferences.reduced_motion).then(Instant::now);
+                        return vec![];
+                    }
+                    15 => {
+                        self.subpage = Some(Subpage::AppDrawerStyle);
                         self.focus = Target::Choice(usize::from(
                             self.preferences.app_drawer_style
                                 == crate::model::AppDrawerStyle::Minimal,
@@ -3375,7 +3443,7 @@ impl State {
                                 config.style = crate::model::WeatherStyle::ALL[index.min(2)]
                             });
                     }
-                    Some(Subpage::AppDrawer) => {
+                    Some(Subpage::AppDrawerStyle) => {
                         self.preferences.app_drawer_style =
                             crate::model::AppDrawerStyle::ALL[index.min(1)];
                     }
@@ -3436,6 +3504,7 @@ impl State {
                         | Subpage::Market(_)
                         | Subpage::Greeting
                         | Subpage::Clock
+                        | Subpage::AppDrawer
                         | Subpage::Weather
                         | Subpage::Shortcuts,
                     ) => {
@@ -3583,6 +3652,7 @@ impl State {
                 "Clear" => match self.keyboard_field {
                     TextField::Location => self.weather.edit(String::new()),
                     TextField::InputName => self.input_name.clear(),
+                    TextField::GreetingName => self.input_name.clear(),
                     TextField::Market(_) => self.input_name.clear(),
                     TextField::Apps => self.query.clear(),
                 },

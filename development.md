@@ -89,6 +89,20 @@ and `target/release/`. Desktop results do not establish TV size or performance.
 
 ## Controls and navigation
 
+SDL-mapped game controllers (including PS5 DualSense when recognized by the TV's SDL
+backend) use D-pad or left stick to navigate, Cross / A for OK, Circle / B for Back,
+and Options / Start for the context menu. Holding OK or Back uses the same behavior
+as the remote. Controllers connected before startup and hot-plugged controllers are
+opened automatically. Input is ignored while Luma is unfocused or hidden; disconnecting
+cancels pending holds. USB/Bluetooth availability depends on the TV firmware and SDL
+backend; verify both on hardware before claiming support for a specific TV.
+
+General → Show app names is off by default, preserving the compact, unlabeled drawer.
+When enabled, the app drawer shows a centered, single-line name beneath the focused grid card
+in both styles, with wider row spacing and scroll padding for the name. Long names are ellipsized
+to the card width. Favorites, Home previews and app-management cards stay unlabeled; labels do not
+change card sizes or hit regions. The preference is stored as `show_drawer_app_names`.
+
 ### Market price widgets
 
 `crypto` and `stocks` preferences hold `enabled`, `symbol`, `currency`, and `position`.
@@ -130,9 +144,11 @@ and is rejected on TV. `xvfb-run -a pnpm test:markets` checks both widgets, edit
 currency, persistence, delayed timestamps, failures, bounded replies and redirect refusal.
 CI runs this as its own isolated smoke suite. Tests never call public market feeds.
 
-Greeting is time-based only. Legacy `greeting_name` preferences are ignored and not
-saved, and Greeting settings offer date options only. The midnight-to-5am translation
-is a greeting, not a loading message.
+`greeting_name` is a locally saved, trimmed, control-free name limited to 40 characters.
+Greeting settings reuse the native/desktop keyboard paths and commit typed replacements on
+Done, Back, keyboard dismissal or a system Home return. An empty edit preserves the old name;
+Clear name explicitly removes it. Existing saved names are restored. The midnight-to-5am
+translation remains a greeting, not a loading message.
 
 `weather_small` defaults to false. When enabled, Weather uses a true 1×1 footprint
 for rendering, placement, collision checks and sanitization. The size toggle preserves
@@ -170,6 +186,21 @@ implementation. New uploads prepare both atlases on the wallpaper worker before 
 the immutable directory. Older uploads or missing/corrupt atlases fall back to the original
 renderer. Shader sampling, glass appearance, GPU cache budgets and lazy text are unchanged.
 `xvfb-run -a pnpm test:startup` verifies desktop GL/GLES framebuffer equality and fallback.
+
+Before SDL starts, Luma composes the first scene once and decodes its images (wallpaper, glass
+atlas, surfaces) on up to three `luma-preload` workers while SDL, the window and the shaders
+start. The renderer takes a decoded image, waits only for an image still decoding, and decodes
+anything else itself; images the first frames did not use are dropped after the first populated
+frame. On webOS, linked shader programs are kept in `shader-cache` beside preferences, keyed by
+the GL vendor, renderer and version strings and the shader sources, and loaded with
+`glProgramBinary`. A mismatch or failed load compiles from source and replaces the file; deleting
+the folder is always safe. On an LG 49UN71006LB (webOS 5.6.2), both together moved the first
+frame from ~1370 ms to ~800 ms after launch: renderer creation fell from ~245 ms to ~4 ms.
+
+The first inventory queues the dock's surfaces on the same workers. Decoded images of 512×512
+pixels or more (wallpapers, glass atlases) are kept in `image-cache` beside preferences as raw
+RGBA, keyed by path, file size and modification time, at most four files. On the same TV this
+moved a cold boot's first frame from ~1060 ms to ~910 ms.
 
 ### Documentation screenshots
 
@@ -248,12 +279,13 @@ its settings. Adding is atomic: browsing/cancelling placement does not install o
 The legacy `show_greeting` and `show_weather` fields now store whether each widget is installed;
 old hidden widgets start removed. Configuration menus have no widget visibility or position rows.
 `show_date` optionally hides the combined Greeting's date line. Removed Weather never requests forecasts.
-Greeting settings contain the date toggle and format picker, with no separate Date widget or position.
+Greeting settings contain the date toggle, format picker, Name and Clear name actions,
+with no separate Date widget or position.
 The date uses 18.4px/600/+0.12 tracking at 72% opacity; Greeting uses
 90.4px/500/−0.065 tracking and 1.05 leading, fitting shorter for long translations.
 The 32.8px date band keeps both lines inside one grid row.
 Weather content is top-aligned within its 2×2 footprint in every style.
-Greeting has no name editor; legacy `greeting_name` fields are ignored and not serialized.
+Names personalize every time-of-day greeting and remain saved when the widget is removed.
 All three weather styles reflow inside the same fixed footprint. `pnpm screenshots --widgets`
 captures the default arrangement, an alternate arrangement, the grid manager, actions and Add catalog.
 
@@ -349,8 +381,9 @@ is persisted per input across restarts; choosing **Automatic** clears only that 
 icon override and restores label-based detection. Existing inputs without an override continue
 using Automatic. This is a backward-compatible feature and does not change input names or visibility.
 
-The Favorites dock has one to three rows and defaults to one. General → App drawer selects `tvos` (default) or
-`minimal`, persisted as `app_drawer_style`. With the dock at the bottom of Home, tvOS leaves 57.6 logical pixels below the glass and shows
+The Favorites dock has one to three rows and defaults to one. General → App drawer groups
+Style, Sorting, and Show app names. Style selects `tvos` (default) or `minimal`, persisted as
+`app_drawer_style`. With the dock at the bottom of Home, tvOS leaves 57.6 logical pixels below the glass and shows
 a clipped, non-interactive 24-logical-pixel peek of the next app row. Minimal lowers the dock to leave 48 logical pixels below
 its glass at the 1920×1080 layout size, without the peek. Both styles share the same open drawer
 position and navigation. Left/Right follows saved order, including reorder mode, and reveals complete
@@ -383,6 +416,7 @@ Input meshes trim transparent source bounds; per-mark optical widths give wide w
 room without stretching their aspect ratio. Header pills preserve a 10px icon-to-label gap.
 The time-only clock opens two compact 72px-high, right-aligned, floating Control Center-style controls for
 Launcher settings (Luma logo) and Device settings (settings icon). Device settings opens LG's native settings UI.
+App and Device settings launches are silent on TV; desktop previews show a notice instead of calling TV services.
 
 ### Liquid Glass renderer
 
@@ -721,7 +755,11 @@ such as Hulu, Joyn and Plex closer to the visual weight of Apple TV, YouTube, Da
 
 Text reads the bundled TTF's advances, kerning and line metrics lazily. Only needed glyph outlines
 are tessellated in font-em coordinates. Complete text runs are cached in static GPU buffers,
-independent of position/color/drawable density, avoiding a draw call per letter. CJK fonts open
+independent of position/color, avoiding a draw call per letter. Font em sizes round down to whole
+physical pixels before computing metrics, wrapping and outline scaling; the effective logical
+size keys the run cache, including across drawable-density changes. Rounding down preserves
+the view's fitted text bounds; optical-font selection remains unchanged. `LUMA_FONT_SIZE_SNAP=0`
+restores fractional sizes for comparison; diagnostics expose `font_size_snapping`. CJK fonts open
 only when needed; there are no glyph bitmap atlases or full-font mesh exports.
 
 MSAA mode requests 4× MSAA, with 2×/single-sample fallbacks if EGL rejects a configuration.
@@ -731,6 +769,14 @@ small-text strokes. Single-sample targets use a narrower half-pixel boundary fri
 origins/baselines are pixel-aligned per drawable axis. There is no LCD subpixel rendering, font
 hinting or complex-script shaping. Inspect `multisample_samples` and `font_antialiasing`:
 offscreen captures can be single-sample while the actual window uses MSAA.
+
+For issue #139, compare default sizing with `LUMA_FONT_SIZE_SNAP=0` on the same TV at
+1920×1080, with identical preferences, time, background and text-rendering mode. Restart
+between runs, retain diagnostics (Luma version, drawable size and actual
+`last_presented.multisample_samples`), and use compositor captures or matched panel photos.
+Inspect the greeting stems and small date at native size and nearest-neighbour enlargement.
+Whole-pixel em sizing is not stem hinting and does not guarantee integer-width stems or
+resolve icon filtering; desktop renders do not establish a TV sharpness improvement.
 
 Glyph geometry has an 8 MiB/4096-entry CPU cache target and text runs a 32 MiB/512-entry GPU
 target. Eviction preserves the current frame, which can temporarily exceed those targets.
@@ -853,13 +899,29 @@ draws the wallpaper once with m and k per vertex (16 strips keep gradients' colo
 exact) instead of one full-screen pass per fill. During the Recents crossfade these fills sit
 beneath the outgoing interface rather than over it, so they fold in while both fade.
 
-### Idle preparation
+### Demand-driven page preparation
 
-The first visit to a page pays for laying out its text, outlining new glyphs, loading logo meshes
-and uploading icons. After each inventory, once the screen has been still for 1.5 s, Luma builds
-the other pages' scenes without drawing them (`Renderer::prepare`), one page per idle wake; the TV
-log reports each (`Luma prewarm: …`). The script action `prewarm` triggers it at once, and the
-profiling timeline records first-use work per frame (`glyph_ms`, `vector_ms`, `image_ms`).
+Hidden Apps and Settings pages are prepared only when opened. Their first visit pays for text
+layout, new glyph outlines, logo meshes and GPU uploads; subsequent visits reuse bounded caches.
+Installed icon decoding still runs on its artwork worker, prioritizing visible cards. Inventory
+refreshes no longer schedule hidden-page rendering on the SDL thread, where that work could block
+Home relaunches and input even while Luma was behind another app. System Home relaunches also
+close the drawer immediately instead of replaying its closing animation.
+
+The explicit diagnostic script action `prewarm` still builds hidden scenes without drawing them
+(`Renderer::prepare`); the TV log reports each (`Luma prewarm: …`). The profiling timeline records
+first-use work per frame (`glyph_ms`, `vector_ms`, `image_ms`).
+
+On webOS, after the first populated frame, Luma composes the Apps page and each Settings section
+once. Their images (drawer surfaces, wallpaper thumbnails) decode on one background worker. Each
+visible, non-animating loop pass then spends up to 4 ms uploading decoded images, loading logo
+meshes and tessellating text a few runs at a time, and the loop wakes every 16 ms while such
+work remains. Shared image paths decode once. The result queue holds at most one decoded image,
+with at most one more held by the worker, so hiding Luma or animating cannot accumulate all
+drawer surfaces in CPU memory. On an LG 49UN71006LB (webOS 5.6.2) the first Settings opening
+fell from a 74 ms to a 46 ms frame and the first Background section from 184 ms to 50 ms, with
+no first-use loading left in either. `LUMA_IDLE_PREPARE=0` turns this idle
+preparation off for comparisons.
 
 ## TV startup diagnostics
 
@@ -1008,6 +1070,13 @@ than `event`; `platform::Lifecycle::from_reply` reads both and feeds the same `r
 handling as v2.
 
 - Startup does not wait for SAM. Until it answers, Home is simply unregistered.
+- When SAM starts Home with a nonempty `preload` launch parameter, Luma creates its window
+  hidden and starts unfocused, without presenting frames. A later lifecycle `relaunch` uses
+  the existing restore/show/raise path. This applies to both Home identities and integration
+  methods, independently of registration success; normal Luma tile launches are unchanged.
+  Manually verify that preload leaves an active app or HDMI input in front, Home reveals Luma,
+  and Home still works with registration refused or `/var/lib/luma-home/no-lifecycle` present
+  (SAM's restart fallback). Hidden-window behavior requires TV verification.
 - No answer within 10 s, a refused answer or the child ending before an answer kills and reaps
   the child and leaves Home unregistered, as before this integration: SAM restarts it per Home
   key. Once SAM has accepted the registration, losing it (a later `returnValue: false` or the
