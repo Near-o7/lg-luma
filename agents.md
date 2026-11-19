@@ -58,8 +58,9 @@ native process, not `luna-send-pub -a` impersonation. Inventory failure must nev
 data on TV. Explicit `--test-extra-apps` is a labeled manual preview applied only after successful
 inventory reads, with separate preferences and no placeholder launch requests.
 
-Pointer hover/down must not move a clicked control. Home favorites use one horizontal strip;
-remote focus/reordering reveals the whole selected card. Apps Up/Down follows six-column grid
+Pointer hover/down must not move a clicked control. Favorite rows scroll horizontally together.
+Remote focus and reordering reveal the whole selected card, and multi-row docks scroll with the app drawer.
+Apps Up/Down follows six-column grid
 indices, including offscreen rows, so headers cannot steal mid-grid navigation. Back restores
 setting subpage parents and supports SDL-webOS Back. OK finishes move mode without launching.
 
@@ -113,3 +114,14 @@ can publish after the main-branch CI build passes. Ordinary PRs, other merges an
 still build/check/package but do not publish. See `development.md#releases` for setup and retries.
 Only create commits or PRs when explicitly requested. For PR descriptions follow the global
 `commands/pr.md` format instructions.
+
+## Pull requests and commits
+
+Split distinct features into separate PRs rather than bundling unrelated features together.
+This requirement does not apply when the PR author is `ecklf`, who may combine features in one PR.
+
+Use Commitizen / Conventional Commits format for every PR title and commit subject:
+`type(scope): description`, with an optional scope, for example `fix: pace animations without VSync`
+or `docs(agents): clarify PR requirements`. Use an appropriate type such as `feat`, `fix`, `docs`,
+`refactor`, `test`, `build`, `ci`, `perf`, `style`, or `chore`. Mark breaking changes with `!` after
+the type or scope and include a `BREAKING CHANGE:` footer in the commit body.
