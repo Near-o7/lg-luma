@@ -3,17 +3,11 @@ use crate::weather::{Location, Unit};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
-pub const BACKGROUNDS: [(&str, &str); 9] = [
-    ("slate", "Slate"),
+pub const BACKGROUNDS: [(&str, &str); 2] = [
     ("midnight", "Midnight"),
-    ("prism", "Prism"),
-    ("dunes", "Monument Valley"),
-    ("san-francisco", "San Francisco"),
-    ("summit", "Summit"),
-    ("forest", "Forest"),
-    ("yosemite", "Yosemite"),
-    ("northern-lights", "Northern lights"),
+    ("northern-lights", "Northern Lights"),
 ];
+pub const DEFAULT_BACKGROUND: &str = "midnight";
 
 // Generic fallbacks use delimited words, so "game" does not match "endgame".
 // Non-ASCII bytes count as boundaries for localized titles. Curated vector
@@ -87,6 +81,13 @@ pub struct Input {
     pub connected: Option<bool>,
     /// Optional signal information; never overrides the cable state or Auto visibility.
     pub signal: Option<bool>,
+}
+
+impl Input {
+    /// A storage identity, not an application ID or an HDMI source.
+    pub fn is_usb_storage(&self) -> bool {
+        self.id.starts_with("luma.usb.")
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -446,8 +447,6 @@ pub struct Preferences {
     pub custom_tiles: Vec<CustomTile>,
     pub hidden: Vec<String>,
     pub background: String,
-    /// Last manually chosen splash, independent of automatic rotation.
-    pub splash_background: Option<String>,
     pub deleted_backgrounds: Vec<String>,
     pub hour_24: bool,
     pub reduced_motion: bool,
@@ -508,8 +507,7 @@ impl Default for Preferences {
             legacy_favorites_dock_top: false,
             custom_tiles: vec![],
             hidden: vec![],
-            background: "dunes".into(),
-            splash_background: None,
+            background: DEFAULT_BACKGROUND.into(),
             deleted_backgrounds: vec![],
             hour_24: false,
             reduced_motion: false,
@@ -792,12 +790,6 @@ impl Preferences {
         }
     }
 
-    pub fn splash_background(&self) -> &str {
-        self.splash_background
-            .as_deref()
-            .unwrap_or(&self.background)
-    }
-
     pub fn favorites(&self, apps: &[App]) -> Vec<String> {
         self.favorites.clone().unwrap_or_else(|| {
             let mut ids = Vec::new();
@@ -863,9 +855,13 @@ impl Preferences {
         self.input_names.get(&input.id).map(String::as_str)
     }
 
-    /// The custom name if one is saved, otherwise the port ("HDMI 2").
+    /// The custom name, otherwise the HDMI port or the storage device's name.
     pub fn input_title<'a>(&'a self, input: &'a Input) -> &'a str {
-        self.input_name(input).unwrap_or(&input.port)
+        self.input_name(input).unwrap_or(if input.is_usb_storage() {
+            &input.title
+        } else {
+            &input.port
+        })
     }
 
     /// Saves a cleaned name; an empty name restores the port title.
@@ -1017,15 +1013,10 @@ impl Preferences {
             self.favorites_dock_row = Some(0);
         }
         self.repair_widget_positions(true);
-        if self.splash_background.as_ref().is_some_and(|id| {
-            !BACKGROUNDS.iter().any(|(known, _)| *known == id) && !crate::wallpapers::valid_id(id)
-        }) {
-            self.splash_background = None;
-        }
         if !BACKGROUNDS.iter().any(|(id, _)| *id == self.background)
             && !crate::wallpapers::valid_id(&self.background)
         {
-            self.background = "dunes".into();
+            self.background = DEFAULT_BACKGROUND.into();
         }
         let mut seen = HashSet::new();
         self.deleted_backgrounds.retain(|id| {

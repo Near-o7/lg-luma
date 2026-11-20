@@ -38,9 +38,9 @@ pub const HOME_TILE_WIDTH: f32 = 270.;
 pub const HOME_TILE_HEIGHT: f32 = 154.4;
 pub const HOME_GRID_TOP: f32 = 188.;
 pub const HOME_GRID_PITCH_Y: f32 = 158.;
-pub const DOCK_PADDING: f32 = 24.;
 pub const DRAWER_DOCK_Y: f32 = 164.8;
 pub const HOME_TILE_PITCH: f32 = 296.4;
+pub const HOME_DOCK_PADDING: f32 = 24.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 pub const CYCLE_FADE: f32 = 1.6;
 
@@ -62,19 +62,19 @@ impl DockLayout {
         self.tile_height() + (self.rows - 1) as f32 * HOME_GRID_PITCH_Y
     }
 
-    pub fn bounds(&self, y: f32) -> Rect {
+    pub fn bounds(&self, y: f32, viewport: Rect) -> Rect {
         Rect::new(
-            HOME_STRIP_LEFT - DOCK_PADDING,
-            y - DOCK_PADDING,
-            HOME_STRIP_RIGHT - HOME_STRIP_LEFT + 2. * DOCK_PADDING,
-            self.height() + 2. * DOCK_PADDING,
+            viewport.x,
+            y - HOME_DOCK_PADDING,
+            viewport.w,
+            self.height() + 2. * HOME_DOCK_PADDING,
         )
     }
 
-    pub fn card(&self, index: usize, y: f32, scroll: f32) -> Rect {
+    pub fn card(&self, index: usize, left: f32, y: f32, scroll: f32) -> Rect {
         let (column, row) = self.position(index);
         Rect::new(
-            HOME_STRIP_LEFT + column as f32 * HOME_TILE_PITCH - scroll,
+            left + column as f32 * HOME_TILE_PITCH - scroll,
             y + row as f32 * HOME_GRID_PITCH_Y,
             HOME_TILE_WIDTH,
             self.tile_height(),
@@ -113,11 +113,22 @@ impl DockLayout {
     fn neighbor(&self, index: usize, count: usize, direction: Direction) -> Option<usize> {
         let (column, row) = self.position(index);
         match direction {
-            Direction::Left => column.checked_sub(1).map(|column| self.index(column, row)),
+            Direction::Left => column
+                .checked_sub(1)
+                .map(|column| self.index(column, row))
+                .or_else(|| {
+                    let last_column = self.columns(count).saturating_sub(1);
+                    self.index_in_row(last_column, row, count).or_else(|| {
+                        let previous_page_start = last_column / APPS_COLUMNS * APPS_COLUMNS;
+                        let previous_page_last_column = previous_page_start.checked_sub(1)?;
+                        self.index_in_row(previous_page_last_column, row, count)
+                    })
+                }),
             Direction::Right => (0..=row)
                 .rev()
                 .map(|row| self.index(column + 1, row))
-                .find(|next| *next < count),
+                .find(|next| *next < count)
+                .or_else(|| self.index_in_row(0, row, count)),
             Direction::Up => row
                 .checked_sub(1)
                 .and_then(|row| self.index_in_row(column, row, count)),
@@ -918,7 +929,7 @@ impl State {
             return vec![];
         }
         let mut apps = self.favorite_apps();
-        // Preserve the stock six-slot backfill in the default one-row layout.
+        // Only the one-row dock backfills from the unpinned apps.
         if self.preferences.home_rows == 1 && apps.len() < APPS_COLUMNS {
             let mut remaining: Vec<_> = self
                 .inventory
@@ -966,9 +977,31 @@ impl State {
 
     /// The favourites' glass card: their tiles scroll, draw and take pointer input only inside it.
     pub fn favorites_viewport(&self) -> Rect {
+        if self.preferences.home_rows > 1 {
+            return self.dock_viewport_for(0);
+        }
+        // dock_apps backfills from all visible apps. For pointer/wheel events we
+        // only need the number of occupied slots, not their sorted order.
+        let slots = self
+            .inventory
+            .apps
+            .iter()
+            .filter(|app| !self.preferences.hidden.contains(&app.id))
+            .take(APPS_COLUMNS)
+            .count();
+        self.dock_viewport_for(slots)
+    }
+
+    pub fn dock_viewport_for(&self, count: usize) -> Rect {
         let content = self.content_viewport();
-        let inset = HOME_STRIP_LEFT - 24.;
-        Rect::new(inset, content.y, 1920. - 2. * inset, content.h)
+        let tiles = if self.preferences.home_rows == 1 && (1..APPS_COLUMNS).contains(&count) {
+            HOME_TILE_WIDTH + (count - 1) as f32 * HOME_TILE_PITCH
+        } else {
+            // Retain the six-slot viewport for overflow and the loading/empty UI.
+            HOME_STRIP_RIGHT - HOME_STRIP_LEFT
+        };
+        let width = tiles + 2. * HOME_DOCK_PADDING;
+        Rect::new((1920. - width) / 2., content.y, width, content.h)
     }
 
     pub fn apps_viewport(&self) -> Rect {
@@ -985,7 +1018,7 @@ impl State {
     pub fn drawer_grid_top(&self) -> f32 {
         // Pinned artwork height, glass inset, then the matching outer list padding.
         if self.preferences.show_favorites_dock {
-            DRAWER_DOCK_Y + self.dock_layout().height() + DOCK_PADDING + DRAWER_PADDING
+            DRAWER_DOCK_Y + self.dock_layout().height() + HOME_DOCK_PADDING + DRAWER_PADDING
         } else {
             DRAWER_DOCK_Y
         }
@@ -1399,7 +1432,6 @@ impl State {
         let Some(id) = next else {
             return false;
         };
-        self.preferences.splash_background = Some(self.preferences.splash_background().to_owned());
         if self.preferences.reduced_motion {
             self.previous_background = None;
         } else {
@@ -1909,7 +1941,8 @@ impl State {
                         self.focus(Target::App(apps[next].id.clone()), controls);
                     } else if matches!(direction, Direction::Up) {
                         self.focus(self.above_dock(layout.position(index).0), controls);
-                    } else if matches!(direction, Direction::Down) {
+                    } else if matches!(direction, Direction::Down) && !self.drawer_apps().is_empty()
+                    {
                         let column = layout
                             .position(index)
                             .0
@@ -2243,12 +2276,12 @@ impl State {
                     // Its grid index still defines the route; reveal_focus then
                     // scrolls it into view, without letting the fixed nav steal Up.
                     let next = match direction {
-                        Direction::Left => {
-                            Some(Target::App(apps[index.saturating_sub(1)].id.clone()))
-                        }
-                        Direction::Right => Some(Target::App(
-                            apps[(index + 1).min(apps.len() - 1)].id.clone(),
+                        Direction::Left => Some(Target::App(
+                            apps[(index + apps.len() - 1) % apps.len()].id.clone(),
                         )),
+                        Direction::Right => {
+                            Some(Target::App(apps[(index + 1) % apps.len()].id.clone()))
+                        }
                         Direction::Up if index < APPS_COLUMNS => {
                             let dock = self.dock_apps();
                             let layout = self.dock_layout();
@@ -3362,11 +3395,6 @@ impl State {
                         Some((self.preferences.background.clone(), Instant::now()));
                     self.background_fade = BACKGROUND_FADE;
                 }
-                self.preferences.splash_background = Some(if crate::wallpapers::valid_id(&id) {
-                    self.preferences.splash_background().to_owned()
-                } else {
-                    id.clone()
-                });
                 self.preferences.background = id;
                 self.preferences.wallpaper_changed = unix_now();
                 self.back();

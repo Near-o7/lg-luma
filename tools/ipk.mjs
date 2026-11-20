@@ -45,6 +45,15 @@ function entries(tar) {
   return result;
 }
 
+const bundledWallpaperIds = ['midnight', 'northern-lights'];
+const bundledWallpaperAsset = new RegExp(
+  `^(?:${bundledWallpaperIds.join('|')})(?:-plain)?(?:@2x)?\\.(?:jpg|glass\\.png)$`,
+);
+
+export function isBundledWallpaperAsset(name) {
+  return bundledWallpaperAsset.test(name);
+}
+
 export function normalizeAndVerifyPackage(bytes, manifest) {
   const archive = members(bytes);
   const member = archive.find((entry) => entry.name === 'data.tar.gz');
@@ -71,6 +80,19 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     throw new Error('Packaged app permissions do not match the source.');
   if (actual.icon !== manifest.icon || actual.largeIcon !== manifest.largeIcon)
     throw new Error('Packaged icon paths do not match the source.');
+  if (actual.splashBackground !== manifest.splashBackground || actual.bgColor !== manifest.bgColor)
+    throw new Error('Packaged launch screen metadata does not match the source.');
+  if (owned.some((file) => /\/(?:assets\/)?splash\//.test(file.name)))
+    throw new Error('The IPK must not contain per-wallpaper splash assets.');
+  if (
+    owned.some(
+      (file) =>
+        file.type !== '5' &&
+        /\/assets\/(?:wallpapers|thumbnails)\//.test(file.name) &&
+        !isBundledWallpaperAsset(file.name.split('/').at(-1)),
+    )
+  )
+    throw new Error('The IPK contains an unexpected bundled wallpaper asset.');
   const vectorManifest = owned.find((file) => file.name.endsWith('/assets/vector-artwork.json'));
   const vectorAssets = vectorManifest && JSON.parse(vectorManifest.data.toString());
   if (
@@ -102,20 +124,12 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     'assets/font-cjk-500.ttf',
     'assets/font-kr-400.ttf',
     'assets/font-kr-500.ttf',
-    ...[
-      'dunes',
-      'midnight',
-      'san-francisco',
-      'summit',
-      'slate',
-      'forest',
-      'prism',
-      'yosemite',
-      'northern-lights',
-    ].flatMap((name) => [
-      `assets/wallpapers/${name}.jpg`,
-      `assets/thumbnails/${name}.jpg`,
-      `splash/${name}.png`,
+    ...bundledWallpaperIds.flatMap((id) => [
+      `assets/wallpapers/${id}.jpg`,
+      `assets/wallpapers/${id}-plain.jpg`,
+      `assets/wallpapers/${id}.glass.png`,
+      `assets/wallpapers/${id}-plain.glass.png`,
+      `assets/thumbnails/${id}.jpg`,
     ]),
     ...vectorAssets.assets.map((name) => {
       if (typeof name !== 'string' || !/^(logos|ui-icons)\/[a-z0-9-]+\.lvec$/.test(name))
