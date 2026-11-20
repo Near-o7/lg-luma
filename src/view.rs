@@ -8,8 +8,9 @@ use crate::{
     renderer::{Color, Draw, TextStyle, WHITE},
     state::{
         APPS_COLUMNS, APPS_SECTION, Control, DRAWER_NAME_HEIGHT, DRAWER_NAME_TOP,
-        HOME_GRID_PITCH_Y, HOME_GRID_TOP, HOME_TILE_HEIGHT, INPUTS_SECTION, KEYS, Overlay, Page,
-        Rect, SYSTEM_SECTION, State, Subpage, Target, TextField, WIDGETS_SECTION,
+        HOME_DOCK_PADDING, HOME_GRID_PITCH_Y, HOME_GRID_TOP, HOME_TILE_HEIGHT, INPUTS_SECTION,
+        KEYS, Overlay, Page, Rect, SYSTEM_SECTION, State, Subpage, Target, TextField,
+        WIDGETS_SECTION,
     },
     weather::{self, Unit},
 };
@@ -75,7 +76,7 @@ impl Assets {
         let id = if BACKGROUNDS.iter().any(|(known, _)| *known == id) {
             id
         } else {
-            "dunes"
+            crate::model::DEFAULT_BACKGROUND
         };
         let suffix = if state.preferences.wallpaper_gradient {
             ""
@@ -928,19 +929,15 @@ fn tile(
     assets: &Assets,
     app: &App,
     rect: Rect,
-    dock: bool,
+    dock: Option<Rect>,
 ) -> bool {
-    let target = if dock && state.page == Page::Apps {
+    let target = if dock.is_some() && state.page == Page::Apps {
         Target::DockApp(app.id.clone())
     } else {
         Target::App(app.id.clone())
     };
     out.control(target.clone(), rect, true);
-    let viewport = if dock {
-        state.favorites_viewport()
-    } else {
-        state.content_viewport()
-    };
+    let viewport = dock.unwrap_or_else(|| state.content_viewport());
     let top = if state.page == Page::Apps {
         0.
     } else {
@@ -963,7 +960,7 @@ fn tile(
         if focused { 0.4 } else { 0.165 },
     );
     let favorite_color = app_face(out, assets, app, rect, state.preferences.language, 19.2);
-    if !dock
+    if dock.is_none()
         && state
             .preferences
             .favorites(&state.inventory.apps)
@@ -994,7 +991,7 @@ fn tile(
     }
     if focused {
         out.ring(rect, 19.2);
-        if !dock && state.page == Page::Apps && state.preferences.show_drawer_app_names {
+        if dock.is_none() && state.page == Page::Apps && state.preferences.show_drawer_app_names {
             let (label, style) = assets.fit_line(&app.title, text(22., 550, -0.02), rect.w, 22.);
             out.text(
                 label,
@@ -1516,9 +1513,17 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
     }
     let language = state.preferences.language;
     let dock_y = state.dock_y();
+    let apps = state.dock_apps();
+    let mut viewport = state.dock_viewport_for(apps.len());
     let layout = state.dock_layout();
-    let dock = layout.bounds(dock_y);
-    let card = |index| layout.card(index, dock_y, state.home_scroll);
+    let dock = layout.bounds(dock_y, viewport);
+    let left = viewport.x + HOME_DOCK_PADDING;
+    let scroll = if apps.len() > APPS_COLUMNS {
+        state.home_scroll
+    } else {
+        0.
+    };
+    let card = |index| layout.card(index, left, dock_y, scroll);
     let clip = if state.drawer_scrolls_dock() && state.drawer_visibility > 0. {
         let viewport = state.apps_viewport();
         if dock.y + dock.h <= viewport.y {
@@ -1531,7 +1536,6 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
     out.draw.push(Draw::Clip(clip));
     out.shadow(dock, 40., 38., 12., 0.22);
     out.glass(dock, 40.);
-    let apps = state.dock_apps();
     if state.loading && state.inventory.apps.is_empty() {
         for index in 0..layout.capacity() {
             out.shape(card(index), 19.2, c(0xffffff, 0.06));
@@ -1566,7 +1570,6 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
         );
     }
     // The favourites scroll inside their glass card and slide under its edges.
-    let mut viewport = state.favorites_viewport();
     if let Some(clip) = clip {
         let bottom = viewport.y + viewport.h;
         viewport.y = viewport.y.max(clip.y);
@@ -1576,7 +1579,7 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
     let mut cards = Vec::with_capacity(apps.len());
     for (index, app) in apps.iter().enumerate() {
         let start = out.draw.len();
-        let focused = tile(out, state, assets, app, card(index), true);
+        let focused = tile(out, state, assets, app, card(index), Some(viewport));
         cards.push((start, out.draw.len(), focused));
     }
     batch_cards(&mut out.draw, &cards);
@@ -2010,7 +2013,7 @@ fn library_grid(out: &mut Scene, state: &State, assets: &Assets) {
                     270.,
                     FACE_HEIGHT,
                 ),
-                false,
+                None,
             );
             cards.push((start, out.draw.len(), focused));
             // Focus and wheel bounds use the destination; pointer input uses the drawn position.
@@ -2075,16 +2078,15 @@ fn rotation_value_width(assets: &Assets, language: Language) -> f32 {
 
 fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
     let focused = state.focus == row.target;
-    let bright = focused;
     let radius = if row.description.is_some() { 20. } else { 48. };
-    if bright {
+    if focused {
         out.draw
             .push(Draw::Glass(row.rect, radius, c(0xe5ebf0, 1.)));
         out.border(row.rect, radius, 1.5, c(0xffffff, 0.7));
     } else {
         settings_surface(out, row.rect, radius);
     }
-    let color = if bright {
+    let color = if focused {
         c(0x2c2c2c, 1.)
     } else {
         c(0xeeeeee, 0.73)
@@ -2095,7 +2097,7 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
             assets,
             icon,
             Rect::new(x, row.rect.y + (row.rect.h - 23.2) / 2., 23.2, 23.2),
-            if bright {
+            if focused {
                 c(0x444444, 1.)
             } else {
                 c(0xe4e4e4, 0.61)
@@ -2153,7 +2155,7 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
                 (row.rect.h - 34. - title_height - 4.8).max(22.8),
             ),
             text(15.2, 400, 0.).leading(1.5),
-            if bright {
+            if focused {
                 c(0x555555, 1.)
             } else {
                 c(0xf5f5f5, 0.56)
@@ -2172,7 +2174,7 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
                 24.,
             ),
             text(18.4, 450, 0.).right(),
-            if bright {
+            if focused {
                 c(0x444444, 1.)
             } else {
                 c(0xeeeeee, 0.73)
@@ -2190,7 +2192,7 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
                 18.4,
                 18.4,
             ),
-            if bright {
+            if focused {
                 c(0x444444, 1.)
             } else {
                 c(0xe4e4e4, 0.61)
@@ -2323,7 +2325,7 @@ fn weather_style_settings(out: &mut Scene, state: &State, assets: &Assets) {
                 chevron: false,
             },
         );
-        // A dark inset keeps the real weather treatment readable on the white focus surface.
+        // A dark inset keeps the weather preview separate from the row's focus treatment.
         let preview = Rect::new(1040., rect.y + 12., 700., 208.);
         out.shape(preview, 16., c(0x192129, 1.));
         let summary = weather_summary_layout_for(state, assets, style, true, state.active_weather);
@@ -2920,7 +2922,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
             for row in apps.chunks(3) {
                 for (column, app) in row.iter().enumerate() {
                     let rect = Rect::new(640. + column as f32 * 380., y - s, 360., 202.5);
-                    tile(out, state, assets, app, rect, false);
+                    tile(out, state, assets, app, rect, None);
                     if state.preferences.hidden.contains(&app.id) {
                         let badge = Rect::new(rect.x + 12., rect.y + 12., 30., 30.);
                         out.shape(badge, 15., c(0x202020, 0.85));
@@ -3905,6 +3907,9 @@ fn shorten(text: &str) -> String {
 
 /// A custom name such as "PS5" can choose the icon; otherwise the TV's label.
 fn input_icon(input: &Input, custom: Option<&str>) -> &'static str {
+    if input.is_usb_storage() {
+        return "usb";
+    }
     custom
         .map(device_icon)
         .filter(|icon| *icon != "hdmi")
@@ -3978,7 +3983,10 @@ fn input_status_color(input: &Input) -> u32 {
 /// the port), the port when a custom name replaces it, then the status.
 pub fn input_status(input: &Input, renamed: bool, language: Language) -> String {
     let mut parts = vec![];
-    if input.connected == Some(true) && input.title != input.port {
+    if input.connected == Some(true)
+        && input.title != input.port
+        && (!input.is_usb_storage() || renamed)
+    {
         parts.push(input.title.as_str());
     }
     if renamed {
@@ -5150,7 +5158,9 @@ mod tests {
         let mut state = State::new(Preferences::default());
         for rows in 1..=crate::model::MAX_HOME_ROWS {
             state.preferences.set_favorite_rows(rows);
-            let dock = state.dock_layout().bounds(state.home_dock_y());
+            let dock = state
+                .dock_layout()
+                .bounds(state.home_dock_y(), state.favorites_viewport());
             for widget in [HomeWidget::Greeting, HomeWidget::Weather] {
                 for position in (0..HOME_GRID_CELLS).filter_map(WidgetPosition::from_cell) {
                     if !state.preferences.can_place_widget(widget, position) {

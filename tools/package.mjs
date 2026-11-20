@@ -3,7 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { prepareWebosRuntime, verifyWebosSdl } from './webos-runtime.mjs';
-import { normalizeAndVerifyPackage } from './ipk.mjs';
+import { isBundledWallpaperAsset, normalizeAndVerifyPackage } from './ipk.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const highResolution = process.argv.includes('--4k');
@@ -84,7 +84,17 @@ await fs.cp(path.join(out, 'assets'), path.join(stage, 'assets'), {
   filter: (source) =>
     path.basename(source) !== '.DS_Store' &&
     // Protect direct packaging calls that reuse an older generated asset cache.
-    !['app-icons', 'icons.json', 'colors.json', 'splash'].includes(path.basename(source)) &&
+    ![
+      'app-icons',
+      'icons.json',
+      'colors.json',
+      'wallpaper-runtime',
+      'foregrounds',
+      'splash',
+      'splash.png',
+    ].includes(path.basename(source)) &&
+    (!['wallpapers', 'thumbnails'].includes(path.basename(path.dirname(source))) ||
+      isBundledWallpaperAsset(path.basename(source))) &&
     (highResolution || !source.endsWith('@2x.jpg')) &&
     !(
       source.endsWith('.png') && ['logos', 'ui-icons'].includes(path.basename(path.dirname(source)))
@@ -96,11 +106,7 @@ await fs.copyFile(
   path.join(stage, 'app-icon-large.png'),
 );
 await fs.copyFile(path.join(root, 'tv/autostart.sh'), path.join(stage, 'autostart.sh'));
-// Splash images: one per background, plus splash.png (the default background) read by webOS.
-await fs.mkdir(path.join(stage, 'splash'), { recursive: true });
-for (const file of await fs.readdir(path.join(out, 'assets/splash')))
-  await fs.copyFile(path.join(out, 'assets/splash', file), path.join(stage, 'splash', file));
-await fs.copyFile(path.join(out, 'assets/splash/dunes.png'), path.join(stage, 'splash.png'));
+await fs.copyFile(path.join(out, 'assets/splash.png'), path.join(stage, 'splash.png'));
 await fs.chmod(path.join(stage, 'autostart.sh'), 0o755);
 for (const file of ['home.sh', 'luma-helper', 'home-filter.js']) {
   await fs.copyFile(

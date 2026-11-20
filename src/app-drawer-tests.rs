@@ -2,6 +2,154 @@ use super::*;
 use crate::{model::AppDrawerStyle, renderer::Draw, state::Subpage};
 
 #[test]
+fn app_navigation_wraps_in_list_order_and_reveals_both_ends() {
+    for style in AppDrawerStyle::ALL {
+        for (page, dock) in [(0, false), (1, true), (1, false)] {
+            let mut state = ready();
+            state.preferences.app_drawer_style = style;
+            state.preferences.reduced_motion = true;
+            let template = state.inventory.apps[0].clone();
+            for index in 0..40 {
+                let mut app = template.clone();
+                app.id = format!("wrap-{index:02}");
+                app.title = format!("Wrap {index:02}");
+                state.inventory.apps.push(app);
+            }
+            state.preferences.favorites =
+                Some((0..12).map(|index| format!("wrap-{index:02}")).collect());
+            state.preferences.hidden = vec!["wrap-00".into(), "wrap-39".into()];
+            state.open(page);
+            let targets: Vec<_> = if page == 0 || dock {
+                state.dock_apps()
+            } else {
+                state.drawer_apps()
+            }
+            .iter()
+            .map(|app| {
+                if dock {
+                    Target::DockApp(app.id.clone())
+                } else {
+                    Target::App(app.id.clone())
+                }
+            })
+            .collect();
+            assert!(targets.len() > 6);
+            let preferences = serde_json::to_value(&state.preferences).unwrap();
+            state.focus(targets[0].clone(), &controls(&state));
+            for (direction, expected) in [
+                (Direction::Left, targets.last().unwrap()),
+                (Direction::Right, &targets[0]),
+            ] {
+                assert!(state.direction(direction, &controls(&state)).is_empty());
+                assert_eq!(&state.focus, expected);
+                let rendered = controls(&state);
+                let card = rendered.iter().find(|c| c.target == state.focus).unwrap();
+                if page == 0 || dock {
+                    assert!(card.rect.x >= crate::state::HOME_STRIP_LEFT - 0.001);
+                    assert!(card.rect.x + card.rect.w <= crate::state::HOME_STRIP_RIGHT + 0.001);
+                } else {
+                    assert!(card.rect.y >= state.drawer_grid_top() - 8. - 0.001);
+                    assert!(card.rect.y + card.rect.h <= 1080.);
+                }
+            }
+            // Horizontal grid navigation crosses rows rather than wrapping each row.
+            state.focus(targets[5].clone(), &controls(&state));
+            state.direction(Direction::Right, &controls(&state));
+            assert_eq!(state.focus, targets[6]);
+            state.direction(Direction::Left, &controls(&state));
+            assert_eq!(state.focus, targets[5]);
+            assert_eq!(
+                serde_json::to_value(&state.preferences).unwrap(),
+                preferences
+            );
+        }
+    }
+}
+
+#[test]
+fn horizontal_wrap_preserves_favorite_row_with_a_sparse_final_page() {
+    for rows in [2, 3] {
+        let mut state = ready();
+        state.preferences.set_favorite_rows(rows);
+        state.preferences.reduced_motion = true;
+        let template = state.inventory.apps[0].clone();
+        let count = usize::from(rows) * 6;
+        let ids: Vec<_> = (0..=count)
+            .map(|index| format!("wrap-{index:02}"))
+            .collect();
+        state.inventory.apps.extend(ids.iter().map(|id| App {
+            id: id.clone(),
+            ..template.clone()
+        }));
+        let row_start = count - 6;
+        for last_page_has_app in [false, true] {
+            let occupied = count + usize::from(last_page_has_app);
+            state.preferences.favorites = Some(ids[..occupied].to_vec());
+            for page in [0, 1] {
+                state.open(page);
+                let target = |index: usize| {
+                    if page == 0 {
+                        Target::App(ids[index].clone())
+                    } else {
+                        Target::DockApp(ids[index].clone())
+                    }
+                };
+                state.focus(target(row_start), &controls(&state));
+                state.direction(Direction::Left, &controls(&state));
+                assert_eq!(state.focus, target(count - 1));
+                state.direction(Direction::Right, &controls(&state));
+                assert_eq!(
+                    state.focus,
+                    target(if last_page_has_app { count } else { row_start })
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn app_navigation_with_one_or_no_apps_stays_valid() {
+    for page in [0, 1] {
+        let mut state = ready();
+        state.inventory.apps.truncate(1);
+        state.open(page);
+        let target = if page == 0 {
+            Target::App(state.inventory.apps[0].id.clone())
+        } else {
+            Target::DockApp(state.inventory.apps[0].id.clone())
+        };
+        state.focus = target.clone();
+        for direction in [Direction::Left, Direction::Right] {
+            assert!(state.direction(direction, &controls(&state)).is_empty());
+            assert_eq!(state.focus, target);
+        }
+        state.inventory.apps.clear();
+        state.open(page);
+        for direction in [Direction::Left, Direction::Right] {
+            state.direction(direction, &controls(&state));
+            assert!(controls(&state).iter().any(|c| c.target == state.focus));
+        }
+    }
+
+    // All but one app are pinned, leaving a one-item drawer.
+    let mut state = ready();
+    state.inventory.apps.truncate(7);
+    state.preferences.favorites = Some(
+        state.inventory.apps[..6]
+            .iter()
+            .map(|app| app.id.clone())
+            .collect(),
+    );
+    state.open(1);
+    let target = Target::App(state.drawer_apps()[0].id.clone());
+    state.focus = target.clone();
+    for direction in [Direction::Left, Direction::Right] {
+        assert!(state.direction(direction, &controls(&state)).is_empty());
+        assert_eq!(state.focus, target);
+    }
+}
+
+#[test]
 fn drawer_app_names_default_off_and_toggle_persists_with_compact_layout_restored() {
     let legacy: Preferences = serde_json::from_value(json!({"show_home_names": true})).unwrap();
     assert!(!legacy.show_drawer_app_names);
