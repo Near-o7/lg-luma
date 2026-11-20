@@ -332,6 +332,27 @@ impl<'a, S: System> Home<'a, S> {
         }
         Ok(())
     }
+    fn boot_apply(&self, config: &Config) -> Result<()> {
+        if config.method == "executable" {
+            // Preserve the existing grace period for older TVs and their restored processes.
+            for _ in 0..5 {
+                self.system.pause();
+            }
+            return self.apply(config, false);
+        }
+        // SAM can already be ready by the time the Homebrew hook runs. Probe before
+        // touching the mount, and wait only when the app manager has not answered.
+        for attempt in 0..=5 {
+            match self.foreground() {
+                Ok(_) => return self.apply(config, false),
+                Err(error) if attempt == 5 => {
+                    return Err(format!("Home app manager was not ready: {error}"));
+                }
+                Err(_) => self.system.pause(),
+            }
+        }
+        unreachable!()
+    }
     pub fn apply(&self, config: &Config, open: bool) -> Result<()> {
         if !self.exists(Path::new(&config.app_dir).join("luma")) {
             return Err("Luma is no longer installed".into());
@@ -612,9 +633,13 @@ pub fn dispatch(
             home.install(Path::new(app.ok_or("Missing installation directory")?))?;
             Ok(json!({"returnValue":true}))
         }
-        "apply" | "disable" | "restore" => {
+        "apply" | "boot-apply" | "disable" | "restore" => {
             let mut config = saved.ok_or("Luma Home has not been enabled")?;
-            if command == "apply" && config.enabled {
+            if command == "boot-apply" {
+                if config.enabled {
+                    home.boot_apply(&config)?;
+                }
+            } else if command == "apply" && config.enabled {
                 home.apply(&config, false)?;
             } else {
                 config.enabled = false;
