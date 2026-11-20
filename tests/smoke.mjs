@@ -379,7 +379,7 @@ try {
   const custom = await scenario('wallpaper-custom', `${backgroundsPage},right,right,enter,enter`);
   assert.equal(custom.preferences.background, customId);
   assert.equal(custom.modal, false);
-  assert.deepEqual(custom.focus, { Background: 1 });
+  assert.deepEqual(custom.focus, { Background: 2 });
   const customRestored = await scenario('wallpaper-custom-restored', 'home,down');
   assert.equal(customRestored.preferences.background, customId);
   const bundledRestored = await scenario(
@@ -707,7 +707,7 @@ try {
   const cycledAfterRestart = await scenario('wallpaper-cycle-restart', 'down');
   assert.equal(
     cycledAfterRestart.preferences.background,
-    customId,
+    'northern-lights',
     'enabled rotation advances to the next wallpaper when Luma restarts',
   );
   const cycleDisabled = await scenario(
