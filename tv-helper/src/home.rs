@@ -880,6 +880,12 @@ impl<'a, S: System> Home<'a, S> {
                 fs::rename(self.system.path(&tmp), self.system.path(&link))
                     .map_err(|e| e.to_string())?;
             }
+            // Staged LG Home registers through SAM's lifecycle-v1 endpoint.
+            manifest
+                .as_object_mut()
+                .ok_or("Invalid Luma package manifest")?
+                .remove("nativeLifeCycleInterfaceVersion");
+            manifest["handlesRelaunch"] = json!(false);
             manifest["id"] = json!(self.id);
             manifest["title"] = json!("Home");
             manifest["visible"] = json!(false);
