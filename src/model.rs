@@ -254,20 +254,72 @@ impl AppSorting {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WeatherStyle {
-    #[default]
     Standard,
     NoIcon,
     Compact,
+    #[default]
+    OneLine,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WeatherIconStyle {
+    Breezy,
+    Lucide,
+    Kickstand,
+    #[default]
+    Kuankuan,
+    None,
+}
+
+impl WeatherIconStyle {
+    pub const ALL: [Self; 4] = [Self::Kuankuan, Self::Breezy, Self::Lucide, Self::Kickstand];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Breezy => "Breezy",
+            Self::Lucide => "Lucide",
+            Self::Kickstand => "Kickstand",
+            Self::Kuankuan => "Kuankuan",
+            Self::None => "No icon",
+        }
+    }
+
+    pub fn index(self) -> usize {
+        Self::ALL.iter().position(|style| *style == self).unwrap()
+    }
+
+    pub fn asset(self, condition: &str) -> String {
+        match self {
+            Self::Breezy => format!("weather/{condition}.png"),
+            Self::Lucide => format!("ui-icons/weather-{condition}.lvec"),
+            Self::Kickstand => format!(
+                "ui-icons/weather-kickstand-{}.lvec",
+                if condition == "drizzle" {
+                    "rain"
+                } else {
+                    condition
+                }
+            ),
+            Self::Kuankuan => format!("ui-icons/weather-kuankuan-{condition}.lvec"),
+            Self::None => String::new(),
+        }
+    }
+
+    pub fn monochrome(self) -> bool {
+        matches!(self, Self::Lucide | Self::Kickstand)
+    }
 }
 
 impl WeatherStyle {
-    pub const ALL: [Self; 3] = [Self::Standard, Self::NoIcon, Self::Compact];
+    pub const ALL: [Self; 3] = [Self::Standard, Self::Compact, Self::OneLine];
 
     pub fn label_key(self) -> &'static str {
         match self {
             Self::Standard => "weatherStyleStandard",
             Self::NoIcon => "weatherStyleNoIcon",
             Self::Compact => "weatherStyleCompact",
+            Self::OneLine => "weatherStyleOneLine",
         }
     }
 
@@ -357,13 +409,13 @@ impl HomeWidget {
     pub fn default_position(self) -> WidgetPosition {
         WidgetPosition {
             column: match self.kind() {
-                Self::Greeting | Self::Favorites => 0,
-                Self::Weather => 4,
+                Self::Greeting | Self::Favorites | Self::Weather => 0,
                 Self::Crypto => 0,
                 Self::Stocks => 1,
                 _ => unreachable!(),
             },
             row: match self.kind() {
+                Self::Weather => 1,
                 Self::Crypto | Self::Stocks => 2,
                 Self::Favorites => HOME_GRID_ROWS as u8 - 1,
                 _ => 0,
@@ -372,7 +424,7 @@ impl HomeWidget {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct WeatherWidgetSettings {
     pub enabled: bool,
@@ -383,6 +435,35 @@ pub struct WeatherWidgetSettings {
     pub unit: Unit,
     pub small: bool,
     pub style: WeatherStyle,
+    pub show_location: bool,
+    pub show_icon: bool,
+    pub icons: WeatherIconStyle,
+}
+
+impl Default for WeatherWidgetSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            position: HomeWidget::Weather.default_position(),
+            location: None,
+            unit: Unit::default(),
+            small: false,
+            style: WeatherStyle::default(),
+            show_location: true,
+            show_icon: true,
+            icons: WeatherIconStyle::default(),
+        }
+    }
+}
+
+impl WeatherWidgetSettings {
+    pub fn visible_icon_style(&self) -> WeatherIconStyle {
+        if self.show_icon {
+            self.icons
+        } else {
+            WeatherIconStyle::None
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -427,6 +508,9 @@ pub struct Preferences {
     #[serde(deserialize_with = "crate::markets::deserialize_settings")]
     pub stocks: crate::markets::Settings,
     pub weather_small: bool,
+    pub weather_show_location: bool,
+    pub weather_show_icon: bool,
+    pub weather_icons: WeatherIconStyle,
     pub recent_apps_behavior: RecentAppsBehavior,
     pub weather_style: WeatherStyle,
     pub app_sorting: AppSorting,
@@ -492,6 +576,9 @@ impl Default for Preferences {
                 ..Default::default()
             },
             weather_small: false,
+            weather_show_location: true,
+            weather_show_icon: true,
+            weather_icons: WeatherIconStyle::default(),
             recent_apps_behavior: RecentAppsBehavior::default(),
             app_sorting: AppSorting::default(),
             app_drawer_style: AppDrawerStyle::default(),
@@ -553,6 +640,9 @@ impl Preferences {
             unit: self.temperature_unit,
             small: self.weather_small,
             style: self.weather_style,
+            show_location: self.weather_show_location,
+            show_icon: self.weather_show_icon,
+            icons: self.weather_icons,
         }
     }
 
@@ -572,6 +662,9 @@ impl Preferences {
             self.temperature_unit = config.unit;
             self.weather_small = config.small;
             self.weather_style = config.style;
+            self.weather_show_location = config.show_location;
+            self.weather_show_icon = config.show_icon;
+            self.weather_icons = config.icons;
         }
     }
 
@@ -611,8 +704,15 @@ impl Preferences {
     pub fn widget_span(&self, widget: HomeWidget) -> (u8, u8) {
         if widget == HomeWidget::Favorites {
             (HOME_GRID_COLUMNS as u8, self.home_rows)
-        } else if widget.kind() == HomeWidget::Weather && self.weather_settings(widget).small {
-            (1, 1)
+        } else if widget.kind() == HomeWidget::Weather {
+            let config = self.weather_settings(widget);
+            if config.small {
+                (1, 1)
+            } else if config.style == WeatherStyle::OneLine {
+                (2, 1)
+            } else {
+                widget.span()
+            }
         } else {
             widget.span()
         }
@@ -629,6 +729,20 @@ impl Preferences {
 
     pub fn toggle_weather_widget_size(&mut self, widget: HomeWidget) {
         self.edit_weather(widget, |config| config.small = !config.small);
+        if !self.relocate_weather_widget(widget) {
+            self.edit_weather(widget, |config| config.small = !config.small);
+        }
+    }
+
+    pub fn set_weather_widget_style(&mut self, widget: HomeWidget, style: WeatherStyle) {
+        let previous = self.weather_settings(widget).style;
+        self.edit_weather(widget, |config| config.style = style);
+        if !self.relocate_weather_widget(widget) {
+            self.edit_weather(widget, |config| config.style = previous);
+        }
+    }
+
+    fn relocate_weather_widget(&mut self, widget: HomeWidget) -> bool {
         // Expanding at an edge or beside Greeting needs a new valid anchor.
         if !self.can_place_widget(widget, self.widget_position(widget)) {
             if let Some(position) = (0..HOME_GRID_CELLS)
@@ -637,9 +751,10 @@ impl Preferences {
             {
                 self.set_widget_position(widget, position);
             } else {
-                self.edit_weather(widget, |config| config.small = !config.small);
+                return false;
             }
         }
+        true
     }
 
     pub fn compare_apps(&self, a: &App, b: &App) -> std::cmp::Ordering {
@@ -985,6 +1100,24 @@ impl Preferences {
 
     pub fn sanitize(&mut self) {
         self.home_rows = self.home_rows.clamp(1, MAX_HOME_ROWS);
+        if self.weather_style == WeatherStyle::NoIcon {
+            self.weather_style = WeatherStyle::Standard;
+            self.weather_icons = WeatherIconStyle::None;
+        }
+        if self.weather_icons == WeatherIconStyle::None {
+            self.weather_icons = WeatherIconStyle::default();
+            self.weather_show_icon = false;
+        }
+        for config in &mut self.extra_weather {
+            if config.style == WeatherStyle::NoIcon {
+                config.style = WeatherStyle::Standard;
+                config.icons = WeatherIconStyle::None;
+            }
+            if config.icons == WeatherIconStyle::None {
+                config.icons = WeatherIconStyle::default();
+                config.show_icon = false;
+            }
+        }
         self.greeting_name = clean_input_name(&self.greeting_name);
         self.extra_crypto.truncate(HOME_GRID_CELLS);
         self.extra_stocks.truncate(HOME_GRID_CELLS);

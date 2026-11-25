@@ -13,6 +13,8 @@ mod feedback;
 mod font;
 mod gamepad;
 mod glass_backdrop;
+#[cfg(any(test, all(feature = "webos", target_os = "linux", target_arch = "arm")))]
+mod helper_lifecycle;
 mod i18n;
 #[path = "input-refresh.rs"]
 mod input_refresh;
@@ -232,6 +234,10 @@ const SCRIPT_POINTER: u32 = u32::MAX - 1;
 // SDL-webOS's Back scancode is outside rust-sdl2's standard Scancode enum.
 // Keycode retains the raw value: SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_WEBOS_BACK).
 const WEBOS_BACK_KEYCODE: i32 = (1 << 30) | 482;
+
+fn is_home(key: Keycode, webos: bool) -> bool {
+    webos && i32::from(key) == sdl_events::WEBOS_HOME_KEYCODE
+}
 
 fn is_back(key: Keycode, webos: bool) -> bool {
     matches!(key, Keycode::Escape | Keycode::AcBack)
@@ -481,6 +487,19 @@ fn input_refresh_active(state: &State, webos: bool, focused: bool, visible: bool
         && state.recents.visibility == 0.
 }
 
+fn home_on_focus(state: &State, webos: bool, was_focused: bool) -> bool {
+    webos
+        && !was_focused
+        && !state.loading
+        && state.page != state::Page::Settings
+        && state.overlay.is_none()
+        && state.moving.is_none()
+}
+
+fn pointer_motion_active(state: &State, xrel: i32, yrel: i32) -> bool {
+    state.pointer || xrel != 0 || yrel != 0
+}
+
 fn animation_wait(vsync: bool, elapsed: Duration) -> u32 {
     if vsync {
         0
@@ -682,18 +701,18 @@ fn run() -> Result<(), String> {
         // Magic Remotes send the separate Exit key for a long Back press.
         // Claim it before video init so the compositor does not close Luma.
         sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_EXIT", "true");
-        // SAM may not relaunch Home when its surface is already foreground. Handle the
-        // physical key ourselves only as Home; normal tile launches keep LG's routing.
-        if options.webos_home {
-            sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_HOME", "true");
-        }
+        // While Luma is foreground, Home returns to its Home tab, including normal tile
+        // and Home Chooser launches. This surface policy is not a global Home-key filter.
+        sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_HOME", "true");
         // SDL-webOS answers tvpower's screen saver requests with `ack: !suspend_screensaver`, and
         // SDL suspends the screen saver unless this hint allows it: LG's screen saver never
         // started while Luma was in front. A launcher has no video to protect.
         sdl2::hint::set("SDL_VIDEO_ALLOW_SCREENSAVER", "1");
-        // In place of LG's Home executable, SDL's own registration cannot reach the bus under
-        // LG's Home role; Luma registers with sam itself below (lifecycle v2).
-        if platform::runs_as_lg_home() {
+        // Luma owns lifecycle v2 below, both under its own identity and in place of LG Home.
+        // Disable SDL's competing app-named connection before video initialization. A staged
+        // LG Home keeps its existing SDL/root registration behavior.
+        if platform::direct_lifecycle_id(options.webos_home, platform::runs_as_lg_home()).is_some()
+        {
             sdl2::hint::set("SDL_WEBOS_REGISTER_APP", "0");
         }
     }
@@ -968,16 +987,14 @@ fn run() -> Result<(), String> {
     let mut captured = None;
     let mut last_drawable = None;
     let mut events = sdl.event_pump()?;
-    // Lifecycle as Home: sam sends "relaunch" (bring the running Luma to the front) instead of
+    // App lifecycle: sam sends "relaunch" (bring the running Luma to the front) instead of
     // killing and restarting it, and "close" when it wants Luma to exit. `end_registration`
     // drops a staged Home's registration (webOS 10/11) if a relaunch did not reach the front.
     type EndRegistration = Box<dyn Fn()>;
     #[cfg(not(all(feature = "webos", target_os = "linux", target_arch = "arm")))]
     let (lifecycle_event, end_registration): (Option<u32>, Option<EndRegistration>) = (None, None);
     #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
-    let (lifecycle_event, end_registration): (Option<u32>, Option<EndRegistration>) = if webos
-        && options.webos_home
-    {
+    let (lifecycle_event, end_registration): (Option<u32>, Option<EndRegistration>) = if webos {
         let subsystem = sdl.event()?;
         // SAFETY: registers one SDL user event type before any are pushed.
         let event_type = unsafe { subsystem.register_event()? };
@@ -999,14 +1016,35 @@ fn run() -> Result<(), String> {
         };
         // SAFETY: geteuid has no preconditions.
         let as_root = unsafe { libc::geteuid() } == 0;
-        if platform::runs_as_lg_home() {
-            // In place of LG's Home executable (webOS 5/6), LG's role is bound to that path,
-            // so Luma registers through lifecycle v2 on its own connection.
+        if !options.webos_home {
+            // SDL/libhelpers already owns APP_ID on LS2, even with SDL automatic lifecycle
+            // registration disabled. Share that connection rather than LSRegister it again.
+            let push = pusher(subsystem.event_sender());
+            match helper_lifecycle::subscribe(move |message| {
+                eprintln!("Luma lifecycle (shared libhelpers): {message}");
+                if let Some(lifecycle) = platform::Lifecycle::from_reply(&message) {
+                    push(lifecycle);
+                }
+            }) {
+                Ok(()) => {
+                    eprintln!("Luma lifecycle: registerApp submitted on SDL/libhelpers connection");
+                    (Some(event_type), None)
+                }
+                Err(error) => {
+                    eprintln!("Luma lifecycle: {error}; continuing without registration");
+                    (None, None)
+                }
+            }
+        } else if let Some(app_id) =
+            platform::direct_lifecycle_id(options.webos_home, platform::runs_as_lg_home())
+        {
+            // In place of LG's Home executable (webOS 5/6), its path-bound role allows
+            // the LG Home identity on Luma's own lifecycle-v2 connection.
             let push = pusher(subsystem.event_sender());
             luna::subscribe(
-                Some(platform::home_id()),
+                Some(app_id),
                 "luna://com.webos.applicationManager/registerApp",
-                &serde_json::json!({"id": platform::home_id()}),
+                &serde_json::json!({"id": app_id}),
                 // sam answers "registered" at once; without it sam would end Home later.
                 Duration::from_secs(10),
                 move |message| {
@@ -1605,6 +1643,11 @@ fn run() -> Result<(), String> {
                         visible = true;
                         // Shown and Restored can come from SDL itself; only focus confirms.
                         if matches!(win_event, WindowEvent::FocusGained) {
+                            if home_on_focus(&state, webos, focused) {
+                                // Some firmware only restores the SDL surface on Home,
+                                // without delivering a lifecycle relaunch or Home key.
+                                pending.extend(state.return_home());
+                            }
                             focused = true;
                             foreground.confirmed();
                         }
@@ -1639,10 +1682,7 @@ fn run() -> Result<(), String> {
                         back_button.cancel();
                     }
                     match key {
-                        _ if webos
-                            && options.webos_home
-                            && i32::from(key) == sdl_events::WEBOS_HOME_KEYCODE =>
-                        {
+                        key if is_home(key, webos) => {
                             if !repeat {
                                 eprintln!("Luma Home key: returning to Home tab");
                                 press = None;
@@ -1742,9 +1782,11 @@ fn run() -> Result<(), String> {
                         cue = Some(Cue::Select);
                     }
                 }
-                Event::MouseMotion { x, y, .. }
-                    if state.moving.is_none()
-                        && !matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
+                Event::MouseMotion {
+                    x, y, xrel, yrel, ..
+                } if state.moving.is_none()
+                    && pointer_motion_active(&state, xrel, yrel)
+                    && !matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
                 {
                     let hovered = hit(&scene.controls, &window, x, y, &state);
                     if let Some(target) = hovered.clone() {
@@ -1973,6 +2015,9 @@ fn run() -> Result<(), String> {
         // stable until release, even if an input reply arrived in the same event-loop turn.
         let inputs_active =
             input_refresh_active(&state, webos, focused, visible) && press.is_none();
+        if platform.take_input_changed() {
+            input_refresh.invalidate(Instant::now());
+        }
         if let Some(inputs) = input_refresh.take_pending(inputs_active) {
             state.set_inputs(inputs);
         }
@@ -2170,8 +2215,12 @@ fn run() -> Result<(), String> {
             end_registration();
         }
         // Shadow textures seen in recent frames are prepared between them, never inside one.
-        if visible && !state.animating() {
-            renderer.prepare_idle();
+        let idle = visible && !state.animating();
+        if idle && let Some(key) = renderer.prepare_idle() {
+            damage_tracker.refresh_shadows(
+                |draw| renderer.shadow_key(draw) == Some(key),
+                damage::bounds,
+            );
         }
         if std::mem::take(&mut drawer_artwork_due) {
             let page = std::mem::replace(&mut state.page, state::Page::Apps);
@@ -2181,6 +2230,8 @@ fn run() -> Result<(), String> {
             let focus = state.focus.clone();
             let scroll = state.scroll;
             let mut views = view::scene(&state, &assets, now).draw;
+            let menu = view::options_menu_draws(&state, &assets);
+            views.extend(menu.iter().cloned());
             // Each Settings section as the sidebar opens it.
             state.page = state::Page::Settings;
             state.drawer_visibility = 0.;
@@ -2190,16 +2241,37 @@ fn run() -> Result<(), String> {
                 state.focus = state::Target::Sidebar(section);
                 views.extend(view::scene(&state, &assets, now).draw);
             }
+            // Then each subpage's labels as it first opens. Only labels: their images and
+            // logos would compete with the drawer's for the texture budget.
+            let mut subpage_labels = Vec::new();
+            for (section, subpage) in idle_subpages(&state) {
+                state.section = section;
+                state.subpage = Some(subpage);
+                state.focus = state::Target::Sidebar(section);
+                subpage_labels.extend(
+                    view::scene(&state, &assets, now)
+                        .draw
+                        .into_iter()
+                        .filter(|draw| matches!(draw, renderer::Draw::Text(..))),
+                );
+            }
+            state.subpage = None;
             state.page = page;
             state.drawer_visibility = visibility;
             state.section = section;
             state.subpage = subpage;
             state.focus = focus;
             state.scroll = scroll;
-            idle_text = views
-                .iter()
+            idle_text = menu
+                .into_iter()
                 .filter(|draw| matches!(draw, renderer::Draw::Text(..)))
-                .cloned()
+                .chain(
+                    views
+                        .iter()
+                        .filter(|draw| matches!(draw, renderer::Draw::Text(..)))
+                        .cloned(),
+                )
+                .chain(subpage_labels)
                 .collect();
             let paths: Vec<String> = views
                 .iter()
@@ -2226,9 +2298,11 @@ fn run() -> Result<(), String> {
                     _ => None,
                 })
                 .collect();
+            // Taken from the end: the drawer's logos first, then each Settings section's.
+            drawer_vectors.reverse();
         }
         // A few milliseconds of preparation per idle pass, so a key press never waits long.
-        if visible && !state.animating() {
+        if idle {
             let started = Instant::now();
             while started.elapsed() < Duration::from_millis(4) {
                 let image = match &drawer_artwork {
@@ -2247,6 +2321,9 @@ fn run() -> Result<(), String> {
                 } else if let Some(path) = drawer_vectors.pop() {
                     // Logos load on this thread: they become GL buffers.
                     renderer.preload_vector(&path);
+                } else if !idle_text.is_empty() && !renderer.text_cache_has_room() {
+                    // Further labels would evict the drawer's and sections' prepared ones.
+                    idle_text.clear();
                 } else if !idle_text.is_empty() {
                     // Text a few runs at a time: glyph outlines and run meshes.
                     let chunk: Vec<_> = idle_text.drain(..idle_text.len().min(4)).collect();
@@ -2372,4 +2449,49 @@ fn hit(
 ) -> Option<Target> {
     let (x, y) = pointer_position(window, x, y)?;
     state.hit_test(controls, x, y)
+}
+
+/// Every Settings subpage with the section it opens from, for idle preparation.
+fn idle_subpages(state: &state::State) -> Vec<(usize, state::Subpage)> {
+    use state::Subpage::*;
+    use state::{INPUTS_SECTION, SYSTEM_SECTION, WIDGETS_SECTION};
+    let mut list: Vec<(usize, state::Subpage)> = [
+        Clock,
+        ClockFormat,
+        TimeFormat,
+        Language,
+        AppDrawer,
+        AppSorting,
+        AppDrawerStyle,
+        RecentApps,
+    ]
+    .into_iter()
+    .map(|subpage| (0, subpage))
+    .collect();
+    list.push((SYSTEM_SECTION, TextRendering));
+    list.extend(
+        [
+            Greeting,
+            DateFormat,
+            Weather,
+            Shortcuts,
+            WeatherLocation,
+            Temperature,
+            WeatherStyle,
+        ]
+        .map(|subpage| (WIDGETS_SECTION, subpage)),
+    );
+    for widget in state.preferences.widgets() {
+        if matches!(
+            widget.kind(),
+            model::HomeWidget::Crypto | model::HomeWidget::Stocks
+        ) {
+            list.push((WIDGETS_SECTION, Market(widget)));
+        }
+    }
+    for input in &state.inventory.inputs {
+        list.push((INPUTS_SECTION, Input(input.id.clone())));
+        list.push((INPUTS_SECTION, InputIcons(input.id.clone())));
+    }
+    list
 }

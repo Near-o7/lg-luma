@@ -115,7 +115,16 @@ opened automatically. Input is ignored while Luma is unfocused or hidden; discon
 cancels pending holds. USB/Bluetooth availability depends on the TV firmware and SDL
 backend; verify both on hardware before claiming support for a specific TV.
 
-General → Show app names is off by default, preserving the compact, unlabeled drawer.
+General orders Clock, Language, UI sounds, App drawer, Recent apps and Reduced motion.
+App drawer uses distinct layout and text-field icons for Style and App names. System's
+Attributions action uses a copyright icon without a trailing chevron.
+
+Home returns select the first favorite, including TV focus restoration from Home or the drawer
+without a lifecycle relaunch. Focus-only restoration preserves settings and overlays. Stationary
+SDL mouse-motion notifications do not replace remote focus. Verify
+returning from an app and an HDMI input, and dismissing the system keyboard, on a TV.
+
+General → App drawer → App names is off by default, preserving the compact, unlabeled drawer.
 When enabled, the app drawer shows a centered, single-line name beneath the focused grid card
 in both styles, with wider row spacing and scroll padding for the name. Long names are ellipsized
 to the card width. Favorites, Home previews and app-management cards stay unlabeled; labels do not
@@ -247,13 +256,16 @@ other apps need manual hardware verification. A desktop-only backend check is av
 The unavailable-backend check runs with
 `SDL_AUDIODRIVER=luma-unavailable cargo test --locked --bin luma unavailable_audio_ -- --ignored --test-threads=1`.
 
-Weather → Widget style persists `weather_style` (`standard`, the default, `no_icon`,
-or `compact`). Home and Settings use the same native layout and painting functions.
-The picker shows all three designs with offline sample weather, in the saved
-temperature unit. Browsing does not change preferences or fetch a forecast. OK/click
+Weather → Widget style persists `weather_style` (`standard`, `compact`, or `one_line`, the default).
+Unset weather positions default to column 0, row 1 below Greeting. Saved styles and positions
+remain unchanged. Home and Settings use the same native layout and painting functions.
+The picker shows all three designs with offline sample weather, using the saved
+temperature unit and location visibility. Browsing does not change preferences or fetch a forecast. OK/click
 saves a style and returns to Weather, while Back/Left cancels without changing the style.
-The no-icon layout reclaims the icon column. Compact uses two lines, with a small icon,
-condition and location on the second. Cached-reading warnings and setup/error states
+The Show icon toggle reclaims the icon column when off. Compact uses two lines, with a small icon,
+condition and optional location on the second. All styles and sizes use one “City · Condition”
+detail line when a reading is available, without a separate city heading. With location names
+hidden the line contains only the condition. Cached-reading warnings and setup/error states
 remain visible. `xvfb-run -a pnpm screenshots --weather-styles` captures all designs and
 the settings preview using the native renderer and loopback-only cached sample weather.
 
@@ -372,9 +384,43 @@ Existing greeting, weather, shortcut and input preferences are unchanged. Scroll
 reserve 64 logical pixels below their last item for both remote focus and wheel scrolling,
 with a tighter 48-pixel spacing for Languages and Backgrounds.
 The weekday/date is part of the combined Greeting, not a standalone widget. Weather uses its
-own fixed footprint with a large condition icon, temperature, condition and location. The colored, static
-icons are original Breezy Weather PNGs, including clear/partly-cloudy night variants, bundled locally
-with their LGPL-3.0 license, attribution and source hashes in `assets/weather/`. No icons are fetched at runtime.
+own fixed footprint with a condition icon, temperature, condition and optional location.
+Standard, Compact and One line are independent of Icon style. Show icon uses the same rounded
+On/Off settings row as Show location name. It hides artwork and closes its gap in every layout
+and size without changing the selected icon set.
+Legacy No icon layouts and icon choices migrate to Show icon off with Kuankuan selected.
+The One line style places the icon, temperature and “City · Condition” side by side in both
+sizes, with uniform 26-pixel text and a 32-pixel icon matching Compact's bottom line
+(18-pixel text and a 24-pixel icon when small). Long labels fit with a shared text size.
+Saved-reading warnings stay below the row.
+One line occupies a 2×1 grid footprint (1×1 in small size). Switching back to a taller
+style relocates the widget if necessary, or keeps the previous style if no space is available.
+Kuankuan is the default icon style. Weather → Widget style → Icon style offers Kuankuan first,
+followed by Breezy, Lucide and Kickstand, with offline condition samples in 200-pixel picker rows
+matching the layout previews, with centered 64-pixel icons. Both weather pickers use 20-pixel preview insets with 28-pixel
+inner corner radii to match the rows' 48-pixel outer corners. Selected previews have 28-pixel white
+checkmarks on subtle circular badges, with 24-pixel top/right padding inside the preview.
+Sidebar breadcrumbs show at most the last three levels, retaining the current page and its closest parents. `weather_icons` stores the primary
+choice; additional instances use `icons`. Lucide, Kickstand and Kuankuan compile to vector meshes;
+Breezy retains its original PNGs. No icons are fetched at runtime. Sources, licenses, adaptations
+and mappings are documented in `assets/weather/README.md`; Kuankuan's preferred editable `.ai`
+sources ship alongside its SVGs. `pnpm assets:weather` optionally restores pinned original files.
+Weather → Widget style → Show location name defaults on. Both appearance controls sit above the
+layout previews in Widget style, not on the Weather configuration page. Returning from the icon
+picker restores its row in Widget style. Turning off the location name hides the city in every style and size,
+including loading and error states, without changing the forecast location or cache. The primary
+widget persists `weather_show_location`; additional instances persist their own `show_location`.
+Style previews follow the active widget's setting. Location settings still show the selected city.
+
+System → Attributions opens `assets/attributions.txt` as a read-only text field. Up/Down scrolls
+with the remote, the mouse wheel scrolls only over the field, and Back/Left returns to the System
+button. The viewport and scrollbar stay fixed while text scrolls, with drawing and pointer hits
+clipped to the field. The body includes author credits, source URLs and references to full license
+texts in the package; legal notices retain their original English text. No keyboard, network request
+or preference save is involved. `ATTRIBUTIONS.txt` also ships beside `ASSETS.md` in the package.
+`xvfb-run -a pnpm screenshots --weather-icons` refreshes every weather documentation image:
+all Home variants, setup, layout and icon pickers, public/private/no-icon previews, and Attributions.
+Both weather capture modes share configuration so removed layouts cannot persist in older previews.
 Disabled weather
 is hidden. Enabled weather without a location uses the same large 144px artwork and a prominent setup action.
 Settings lists render behind fixed controls. The drawer keeps a one-row dock fixed. With multiple
@@ -474,6 +520,12 @@ preferences are not reloaded. At most one input read is queued, errors retain th
 and retry after ten seconds, and an unchanged snapshot does not redraw. Holds, reordering, other overlays,
 loading and hidden/unfocused pages pause polling and defer pending snapshots, keeping pointer
 targets stationary through release. A later complete inventory supersedes deferred input data.
+Pauses preserve the deadline, so repeated short interactions cannot postpone refresh forever.
+A native EIM `getAllInputStatus` subscription coalesces change notifications into an immediate
+worker refresh. Subscription refusal leaves polling available. The subscription does not query
+CEC power or switch inputs. Firmware may still return cached `hdmiSignalExist` values. Verify
+PS5 wake/rest transitions while remaining on Home, plus unplug/replug and keyboard dismissal,
+on hardware before treating signal freshness or focus restoration as confirmed.
 Auto visibility remains cable-based: boolean `hdmiPlugIn` takes priority over `connected`, with
 the existing fallback when unavailable or malformed. Optional boolean `hdmiSignalExist` changes
 only the detail to **No signal** when a cable is present. A stale positive signal cannot override
@@ -1001,6 +1053,56 @@ reply limit. Errors include URI and the bus refusal. Fixed inventory commands ru
 Homebrew Channel `exec`, parsing complete multi-line `luna-send -n 1` JSON replies. Input-read
 failures preserve the last valid inputs. No failed inventory read substitutes demo apps on TV.
 
+### Home Chooser integration
+
+On native webOS, Luma requests `SDL_WEBOS_ACCESS_POLICY_KEYS_HOME` before video initialization
+for every launch, not just legacy Home takeover. When the compositor delivers Home to Luma's
+foreground surface, it returns directly to the Home tab through `State::return_home`, dismissing
+overlays and saving in-progress keyboard edits. Repeated Home stays at the root, without exiting
+or opening Recents. Ordinary tile launches receive the same behavior, even when Luma is not the
+selected launcher. Desktop key handling is unchanged.
+
+This is a native window policy, not a global key filter or a Home Chooser API call. It adds no
+installation permission and works independently of the inventory/icon API integration.
+TV verification is pending: check Home from Apps, Settings, overlays and the root, repeated presses
+and holds, opening Luma from its tile without selecting it as Home, launching another app and
+pressing Home, and changing the selected launcher. A platform relaunch after the key is safe for
+navigation, but actual compositor delivery and background routing must be verified on hardware.
+
+The installed `appinfo.json` declares `appCategory: ["home"]`, so
+[Home Chooser](https://github.com/webosbrew/home-chooser/blob/main/docs/launcher-api.md) can select
+Luma under `com.ecklf.luma`. Keep the window full-screen (no `defaultWindowType: "overlay"`):
+Home Chooser uses this distinction for its empty-screen policy. Back must not exit the root Home.
+
+`handlesRelaunch: true` and `nativeLifeCycleInterfaceVersion: 2` match Luma's explicit
+`registerApp` subscription under `com.ecklf.luma`, submitted through SDL/libhelpers' existing
+app-named LS2 connection. Disabling SDL automatic lifecycle registration does not release that
+bus name, so Luma must not open a second connection claiming it. SDL automatic lifecycle
+registration is disabled before video initialization to avoid competing subscriptions.
+On `relaunch`, Luma returns to its Home scene, restores/shows/raises the existing window and
+refreshes inventory; on `close` it exits. Submission is nonblocking, and a submission failure is
+logged rather than aborting before the first frame. Every reply is logged with
+`Luma lifecycle (shared libhelpers)`. This needs neither root nor app-ID impersonation.
+`noSplashOnLaunch: true` avoids SAM splash surfaces for the native launcher. Home Chooser
+launches retain `APPID=com.ecklf.luma`; do not classify them as `options.webos_home`, which
+is reserved for the unchanged legacy takeover paths. On a TV, verify that background Home
+presses deliver relaunch events, preserve Luma's PID and actually focus the existing window;
+desktop tests do not establish SAM or compositor behavior.
+
+Only the `home` category is required for selection. The optional
+`org.webosbrew.homechooser.applications` permission is not declared, so Luma can still install
+without Home Chooser. Existing inventory/artwork and privileged app-management paths remain
+unchanged. A separate follow-up will introduce API calls through SDL/libhelpers' app-named
+handle rather than Luma's anonymous platform connections.
+
+Disable the legacy takeover, autostart and any Input Hook Home mapping before selecting Luma.
+Home Chooser owns stock-Home suppression and boot recovery; do not run both integrations.
+For manual TV verification: select Luma, launch an app/input and press Home repeatedly, check
+Back at the root and within settings, cold-boot, switch back to LG Home, and test removal of the
+selected launcher. Check SAM's running list for LG Home after selection and after a reboot;
+Home Chooser documents that webOS 5 keeps it loaded until restart. Host metadata tests do not
+verify compositor behavior or memory savings on hardware.
+
 ### Optional native Home integration
 
 `tv/home.sh` and the native Rust `luma-helper` executable are packaged beside `luma`. They are a root-only, explicit integration
@@ -1201,7 +1303,9 @@ visible, the widget enabled and a city configured. ureq/rustls uses embedded cer
 an eight-second timeout, no redirects/proxy and 256 KiB reply limits. Search/forecast/cache writes
 have separate workers and generation IDs, avoiding stale responses overwriting current state.
 Fresh Celsius readings are reused for 15 minutes; valid saved data lasts up to six hours and
-failure retries after five minutes. Unit changes convert unrounded cached Celsius immediately.
+failures with a usable saved reading retry after five minutes. Without a reading, retries happen
+after 10, 20, 30, 60 and 120 seconds, then every five minutes while Home is visible. Success or
+a location change resets this bounded startup backoff. Unit changes convert unrounded cached Celsius immediately.
 Removing a city clears its cache. The `.weather.json` sidecar uses Unix-seconds timestamps.
 Mock servers accept only literal loopback HTTP origins and are refused in TV builds.
 

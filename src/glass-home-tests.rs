@@ -4,6 +4,14 @@ use crate::{
     state::{APPS_SECTION, Rect, Subpage},
 };
 
+// These grid and layout regressions exercise a saved, two-row Standard widget.
+fn ready() -> State {
+    let mut state = super::ready();
+    state.preferences.weather_style = crate::model::WeatherStyle::Standard;
+    state.preferences.weather_position = crate::model::WidgetPosition { column: 4, row: 0 };
+    state
+}
+
 #[test]
 fn inputs_have_their_own_sidebar_section_directly_below_apps() {
     use crate::state::{INPUTS_SECTION, SETTINGS_ORDER, WIDGETS_SECTION};
@@ -336,7 +344,11 @@ fn resizing_favorites_reserves_real_grid_rows_and_repairs_collisions() {
         WidgetPosition,
     };
 
-    let mut prefs = Preferences::default();
+    let mut prefs = Preferences {
+        weather_style: crate::model::WeatherStyle::Standard,
+        weather_position: WidgetPosition { column: 4, row: 0 },
+        ..Preferences::default()
+    };
     let original_greeting = prefs.widget_position(Greeting);
     let original_weather = prefs.widget_position(Weather);
     for rows in [1, 2, 3] {
@@ -364,7 +376,11 @@ fn resizing_favorites_reserves_real_grid_rows_and_repairs_collisions() {
 fn expanding_favorites_relocates_widgets_and_preserves_them_when_the_grid_is_full() {
     use crate::model::{HomeWidget, WidgetPosition};
     use HomeWidget::{Crypto, ExtraCrypto, Favorites, Stocks, Weather};
-    let mut prefs = Preferences::default();
+    let mut prefs = Preferences {
+        weather_style: crate::model::WeatherStyle::Standard,
+        weather_position: WidgetPosition { column: 4, row: 0 },
+        ..Preferences::default()
+    };
     prefs.set_widget_present(Crypto, true);
     assert!(prefs.set_favorite_rows(3));
     assert_eq!(prefs.widget_position(Favorites).row, 2);
@@ -735,7 +751,7 @@ fn widget_positions_default_to_requested_spans_and_sanitize_safely() {
     );
     assert_eq!(
         preferences.weather_position,
-        WidgetPosition { column: 4, row: 0 }
+        WidgetPosition { column: 0, row: 1 }
     );
     assert!(preferences.weather_visible());
     for greeting in 0..crate::model::HOME_GRID_CELLS {
@@ -1012,7 +1028,7 @@ fn weather_empty_state_uses_a_large_icon_and_setup_action() {
     let state = ready();
     let rendered = scene(&state);
     assert!(rendered.draw.iter().any(|draw| matches!(draw,
-        Draw::Image(path, rect, ..) | Draw::TintedImage(path, rect, ..) if path.ends_with("weather/partly-cloudy.png") && rect.w == 144. && rect.h == 144.)));
+        Draw::Image(path, rect, ..) | Draw::TintedImage(path, rect, ..) if path.ends_with(&state.preferences.weather_icons.asset("partly-cloudy")) && rect.w == 144. && rect.h == 144.)));
     assert!(rendered.draw.iter().any(|draw| matches!(draw,
         Draw::Text(label, _, style, ..) if label == state.preferences.language.t("setWeatherLocation") && style.size >= 24.)));
     let setup = rendered

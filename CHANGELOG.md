@@ -1,5 +1,57 @@
 # lg-luma
 
+## 3.13.3
+
+### Patch Changes
+
+- f8f7eba: Restore favorite focus on Home returns, reorder General settings, clarify drawer labels and icons, and simplify the Attributions action. Refresh inputs on native EIM notifications and preserve polling deadlines across interactions.
+
+## 3.13.2
+
+### Patch Changes
+
+- b3f7115: Handle native app lifecycle registration explicitly for ordinary and Home Chooser launches, returning to the Home scene on relaunch while preserving legacy LG Home takeover paths.
+- b7aec89: Prevent uninstalling Home Chooser through Luma or its privileged helper.
+- 9f7da39: Fix the native startup black screen caused by duplicate lifecycle bus-name registration by sharing SDL/libhelpers' existing app connection.
+
+## 3.13.1
+
+### Patch Changes
+
+- ea94e4d: Switch to Settings → Apps faster on webOS TVs: draws entirely outside the current clip (rows scrolled out of a list) are no longer submitted, and the app cards there are grouped like the drawer's.
+- d0149ba: Handle the native foreground Home key in ordinary Luma launches as well as legacy Home takeover. Home returns directly from Apps, Settings or an overlay to Luma's Home tab, and stays there at the root, without requiring the Home Chooser launcher API.
+- 5866c28: Open the app options menu and Settings subpages without a first-frame stutter on webOS TVs: their labels are prepared while the launcher is idle. When a shadow finishes its idle preparation, only that shadow is redrawn instead of every shadow on screen, and drawer logos load before those of the Settings sections.
+
+## 3.13.0
+
+### Minor Changes
+
+- 3ff03c5: Enable native relaunch handling for Luma selected through Home Chooser, suppress the native splash, and document migration from the standalone takeover scripts. Home Chooser manages stock-Home suppression; Luma retains its existing Homebrew Channel platform integration.
+
+  Home Chooser remains optional. Luma does not declare its applications API permission or require it for installation.
+
+### Patch Changes
+
+- 69eae29: Require explicit confirmation before an in-app upgrade from Luma v1, v2 or v3 to v4 or later. Default to Close and explain the Home Chooser migration steps before downloading.
+
+## 3.12.1
+
+### Patch Changes
+
+- 3085234: Default unconfigured weather widgets to the One line layout below Greeting without changing saved styles or positions. Retry weather more quickly when the network is unavailable during startup, using bounded backoff until the first reading succeeds.
+
+## 3.12.0
+
+### Minor Changes
+
+- 4f6a4ad: Add per-widget location-name visibility, a Show icon toggle and weather icon style settings. Default to Kuankuan, with Breezy, Lucide and Kickstand alternatives, preserving saved choices and reflecting appearance settings in layout previews. Add a read-only, scrollable System → Attributions page and bundle the new artwork's licenses and editable sources.
+
+## 3.11.1
+
+### Patch Changes
+
+- 65dfa47: Center the app move arrows inside their indicator badge.
+
 ## 3.11.0
 
 ### Minor Changes
