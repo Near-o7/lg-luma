@@ -36,6 +36,9 @@ mod weather_style_tests;
 #[path = "settings-contrast-tests.rs"]
 mod settings_contrast_tests;
 
+#[path = "attributions-tests.rs"]
+mod attributions_tests;
+
 fn ready() -> State {
     let mut state = State::new(Preferences::default());
     state.set_inventory(demo_inventory(), None);
@@ -123,7 +126,7 @@ fn ui_sounds_default_off_and_toggle_without_moving_controls() {
         let mut state = ready();
         state.open(2);
         state.direction(Direction::Right, &controls(&state));
-        for _ in 0..4 {
+        for _ in 0..2 {
             state.direction(Direction::Down, &controls(&state));
         }
         assert_eq!(state.focus, Target::Setting(11));
@@ -162,6 +165,46 @@ fn manage_apps(state: &mut State) {
 }
 
 #[test]
+fn home_focus_recovery_selects_the_first_favorite_and_ignores_stationary_pointer_events() {
+    let mut state = ready();
+    state.preferences.favorites = Some(vec!["youtube.leanback.v4".into(), "netflix".into()]);
+    state.open(2);
+    assert!(!crate::home_on_focus(&state, true, false));
+    state.open(1);
+    assert!(crate::home_on_focus(&state, true, false));
+    assert!(!crate::home_on_focus(&state, false, false));
+    assert!(!crate::home_on_focus(&state, true, true));
+    state.loading = true;
+    assert!(!crate::home_on_focus(&state, true, false));
+    state.loading = false;
+    state.overlay = Some(Overlay::SystemKeyboard);
+    assert!(!crate::home_on_focus(&state, true, false));
+    state.overlay = None;
+    state.hover = Some(Target::InputsMenu);
+    state.return_home();
+    assert_eq!(state.focus, Target::App("youtube.leanback.v4".into()));
+    assert!(state.hover.is_none());
+    assert!(!crate::pointer_motion_active(&state, 0, 0));
+    assert!(crate::pointer_motion_active(&state, 1, 0));
+    assert!(crate::pointer_motion_active(&state, 0, -1));
+    state.pointer = true;
+    assert!(crate::pointer_motion_active(&state, 0, 0));
+    state.set_inventory(demo_inventory(), None);
+    assert_eq!(state.focus, Target::App("youtube.leanback.v4".into()));
+}
+
+#[test]
+fn general_settings_follow_the_visible_order_for_remote_navigation() {
+    let mut state = ready();
+    state.open(2);
+    state.direction(Direction::Right, &controls(&state));
+    for index in [1, 4, 11, 13, 12, 2] {
+        assert_eq!(state.focus, Target::Setting(index));
+        state.direction(Direction::Down, &controls(&state));
+    }
+}
+
+#[test]
 fn home_relaunch_returns_from_apps_and_settings() {
     for page in [1, 2] {
         let mut state = ready();
@@ -186,6 +229,39 @@ fn home_relaunch_returns_from_apps_and_settings() {
         assert!(state.dirty);
         assert!(state.return_home().is_empty());
         assert!(state.overlay.is_none(), "Home again must not open Recents");
+    }
+}
+
+#[test]
+fn foreground_home_key_is_native_only_without_a_takeover_or_chooser_requirement() {
+    let key = sdl2::keyboard::Keycode::from_i32(crate::sdl_events::WEBOS_HOME_KEYCODE).unwrap();
+    assert!(crate::is_home(key, true));
+    assert!(!crate::is_home(key, false));
+    for key in [
+        sdl2::keyboard::Keycode::AcBack,
+        sdl2::keyboard::Keycode::Escape,
+        sdl2::keyboard::Keycode::Return,
+    ] {
+        assert!(!crate::is_home(key, true));
+    }
+}
+
+#[test]
+fn foreground_home_navigation_stays_at_root_and_a_second_delivery_is_harmless() {
+    for page in [0, 1, 2] {
+        let mut state = ready();
+        state.open(page);
+        state.query = "YouTube".into();
+        state.pressed = Some(Target::Nav(page));
+        for _ in 0..2 {
+            assert!(state.return_home().is_empty());
+            assert_eq!(state.page, Page::Home);
+            assert_eq!(state.drawer_visibility, 0.);
+            assert!(state.query.is_empty());
+            assert!(state.pressed.is_none());
+            assert!(state.overlay.is_none());
+            assert_eq!(state.recents.visibility, 0.);
+        }
     }
 }
 
@@ -242,6 +318,9 @@ fn home_relaunch_dismisses_overlays_without_cancelling_mutations() {
             restore: Target::Nav(1),
         },
         Overlay::WallpaperUpload,
+        Overlay::UpdateConfirmation {
+            version: "4.0.0".into(),
+        },
         Overlay::BackgroundOptions {
             id: "dunes".into(),
             restore: Target::Sidebar(1),
@@ -1572,6 +1651,7 @@ fn protected_apps_cannot_be_deleted_through_ui_or_worker() {
         "com.luma.launcher.native",
         "org.webosbrew.hbchannel",
         "org.webosbrew.hbchannel.service",
+        "org.webosbrew.homechooser",
         "custom.lamp",
         "invalid';command",
     ] {
@@ -1836,9 +1916,8 @@ fn weather_location_keyboard_back_and_sidebar_routes_restore_focus() {
     assert_eq!(state.focus, Target::WidgetAdd);
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::WidgetCell(0));
-    for _ in 0..4 {
-        state.direction(Direction::Right, &controls(&state));
-    }
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::WidgetCell(6));
     state.activate();
     assert_eq!(
         state.focus,
@@ -1858,7 +1937,7 @@ fn weather_location_keyboard_back_and_sidebar_routes_restore_focus() {
     assert_eq!(state.focus, Target::WeatherLocation);
     assert_eq!(state.subpage, Some(crate::state::Subpage::Weather));
     state.back();
-    assert_eq!(state.focus, Target::WidgetCell(4));
+    assert_eq!(state.focus, Target::WidgetCell(6));
     assert!(state.subpage.is_none());
     state.back();
     assert_eq!(state.focus, Target::Sidebar(crate::state::WIDGETS_SECTION));
@@ -1925,7 +2004,7 @@ fn home_weather_setup_returns_through_the_widgets_weather_parent() {
     assert_eq!(state.focus, Target::WeatherLocation);
     state.back();
     assert!(state.subpage.is_none());
-    assert_eq!(state.focus, Target::WidgetCell(4));
+    assert_eq!(state.focus, Target::WidgetCell(6));
 }
 
 #[test]
@@ -2420,6 +2499,17 @@ fn normal_app_preload_does_not_change_startup_visibility() {
         assert_eq!(options.preload, None);
         assert!(!options.start_hidden(), "{metadata}");
     }
+}
+
+#[test]
+fn direct_lifecycle_registration_preserves_app_and_legacy_home_identities() {
+    use crate::platform::{APP_ID, direct_lifecycle_id, home_id};
+    // Home Chooser and tile launches are the installed app, regardless of root status.
+    assert_eq!(direct_lifecycle_id(false, false), Some(APP_ID));
+    assert_eq!(direct_lifecycle_id(false, true), Some(APP_ID));
+    // Executable replacement keeps LG's identity; staged Home retains its existing fallback.
+    assert_eq!(direct_lifecycle_id(true, true), Some(home_id()));
+    assert_eq!(direct_lifecycle_id(true, false), None);
 }
 
 #[test]
@@ -3389,14 +3479,14 @@ fn update_card_shows_both_versions_and_explicitly_starts_installation() {
                 .iter()
                 .any(|control| control.target == Target::InstallUpdate)
         );
-        state.available_update = Some("9.0.0".into());
+        state.available_update = Some("3.99.0".into());
         let rendered = scene(&state);
         for label in [
             language.t("updateAvailable").to_owned(),
-            language.format("installUpdate", &[("version", "9.0.0")]),
+            language.format("installUpdate", &[("version", "3.99.0")]),
             language.format(
                 "updateVersions",
-                &[("current", "test"), ("latest", "9.0.0")],
+                &[("current", "test"), ("latest", "3.99.0")],
             ),
         ] {
             assert!(
@@ -3411,7 +3501,7 @@ fn update_card_shows_both_versions_and_explicitly_starts_installation() {
         assert_eq!(state.focus, Target::InstallUpdate);
         assert_eq!(
             state.activate(),
-            vec![Effect::UpdateDownload("9.0.0".into())]
+            vec![Effect::UpdateDownload("3.99.0".into())]
         );
         let button = rendered
             .controls
@@ -3498,6 +3588,115 @@ fn update_card_keeps_status_surface_and_button_only_action() {
             );
         }
     }
+}
+
+#[test]
+fn v4_upgrade_defaults_to_close_and_requires_explicit_confirmation() {
+    use crate::{i18n::Language, renderer::Draw, update::InstallStatus};
+    for language in Language::ALL {
+        let mut state = ready();
+        state.preferences.language = language;
+        state.open(2);
+        state.section = crate::state::SYSTEM_SECTION;
+        state.available_update = Some("4.0.0".into());
+        state.focus = Target::InstallUpdate;
+        assert!(state.activate().is_empty());
+        assert_eq!(state.update, InstallStatus::Idle);
+        assert_eq!(state.focus, Target::CloseDialog);
+        let modal = scene(&state);
+        assert!(modal.modal.is_some());
+        assert_eq!(modal.controls.len(), 2);
+        assert_eq!(modal.controls[0].target, Target::CloseDialog);
+        assert_eq!(modal.controls[1].target, Target::ConfirmUpdate);
+        for direction in [
+            Direction::Up,
+            Direction::Left,
+            Direction::Down,
+            Direction::Right,
+        ] {
+            state.direction(direction, &modal.controls);
+            assert!(matches!(
+                state.focus,
+                Target::CloseDialog | Target::ConfirmUpdate
+            ));
+        }
+        state.focus = Target::CloseDialog;
+        for key in [
+            "homeChooserUpgradeDefault",
+            "homeChooserUpgradeDisable",
+            "homeChooserUpgradeInstall",
+            "homeChooserUpgradeSelect",
+        ] {
+            assert!(
+                modal
+                    .draw
+                    .iter()
+                    .any(|draw| matches!(draw, Draw::Text(value, ..) if value == language.t(key)))
+            );
+        }
+        assert!(
+            state.activate().is_empty(),
+            "a second OK closes, never installs"
+        );
+        assert!(state.overlay.is_none());
+        assert_eq!(state.focus, Target::InstallUpdate);
+        assert_eq!(state.update, InstallStatus::Idle);
+        assert!(state.activate().is_empty());
+        assert!(state.back().is_empty());
+        assert_eq!(state.focus, Target::InstallUpdate);
+        assert!(state.activate().is_empty());
+        state.direction(Direction::Right, &controls(&state));
+        assert_eq!(state.focus, Target::ConfirmUpdate);
+        assert_eq!(
+            state.activate(),
+            vec![Effect::UpdateDownload("4.0.0".into())]
+        );
+        assert!(state.overlay.is_none());
+        assert_eq!(state.update, InstallStatus::Downloading(0));
+        assert!(state.activate().is_empty());
+    }
+}
+
+#[test]
+fn upgrade_confirmation_cannot_install_without_a_matching_pending_version() {
+    let mut state = ready();
+    state.available_update = Some("4.0.0".into());
+    state.focus = Target::ConfirmUpdate;
+    assert!(state.activate().is_empty());
+    state.overlay = Some(Overlay::UpdateConfirmation {
+        version: "4.0.0".into(),
+    });
+    state.available_update = Some("4.0.1".into());
+    assert!(state.activate().is_empty());
+    assert_eq!(state.update, crate::update::InstallStatus::Idle);
+}
+
+#[test]
+fn pointer_upgrade_confirmation_requires_the_explicit_confirm_button() {
+    let mut state = ready();
+    state.open(2);
+    state.section = crate::state::SYSTEM_SECTION;
+    state.available_update = Some("4.0.1".into());
+    state.focus = Target::InstallUpdate;
+    assert!(state.activate().is_empty());
+    let modal = scene(&state);
+    assert!(state.hit_test(&modal.controls, 10., 10.).is_none());
+    for target in [Target::CloseDialog, Target::ConfirmUpdate] {
+        let button = modal
+            .controls
+            .iter()
+            .find(|control| control.target == target)
+            .unwrap();
+        let (x, y) = button.rect.center();
+        assert_eq!(state.hit_test(&modal.controls, x, y), Some(target.clone()));
+        state.pointer = true;
+        state.focus(target.clone(), &modal.controls);
+        assert_eq!(state.focus, target);
+    }
+    assert_eq!(
+        state.activate(),
+        vec![Effect::UpdateDownload("4.0.1".into())]
+    );
 }
 
 #[test]
@@ -3690,9 +3889,9 @@ fn update_card_shows_progress_restores_retry_and_ignores_presses_while_busy() {
         state.activate().is_empty(),
         "no second check while one runs"
     );
-    state.update_response(Ok(Some("9.9.9".into())));
+    state.update_response(Ok(Some("3.99.9".into())));
     assert!(scene(&state).draw.iter().any(|draw| {
-        matches!(draw, crate::renderer::Draw::Text(text, ..) if text == "Install 9.9.9")
+        matches!(draw, crate::renderer::Draw::Text(text, ..) if text == "Install 3.99.9")
     }));
     let initial = scene(&state);
     assert!(
@@ -3703,7 +3902,7 @@ fn update_card_shows_progress_restores_retry_and_ignores_presses_while_busy() {
     );
     assert_eq!(
         state.activate(),
-        vec![Effect::UpdateDownload("9.9.9".into())]
+        vec![Effect::UpdateDownload("3.99.9".into())]
     );
     assert_eq!(state.update, InstallStatus::Downloading(0));
     assert!(state.activate().is_empty());
@@ -3730,7 +3929,7 @@ fn update_card_shows_progress_restores_retry_and_ignores_presses_while_busy() {
         geometry(initial.controls),
         "progress must not move hit targets"
     );
-    state.install_response(Response::Installing("9.9.9".into()));
+    state.install_response(Response::Installing("3.99.9".into()));
     assert!(state.activate().is_empty());
     state.pressed = Some(Target::InstallUpdate);
     state.install_response(Response::Finished(Err("disk full".into())));
@@ -3774,4 +3973,47 @@ fn hovering_corner_controls_keeps_their_geometry_and_does_not_change_pages() {
     assert_eq!(state.page, Page::Home);
     state.hover = None;
     assert_eq!(tab(&state), idle);
+}
+
+#[test]
+fn settings_app_cards_draw_shadows_faces_then_logos_like_the_drawer() {
+    use crate::renderer::Draw;
+    let mut state = ready();
+    state.open(2);
+    state.section = crate::state::APPS_SECTION;
+    state.focus = Target::Sidebar(crate::state::APPS_SECTION);
+    let draws = scene(&state).draw;
+    let clip = draws
+        .iter()
+        .position(|draw| matches!(draw, Draw::Clip(Some(_))))
+        .unwrap();
+    let end = clip
+        + draws[clip..]
+            .iter()
+            .position(|draw| matches!(draw, Draw::Clip(None)))
+            .unwrap();
+    let cards = &draws[clip..end];
+    let last_shadow = cards
+        .iter()
+        .rposition(|draw| matches!(draw, Draw::Shadow(..)))
+        .unwrap();
+    let first_logo = cards
+        .iter()
+        .position(|draw| matches!(draw, Draw::Image(path, ..) | Draw::TintedImage(path, ..) if path.ends_with(".lvec")))
+        .unwrap();
+    let last_face = cards
+        .iter()
+        .rposition(|draw| {
+            matches!(draw, Draw::AppImage(..))
+                || matches!(draw, Draw::Image(path, ..) if !path.ends_with(".lvec"))
+        })
+        .unwrap();
+    assert!(
+        cards
+            .iter()
+            .filter(|draw| matches!(draw, Draw::Shadow(..)))
+            .count()
+            > 3
+    );
+    assert!(last_shadow < last_face && last_face < first_logo);
 }

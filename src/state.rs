@@ -163,6 +163,7 @@ pub enum Target {
     LumaSettings,
     TvSettings,
     InstallUpdate,
+    ConfirmUpdate,
     CheckUpdates,
     Recent(String),
     RecentEmpty,
@@ -214,6 +215,11 @@ pub enum Target {
     WeatherTemperature,
     WeatherStyle,
     WeatherSize,
+    WeatherShowLocation,
+    WeatherShowIcon,
+    WeatherIcons,
+    Attributions,
+    AttributionText,
     WeatherQuery,
     WeatherSearch,
     WeatherClear,
@@ -257,6 +263,7 @@ pub struct Control {
 
 #[derive(Clone, Debug)]
 pub enum Overlay {
+    UpdateConfirmation { version: String },
     Inputs,
     Settings,
     Options { id: String, restore: Target },
@@ -295,6 +302,8 @@ pub enum Subpage {
     AppDrawer,
     RecentApps,
     TextRendering,
+    WeatherIcons,
+    Attributions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -705,6 +714,7 @@ impl State {
         self.recents.closing_focus = None;
         self.wallpaper_upload = None;
         self.pointer = false;
+        self.hover = None;
         self.pressed = None;
         self.open(0);
         // A system relaunch reveals Home directly, not the previous app's drawer
@@ -1033,6 +1043,20 @@ impl State {
         Rect::new(620., 244.8, 1160., content.y + content.h - 244.8)
     }
 
+    pub fn attributions_viewport(&self) -> Rect {
+        Rect::new(640., 164.8, 1120., 1080. - 164.8 - SETTINGS_BOTTOM_PADDING)
+    }
+
+    fn scroll_attributions(&mut self, controls: &[Control], delta: f32) {
+        let viewport = self.attributions_viewport();
+        let height = controls
+            .iter()
+            .find(|control| control.target == Target::AttributionText)
+            .map_or(viewport.h, |control| control.rect.h);
+        self.scroll = (self.scroll + delta).clamp(0., (height - viewport.h).max(0.));
+        self.dirty = true;
+    }
+
     pub fn hit_test(&self, controls: &[Control], x: f32, y: f32) -> Option<Target> {
         controls
             .iter()
@@ -1045,8 +1069,9 @@ impl State {
                 {
                     return false;
                 }
-                let viewport = if (self.page == Page::Home
-                    && matches!(control.target, Target::App(_)))
+                let viewport = if control.target == Target::AttributionText {
+                    self.attributions_viewport()
+                } else if (self.page == Page::Home && matches!(control.target, Target::App(_)))
                     || matches!(control.target, Target::DockApp(_))
                 {
                     self.favorites_viewport()
@@ -1076,6 +1101,16 @@ impl State {
         x: i32,
         y: i32,
     ) -> bool {
+        if self.page == Page::Settings
+            && self.subpage == Some(Subpage::Attributions)
+            && self.overlay.is_none()
+        {
+            if position.is_none_or(|(x, y)| self.attributions_viewport().contains(x, y)) {
+                self.scroll_attributions(controls, -y as f32 * 90.);
+                self.pointer = true;
+            }
+            return false;
+        }
         let backgrounds =
             self.page == Page::Settings && self.section == 1 && self.subpage.is_none();
         if self.managing_apps()
@@ -1346,7 +1381,7 @@ impl State {
             {
                 self.set_scroll(0.);
             } else if control.scrollable
-                && !matches!(self.focus, Target::DockApp(_))
+                && !matches!(self.focus, Target::DockApp(_) | Target::AttributionText)
                 && self.page != Page::Home
             {
                 let top = if self.managing_apps() {
@@ -1646,6 +1681,11 @@ impl State {
                 self.subpage = Some(Subpage::Weather);
                 Target::WeatherStyle
             }
+            Some(Subpage::WeatherIcons) => {
+                self.subpage = Some(Subpage::WeatherStyle);
+                Target::WeatherIcons
+            }
+            Some(Subpage::Attributions) => Target::Attributions,
             Some(Subpage::Language) => Target::Setting(4),
             Some(Subpage::TextRendering) => Target::Setting(7),
             Some(Subpage::AppSorting) => {
@@ -1669,6 +1709,19 @@ impl State {
         self.dirty = true;
         if self.recents_open() {
             return self.recent_direction(direction);
+        }
+        if self.overlay.is_none()
+            && self.page == Page::Settings
+            && self.subpage == Some(Subpage::Attributions)
+            && self.focus == Target::AttributionText
+        {
+            match direction {
+                Direction::Up => self.scroll_attributions(controls, -180.),
+                Direction::Down => self.scroll_attributions(controls, 180.),
+                Direction::Left => self.close_subpage(),
+                Direction::Right => {}
+            }
+            return vec![];
         }
         if self.overlay.is_none()
             && self.page == Page::Settings
@@ -1979,6 +2032,14 @@ impl State {
                     Target::WeatherStyle,
                     Target::WeatherSize,
                 ]),
+                Some(Subpage::WeatherStyle) => Some(&[
+                    Target::WeatherShowLocation,
+                    Target::WeatherShowIcon,
+                    Target::WeatherIcons,
+                    Target::Choice(0),
+                    Target::Choice(1),
+                    Target::Choice(2),
+                ]),
                 Some(Subpage::Clock) => Some(&[Target::ClockFormat, Target::ClockTimeFormat]),
                 _ => None,
             };
@@ -2008,6 +2069,7 @@ impl State {
                                 | Target::WeatherLocation
                                 | Target::WeatherTemperature
                                 | Target::WeatherStyle
+                                | Target::WeatherIcons
                                 | Target::MarketSymbol(_)
                                 | Target::MoveWidget(_)
                         ) =>
@@ -2030,6 +2092,7 @@ impl State {
                     ) => 2,
                     Some(Subpage::FavoriteRows) => usize::from(MAX_HOME_ROWS),
                     Some(Subpage::RecentApps) => crate::model::RecentAppsBehavior::ALL.len(),
+                    Some(Subpage::WeatherIcons) => crate::model::WeatherIconStyle::ALL.len(),
                     Some(Subpage::InputIcons(_)) => crate::model::INPUT_ICONS.len() + 1,
                     Some(Subpage::Language) => Language::ALL.len(),
                     Some(Subpage::DateFormat) => crate::model::DateFormat::ALL.len(),
@@ -2144,6 +2207,7 @@ impl State {
                     | Target::WeatherLocation
                     | Target::WeatherTemperature
                     | Target::WeatherStyle
+                    | Target::Attributions
             ) && matches!(direction, Direction::Right)
             {
                 return self.activate();
@@ -3013,6 +3077,38 @@ impl State {
                     self.panel_started = Some(Instant::now());
                 }
             }
+            Target::WeatherShowLocation => {
+                self.preferences
+                    .edit_weather(self.active_weather, |config| {
+                        config.show_location = !config.show_location;
+                    });
+                return vec![Effect::Save];
+            }
+            Target::WeatherShowIcon => {
+                self.preferences
+                    .edit_weather(self.active_weather, |config| {
+                        config.show_icon = !config.show_icon;
+                    });
+                return vec![Effect::Save];
+            }
+            Target::WeatherIcons => {
+                self.subpage = Some(Subpage::WeatherIcons);
+                self.focus = Target::Choice(
+                    self.preferences
+                        .weather_settings(self.active_weather)
+                        .icons
+                        .index(),
+                );
+                self.scroll = 0.;
+                self.panel_started = (!self.preferences.reduced_motion).then(Instant::now);
+            }
+            Target::Attributions => {
+                self.subpage = Some(Subpage::Attributions);
+                self.focus = Target::AttributionText;
+                self.scroll = 0.;
+                self.panel_started = (!self.preferences.reduced_motion).then(Instant::now);
+            }
+            Target::AttributionText => {}
             Target::WeatherQuery => self.open_keyboard(TextField::Location),
             Target::DateToggle => {
                 self.preferences.show_date = !self.preferences.show_date;
@@ -3198,6 +3294,29 @@ impl State {
                     && let Some(version) = &self.available_update
                 {
                     let version = version.clone();
+                    if crate::update::requires_home_chooser_confirmation(
+                        env!("CARGO_PKG_VERSION"),
+                        &version,
+                    ) {
+                        self.overlay = Some(Overlay::UpdateConfirmation { version });
+                        self.focus = Target::CloseDialog;
+                        self.pressed = None;
+                        self.panel_started = None;
+                        return vec![];
+                    }
+                    self.update = crate::update::InstallStatus::Downloading(0);
+                    return vec![Effect::UpdateDownload(version)];
+                }
+            }
+            Target::ConfirmUpdate => {
+                if !self.update_busy()
+                    && let Some(Overlay::UpdateConfirmation { version }) = &self.overlay
+                    && self.available_update.as_ref() == Some(version)
+                {
+                    let version = version.clone();
+                    self.overlay = None;
+                    self.focus = Target::InstallUpdate;
+                    self.pressed = None;
                     self.update = crate::update::InstallStatus::Downloading(0);
                     return vec![Effect::UpdateDownload(version)];
                 }
@@ -3466,10 +3585,18 @@ impl State {
                         return if changed { vec![Effect::Save] } else { vec![] };
                     }
                     Some(Subpage::WeatherStyle) => {
+                        self.preferences.set_weather_widget_style(
+                            self.active_weather,
+                            crate::model::WeatherStyle::ALL
+                                [index.min(crate::model::WeatherStyle::ALL.len() - 1)],
+                        );
+                    }
+                    Some(Subpage::WeatherIcons) => {
+                        let Some(style) = crate::model::WeatherIconStyle::ALL.get(index) else {
+                            return vec![];
+                        };
                         self.preferences
-                            .edit_weather(self.active_weather, |config| {
-                                config.style = crate::model::WeatherStyle::ALL[index.min(2)]
-                            });
+                            .edit_weather(self.active_weather, |config| config.icons = *style);
                     }
                     Some(Subpage::AppDrawerStyle) => {
                         self.preferences.app_drawer_style =
@@ -3534,7 +3661,8 @@ impl State {
                         | Subpage::Clock
                         | Subpage::AppDrawer
                         | Subpage::Weather
-                        | Subpage::Shortcuts,
+                        | Subpage::Shortcuts
+                        | Subpage::Attributions,
                     ) => {
                         return vec![];
                     }
@@ -3705,6 +3833,12 @@ impl State {
         }
         if let Some(overlay) = self.overlay.take() {
             self.panel_started = None;
+            if matches!(overlay, Overlay::UpdateConfirmation { .. }) {
+                self.focus = Target::InstallUpdate;
+                self.pressed = None;
+                self.reconcile_focus();
+                return vec![];
+            }
             if let Overlay::WidgetCatalog { restore, .. } = overlay {
                 self.focus = restore;
                 self.pressed = None;
