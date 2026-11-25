@@ -771,6 +771,26 @@ fn failed_atomic_write_cleans_its_private_temporary_file() {
     }));
 }
 #[test]
+fn staged_home_uses_legacy_lifecycle_without_changing_the_installed_manifest() {
+    let f = Fixture::new();
+    f.put("/etc/starfish-release", b"Rockhopper release 11.2.0-3711");
+    let manifest = json!({
+        "id": APP, "type": "native", "main": "luma",
+        "nativeLifeCycleInterfaceVersion": 2, "handlesRelaunch": true,
+        "noSplashOnLaunch": true
+    });
+    let installed = format!("{DIR}/appinfo.json");
+    f.put_json(&installed, manifest.clone());
+    home::dispatch(&f, "enable", Some(DIR), Some(home::HOME)).unwrap();
+    let staged = system::json(&f, "/var/lib/luma-home/app/appinfo.json").unwrap();
+    assert_eq!(staged["id"], home::HOME);
+    assert!(staged.get("nativeLifeCycleInterfaceVersion").is_none());
+    assert_eq!(staged["handlesRelaunch"], false);
+    assert_eq!(staged["noSplashOnLaunch"], true);
+    assert_eq!(system::json(&f, installed).unwrap(), manifest);
+}
+
+#[test]
 fn stage_uses_static_splash_without_per_wallpaper_images() {
     let f = Fixture::new();
     f.put_json(
